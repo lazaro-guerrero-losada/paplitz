@@ -1,0 +1,76 @@
+{
+  "name": "paplitz",
+  "private": true,
+  "version": "0.1.1",
+  "description": "Paplitz — Simulador y Práctica de Perspectiva",
+  "author": "Paplitz Team",
+  "main": "electron/main.cjs",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "cap:sync": "cap sync android",
+    "cap:open": "cap open android",
+    "build:android": "npm run build && cap sync android",
+    "electron:dev": "concurrently -k \"vite\" \"wait-on tcp:5173 && electron .\"",
+    "electron:build": "npm run build && electron-builder --win nsis",
+    "electron:build:portable": "npm run build && electron-builder --win portable",
+    "electron:build:all": "npm run build && electron-builder --win nsis portable"
+  },
+  "build": {
+    "appId": "com.paplitz.app",
+    "productName": "Paplitz",
+    "directories": {
+      "output": "dist_electron"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Paplitz"
+    }
+  },
+  "dependencies": {
+    "@bible-strong/avatar-core": "^0.1.0",
+    "@bible-strong/avatar-react": "^0.1.0",
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
+    "@types/qrcode": "^1.5.6",
+    "clsx": "^2.1.1",
+    "jspdf": "^3.0.4",
+    "jsqr": "^1.4.0",
+    "lucide-react": "^1.16.0",
+    "pdfjs-dist": "^6.3.289",
+    "qrcode": "^1.5.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwind-merge": "^3.0.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.0.0",
+    "@tailwindcss/vite": "^4.0.9",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^10.0.5",
+    "electron": "^44.3.0",
+    "electron-builder": "^26.15.3",
+    "jpeg-js": "^0.4.4",
+    "tailwindcss": "^4.0.9",
+    "typescript": "~5.7.3",
+    "vite": "^6.2.0",
+    "wait-on": "^9.1.0"
+  }
+}

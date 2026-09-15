@@ -1,0 +1,132 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-heading: 'Eczar', serif;
+    --font-sans: 'Inter', sans-serif;
+  }
+
+  html, body {
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: #ffffff;
+    color: #000000;
+    overscroll-behavior-y: none;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+
+  h1, h2, h3, h4, h5, h6, .font-display {
+    font-family: var(--font-heading);
+  }
+}
+
+/* Patrones y tramas clásicas de entintado técnico y cómic / manga */
+
+/* 1. Trama de puntos (Screentone fino) */
+.pattern-dots-fine {
+  background-image: radial-gradient(#000000 1px, transparent 1px);
+  background-size: 6px 6px;
+}
+
+/* 2. Trama de puntos densa (Screentone grueso) */
+.pattern-dots-dense {
+  background-image: radial-gradient(#000000 1.5px, transparent 1.5px);
+  background-size: 8px 8px;
+}
+
+/* 3. Cuadrícula de papel milimetrado/técnico */
+.pattern-grid-paper {
+  background-image: 
+    linear-gradient(to right, rgba(0, 0, 0, 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.08) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* 4. Rayado diagonal (Hatching / Tramado simple) */
+.pattern-hatch-diagonal {
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 4px,
+    rgba(0, 0, 0, 0.25) 4px,
+    rgba(0, 0, 0, 0.25) 5px
+  );
+}
+
+/* 5. Rayado cruzado (Cross-hatching técnico) */
+.pattern-crosshatch {
+  background: 
+    repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(0, 0, 0, 0.2) 4px, rgba(0, 0, 0, 0.2) 5px),
+    repeating-linear-gradient(-45deg, transparent, transparent 4px, rgba(0, 0, 0, 0.2) 4px, rgba(0, 0, 0, 0.2) 5px);
+}
+
+/* Estilo de botón e inputs con estética de corte de imprenta / carboncillo */
+.btn-ink {
+  background-color: #000000;
+  color: #ffffff;
+  border: 2px solid #000000;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 3px 3px 0px #000000;
+}
+
+.btn-ink:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0px #000000;
+}
+
+.btn-ink:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0px #000000;
+}
+
+.btn-ink-outline {
+  background-color: #ffffff;
+  color: #000000;
+  border: 2px solid #000000;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 3px 3px 0px #000000;
+}
+
+.btn-ink-outline:hover {
+  background-color: #f5f5f5;
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0px #000000;
+}
+
+.btn-ink-outline:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0px #000000;
+}
+
+/* Contenedores con borde y sombra sólida estilo fanzine / manual de diseño */
+.card-ink {
+  background: #ffffff;
+  border: 2px solid #000000;
+  box-shadow: 4px 4px 0px #000000;
+}
+
+/* Animación de temblor / castañeo para Cubito cuando tiembla de miedo */
+@keyframes cubito-shiver {
+  0% { transform: translate(0px, 0px); }
+  20% { transform: translate(-2.5px, 1.5px); }
+  40% { transform: translate(2px, -2px); }
+  60% { transform: translate(-2px, -1px); }
+  80% { transform: translate(1.5px, 2px); }
+  100% { transform: translate(0px, 0px); }
+}
+
+.cubito-tremor {
+  animation: cubito-shiver 0.08s infinite ease-in-out;
+}
