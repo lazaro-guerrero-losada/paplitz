@@ -1,88 +1,113 @@
 # Paplitz 📐
 
-> Aplicación de código abierto para el aprendizaje de dibujo técnico, perspectiva y memoria muscular espacial. Inspirada en **Duolingo**, **Daromeon** y la metodología de **"Sketching: The Basics"** (*Koos Eissen & Roselien Steur*).
+> An open-source interactive simulator and training tool for mastering technical sketching, 3D perspective, and spatial muscle memory. Inspired by **Duolingo**, **Daromeon**, and the instructional methodology of **"Sketching: The Basics"** (*Koos Eissen & Roselien Steur*).
 
 ![Paplitz Logo](public/paplitz-logo.svg)
 
----
-
-## 📚 Documentación Técnica para Desarrolladores y Agentes
-
-Si vas a realizar tareas de desarrollo avanzadas o portar la app a otras plataformas, consulta la carpeta **[`docs/`](./docs/README.md)**:
-
-* **[Índice Central de Documentación](./docs/README.md)**
-* **[Arquitectura y Código](./docs/ARCHITECTURE.md)**
-* **[Motor 3D y Perspectiva](./docs/GEOMETRY_AND_PERSPECTIVE.md)**
-* **[Validador de Trazos](./docs/STROKE_EVALUATION_AND_SCORING.md)**
-* **[Avatar Cubito](./docs/AVATAR_CUBITO.md)**
-* **[Minijuegos y Niveles](./docs/MINIGAMES_AND_PROGRESSION.md)**
-* **[Láminas PDF y Escáner QR](./docs/ANALOG_WORKSHEETS_AND_QR.md)**
-* **📱 [GUÍA PORT ANDROID (Capacitor / S-Pen / Permisos)](./docs/PORTING_GUIDE_ANDROID.md)**
-* **💻 [GUÍA EJECUTABLE WINDOWS .EXE (Tauri v2 / Electron)](./docs/PORTING_GUIDE_WINDOWS_EXE.md)**
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![React](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=white)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-6.2-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
+[![TailwindCSS](https://img.shields.io/badge/TailwindCSS-v4-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 
 ---
 
-## ✨ Características Principales
+## 🌟 Key Features
 
-* **Estética Ink en Blanco y Negro Puro:** Diseñada con inspiración en manuales de dibujo industrial, fanzines técnicos y tramas de cómic/manga (*screentones / halftones*).
-* **"El Camino" de Aprendizaje (Estilo Duolingo):** Progresión por unidades temáticas, calentamientos rápidos de trazo, retos contrarreloj, exámenes y guías teóricas integradas.
-* **Motor Matemático 3D Offline:** Sin dependencias de Inteligencia Artificial externa, sin costes de API y 100% privado. La perspectiva cónica se valida por geometría analítica en milisegundos.
-* **Soporte de Entrada Dual:**
-  * **Digital:** Lienzo interactivo optimizado para tableta gráfica / lápiz digital (Apple Pencil, Wacom, S-Pen) con sensibilidad a la presión (`PointerEvents`).
-  * **Analógico / Hojas A4:** Generador de plantillas PDF vectoriales imprimibles con 12 casillas codificadas y sistema para validar fotos o escaneos de los dibujos hechos con lápiz sobre papel.
-* **Gamificación Local:** Sistema de racha diaria (Streak 🔥) y puntos de experiencia (XP) sin necesidad de registrarse ni crear cuentas.
+* 🖤 **Pure Black & White Ink Aesthetic:** Designed with inspiration from industrial design manuals, technical fanzines, and screentone / halftone manga aesthetics.
+* 🗺️ **Learning Path ("The Path" - Duolingo-Style):** Progressive thematic units, stroke warm-ups, time-attack challenges, final mastery exams, and integrated theoretical guides.
+* 🧮 **Offline 3D Mathematical Engine:** Zero external AI dependencies, zero API costs, and 100% private. Conic and cylindrical perspective calculations are validated purely through analytical geometry in sub-milliseconds.
+* ✏️ **Dual Input Support:**
+  * **Digital Canvas:** Highly responsive drawing canvas optimized for drawing tablets & styluses (Wacom, Apple Pencil, S-Pen, Huion) with pressure sensitivity and tilt (`PointerEvents`).
+  * **Analog Worksheets (A4):** Printable vector PDF generator with 12 encoded challenge slots and an integrated camera scanner to validate real-world pencil drawings on paper.
+* 🧊 **Interactive 3D Avatar ("Sensei Cubito"):** Procedural mascot that reacts in real-time to your strokes, accuracy, mistakes, and combos.
+* 🕹️ **Arcade & Minigame Modes:** *Fever*, *Blitz*, *Survival*, and *Speed Sprint* modes for fast-paced muscle memory drills.
+* ⚡ **100% Client-Side & Local Gamification:** Daily streak tracking, XP progression, and level unlocks stored locally without requiring account registration.
 
 ---
 
-## 🚀 Cómo Ejecutar en Local
+## 📚 Technical Documentation for Developers
 
-Cualquier persona puede clonar y ejecutar el proyecto en su equipo en 2 minutos:
+For deep architectural insights, mathematical formulations, or platform porting guides, explore the [`docs/`](./docs/README.md) directory:
+
+* 📖 **[Documentation Index](./docs/README.md)**
+* 🏗️ **[Architecture & Component Tree](./docs/ARCHITECTURE.md)**
+* 📐 **[3D Geometry & Perspective Engine](./docs/GEOMETRY_AND_PERSPECTIVE.md)**
+* 🎯 **[Stroke Evaluation & Scoring Algorithms](./docs/STROKE_EVALUATION_AND_SCORING.md)**
+* 🧊 **[Sensei Cubito Avatar System](./docs/AVATAR_CUBITO.md)**
+* 🎮 **[Minigames & Progression Engine](./docs/MINIGAMES_AND_PROGRESSION.md)**
+* 📄 **[Analog Worksheets & QR Scanner](./docs/ANALOG_WORKSHEETS_AND_QR.md)**
+* 📱 **[Android Porting Guide (Capacitor / S-Pen)](./docs/PORTING_GUIDE_ANDROID.md)**
+* 💻 **[Windows Executable Guide (Electron / Tauri)](./docs/PORTING_GUIDE_WINDOWS_EXE.md)**
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+* [Node.js](https://nodejs.org/) (version 18 or higher)
+* `npm` (comes with Node.js)
+
+### Local Development
 
 ```bash
-# 1. Clonar el repositorio
-git clone https://github.com/tu-usuario/paplitz.git
+# 1. Clone the repository
+git clone https://github.com/lazaro-guerrero-losada/paplitz.git
 cd paplitz
 
-# 2. Instalar dependencias (requiere Node.js 18+)
+# 2. Install dependencies
 npm install
 
-# 3. Iniciar el servidor de desarrollo
+# 3. Start development server
 npm run dev
 ```
 
-Abre [http://localhost:5173](http://localhost:5173) en tu navegador.
+Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ---
 
-## 📦 Construir para Producción
+## 📦 Building for Production & Multiplatform
 
+### Web (Production Bundle)
 ```bash
 npm run build
 ```
+Generates optimized static assets in the `dist/` directory, ready to deploy instantly on **Vercel**, **Netlify**, or **GitHub Pages**.
 
-Genera los archivos estáticos en la carpeta `dist/`, listos para publicar en **GitHub Pages**, **Vercel**, **Netlify** o empaquetar con **Tauri / Electron** para escritorio.
+### Windows Executable (`.exe`)
+```bash
+npm run electron:build
+```
+Produces an installer (`.exe`) inside `dist_electron/`.
 
----
-
-## 🛠️ Tecnologías Utilizadas
-
-* **React 19** + **TypeScript**
-* **Vite**
-* **Tailwind CSS v4**
-* **jsPDF** (para exportación vectorial de plantillas A4)
-* **Lucide Icons**
-
----
-
-## 💡 Inspiración y Referencias
-
-Paplitz nació como un proyecto personal inspirado por grandes referentes del aprendizaje visual y la perspectiva:
-
-* **[Daromeon](https://daromeon.com/)**: Agradecimiento especial por la inspiración conceptual original en herramientas de práctica de perspectiva. Paplitz toma esa chispa inicial y la reimagina con un enfoque propio: motor geométrico offline en TypeScript, gamificación estilo Duolingo, soporte de láminas analógicas y arquitectura multiplataforma.
-* **"Sketching: The Basics"** (*Koos Eissen & Roselien Steur*): Referencia bibliográfica fundamental para los principios teóricos de dibujo industrial, puntos de fuga y construcción de elipses y cajas en perspectiva. *(Nota: El material bibliográfico y libros con copyright no están incluidos en este repositorio).*
+### Android (`.apk`)
+```bash
+npm run build:android
+npm run cap:open
+```
+Syncs the web build with Android Studio to compile the native `.apk`.
 
 ---
 
-## 📄 Licencia
+## 🛠️ Tech Stack
 
-Código abierto bajo licencia [MIT](LICENSE).
+* **Frontend:** React 19, TypeScript, Vite, Tailwind CSS v4
+* **Canvas & Input:** HTML5 Canvas, Pointer Events API (Pressure & Tilt)
+* **Geometry Engine:** Pure Analytical Geometry & Vector Math (0 dependencies)
+* **Document & Scanner:** jsPDF (Vector A4 sheets), jsQR & pdfjs-dist (Camera & PDF validation)
+* **Desktop & Mobile:** Electron & Capacitor
+
+---
+
+## 💡 Acknowledgments & References
+
+Paplitz was born as a passion project inspired by pioneer works in perspective learning and visual education:
+
+* **[Daromeon](https://daromeon.com/)**: Special acknowledgment for the early conceptual inspiration on perspective practice tools. Paplitz builds upon this idea with a unique architecture: a custom offline 3D geometric engine in TypeScript, Duolingo-style gamification, analog A4 worksheet printing with QR camera scanning, and full cross-platform support.
+* **"Sketching: The Basics"** (*Koos Eissen & Roselien Steur*): Primary pedagogical reference for theoretical foundations in industrial sketching, vanishing points, ellipse construction, and spatial projection. *(Note: Copyrighted book materials are not included in this repository).*
+
+---
+
+## 📄 License
+
+This project is licensed under the [MIT License](LICENSE).

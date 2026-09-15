@@ -1,53 +1,53 @@
-# 📐 Paplitz (Web Dibujitos) — Documentación Central del Proyecto
+# 📐 Paplitz — Central Technical Documentation
 
-Bienvenido a la carpeta de documentación de **Paplitz** (denominado en desarrollo como *Web dibujitos*).
+Welcome to the **Paplitz** developer documentation.
 
-Esta documentación ha sido preparada con el máximo nivel de detalle para que **cualquier agente o desarrollador que se incorpore en nuevos chats** disponga de toda la información técnica necesaria para:
-1. **Comprender la arquitectura, lógica matemática y componentes de la aplicación.**
-2. **Crear una versión móvil nativa para Android** (con soporte de Stylus / S-Pen).
-3. **Compilar un ejecutable nativo para Windows (`.exe`)** autónomo y ligero.
+This documentation provides complete architectural, mathematical, and algorithmic references for contributors, developers, and autonomous agents:
+1. **Understand core architecture, analytical 3D geometry engine, and UI components.**
+2. **Develop and compile the Android native application (with Stylus / S-Pen support).**
+3. **Build and package the Windows desktop standalone executable (`.exe`).**
 
 ---
 
-## 🗺️ Índice de Documentos
+## 🗺️ Documentation Directory
 
-| Documento | Audiencia / Propósito |
+| Document | Purpose & Scope |
 | :--- | :--- |
-| **[ARCHITECTURE.md](./ARCHITECTURE.md)** | **General**: Estructura de carpetas, árbol de componentes, ciclo de vida y gestión de estado. |
-| **[GEOMETRY_AND_PERSPECTIVE.md](./GEOMETRY_AND_PERSPECTIVE.md)** | **Matemáticas / 3D**: Proyección cónica, ejes X, Y, Z, puntos de fuga, cubos y sombras horizontales. |
-| **[STROKE_EVALUATION_AND_SCORING.md](./STROKE_EVALUATION_AND_SCORING.md)** | **Algoritmia**: Normalización de trazos, detección de esquinas (*corner splitting*) y puntuación. |
-| **[AVATAR_CUBITO.md](./AVATAR_CUBITO.md)** | **Avatar / UX**: Motor Bible Strong, animaciones, arrastre táctil/ratón y colisiones. |
-| **[MINIGAMES_AND_PROGRESSION.md](./MINIGAMES_AND_PROGRESSION.md)** | **Gameplay**: Modos arcade (*Fiebre*, *Blitz*, *Supervivencia*, *Sprint*), currículo y niveles XP. |
-| **[ANALOG_WORKSHEETS_AND_QR.md](./ANALOG_WORKSHEETS_AND_QR.md)** | **Dibujo en papel**: Generador de PDFs A4, codificación QR y escáner por cámara/webcam. |
-| **[PORTING_GUIDE_ANDROID.md](./PORTING_GUIDE_ANDROID.md)** | **AGENTE ANDROID**: Guía paso a paso para empaquetar con Capacitor, soporte S-Pen y permisos. |
-| **[PORTING_GUIDE_WINDOWS_EXE.md](./PORTING_GUIDE_WINDOWS_EXE.md)** | **AGENTE WINDOWS .EXE**: Guía paso a paso para generar el `.exe` con Tauri v2 o Electron. |
+| **[ARCHITECTURE.md](./ARCHITECTURE.md)** | **General**: Folder structure, component tree, state management, and lifecycle. |
+| **[GEOMETRY_AND_PERSPECTIVE.md](./GEOMETRY_AND_PERSPECTIVE.md)** | **3D Math**: Conic perspective projection, vanishing points, 3D coordinate spaces, and horizon shadows. |
+| **[STROKE_EVALUATION_AND_SCORING.md](./STROKE_EVALUATION_AND_SCORING.md)** | **Algorithms**: Stroke normalization, polyline corner splitting, and geometric tolerance scoring. |
+| **[AVATAR_CUBITO.md](./AVATAR_CUBITO.md)** | **Avatar / UX**: Sensei Cubito 3D procedural avatar, procedural animations, physics, and expressions. |
+| **[MINIGAMES_AND_PROGRESSION.md](./MINIGAMES_AND_PROGRESSION.md)** | **Gameplay**: Arcade modes (*Fever*, *Blitz*, *Survival*, *Sprint*), curriculum system, and XP progression. |
+| **[ANALOG_WORKSHEETS_AND_QR.md](./ANALOG_WORKSHEETS_AND_QR.md)** | **Paper Drawing**: Vector A4 PDF generation, QR grid indexing, and camera/scanner validation engine. |
+| **[PORTING_GUIDE_ANDROID.md](./PORTING_GUIDE_ANDROID.md)** | **Android Guide**: Step-by-step setup with Capacitor, S-Pen low-latency stylus support, and camera permissions. |
+| **[PORTING_GUIDE_WINDOWS_EXE.md](./PORTING_GUIDE_WINDOWS_EXE.md)** | **Windows Guide**: Step-by-step packaging for standalone desktop executables (`.exe`) via Electron & Tauri. |
 
 ---
 
-## ⚡ Comandos Rápidos del Proyecto
+## ⚡ Quickstart Commands
 
 ```bash
-# 1. Instalar dependencias del proyecto
+# 1. Install dependencies
 npm install
 
-# 2. Iniciar servidor de desarrollo con Hot Reload (por defecto en http://localhost:5173/)
+# 2. Start local development server with Hot Module Replacement (http://localhost:5173/)
 npm run dev
 
-# 3. Compilar TypeScript y empaquetar con Vite para producción (genera carpeta /dist)
+# 3. Typecheck and build production bundle (outputs to /dist)
 npm run build
 
-# 4. Previsualizar el bundle de producción localmente
+# 4. Preview production build locally
 npm run preview
 ```
 
 ---
 
-## 💡 ¿Qué es Paplitz?
+## 💡 What is Paplitz?
 
-Paplitz es un simulador interactivo de **bocetado industrial y perspectiva espacial**, inspirado en la metodología docente de **Koos Eissen** (*Sketching: The Basics*). 
+Paplitz is an interactive **industrial sketching and spatial perspective simulator**, inspired by the pedagogical methods of **Koos Eissen** (*Sketching: The Basics*).
 
-A diferencia de un software de pintura genérico, Paplitz es una **herramienta de entrenamiento cognitivo**:
-- Genera desafíos geométricos (cubos incompletos en 2 y 3 puntos de fuga).
-- El usuario debe completar a mano alzada las aristas o sombras que faltan.
-- El sistema evalúa con rigor geométrico la alineación a los puntos de fuga, longitud y cierre del volumen.
-- El avatar 3D procedural ("Cubito") reacciona en vivo con expresiones animadas y acompaña al alumno.
+Unlike generic drawing apps, Paplitz is a **cognitive spatial training platform**:
+- Generates procedural geometric challenges (incomplete cubes in 2 and 3-point vanishing perspective).
+- The user completes missing edges, planes, or projected cast shadows freehand.
+- The system evaluates vanishing point convergence, stroke straightness, and volume closure with analytical geometric precision in milliseconds.
+- A procedural 3D companion mascot ("Sensei Cubito") reacts dynamically to strokes, combos, and accuracy.
