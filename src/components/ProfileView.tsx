@@ -1,10 +1,23 @@
 import React, { useState } from 'react';
-import { Flame, Trophy, RotateCcw, Award, CheckCircle, BarChart2, BookOpen, Unlock, Lock, Sparkles, ShoppingBag, ExternalLink } from 'lucide-react';
+import { Flame, Trophy, RotateCcw, Award, CheckCircle, BarChart2, BookOpen, Unlock, Lock, Sparkles, ShoppingBag, ExternalLink, Save, HardDrive, Download, Upload, Copy, FileText, Cloud, CloudUpload, CloudDownload, AlertTriangle } from 'lucide-react';
 import { calculatePlayerLevel } from '../lib/levelSystem';
 import { DEFAULT_COSMETICS } from '../lib/avatarTypes';
 import { Avatar } from '@bible-strong/avatar-react';
 import type { AvatarDefinition } from '@bible-strong/avatar-core';
 import cubeeDefinitionRaw from '../lib/cubee.avatar.json';
+import { Unit } from '../lib/curriculumData';
+import {
+  PaplitzSaveData,
+  buildCurrentSaveData,
+  downloadSaveFile,
+  copySaveToClipboard,
+  parseSaveFromString,
+} from '../lib/saveSystem';
+import {
+  getSupabaseConfig,
+  saveProgressToCloud,
+  loadProgressFromCloud,
+} from '../lib/cloudSync';
 
 function GithubIcon({ className = 'w-4 h-4' }: { className?: string }) {
   return (
@@ -18,6 +31,8 @@ function GithubIcon({ className = 'w-4 h-4' }: { className?: string }) {
 const cubeeDefinition = cubeeDefinitionRaw as unknown as AvatarDefinition;
 
 interface ProfileViewProps {
+  units: Unit[];
+  scoresHistory: number[];
   streak: number;
   xp: number;
   completedNodesCount: number;
@@ -28,9 +43,12 @@ interface ProfileViewProps {
   onLockAllNodes?: () => void;
   onResetProgress: () => void;
   onOpenGuide?: () => void;
+  onRestoreSave: (data: PaplitzSaveData) => void;
 }
 
 export const ProfileView: React.FC<ProfileViewProps> = ({
+  units,
+  scoresHistory,
   streak,
   xp,
   completedNodesCount,
@@ -41,9 +59,116 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   onLockAllNodes,
   onResetProgress,
   onOpenGuide,
+  onRestoreSave,
 }) => {
   const levelInfo = calculatePlayerLevel(xp);
   const [testAnimation, setTestAnimation] = useState<string>('celebrate');
+
+  // Estados para Copia de Seguridad y Sincronización
+  const [copied, setCopied] = useState(false);
+  const [showPasteModal, setShowPasteModal] = useState(false);
+  const [pastedText, setPastedText] = useState('');
+  const [saveStatusMessage, setSaveStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Estados para Supabase Cloud
+  const cloudConfig = getSupabaseConfig();
+  const [cloudAlias, setCloudAlias] = useState<string>(() => localStorage.getItem('paplitz_cloud_alias') || '');
+  const [cloudPin, setCloudPin] = useState<string>('');
+  const [cloudLoading, setCloudLoading] = useState<boolean>(false);
+  const [cloudMessage, setCloudMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // 1. Descargar archivo de guardado local
+  const handleDownloadSave = () => {
+    const saveData = buildCurrentSaveData(units, streak, xp, scoresHistory);
+    downloadSaveFile(saveData);
+    setSaveStatusMessage({ type: 'success', text: '¡Archivo descargado correctamente!' });
+    setTimeout(() => setSaveStatusMessage(null), 4000);
+  };
+
+  // 2. Copiar código de guardado al portapapeles
+  const handleCopySave = async () => {
+    const saveData = buildCurrentSaveData(units, streak, xp, scoresHistory);
+    const ok = await copySaveToClipboard(saveData);
+    if (ok) {
+      setCopied(true);
+      setSaveStatusMessage({ type: 'success', text: '¡Código de guardado copiado al portapapeles!' });
+      setTimeout(() => setCopied(false), 3000);
+      setTimeout(() => setSaveStatusMessage(null), 4000);
+    } else {
+      setSaveStatusMessage({ type: 'error', text: 'No se pudo acceder al portapapeles.' });
+    }
+  };
+
+  // 3. Subir archivo local .json
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      const parseResult = parseSaveFromString(content);
+      if (parseResult.valid && parseResult.data) {
+        onRestoreSave(parseResult.data);
+        setSaveStatusMessage({ type: 'success', text: '¡Partida restaurada con éxito desde el archivo!' });
+      } else {
+        setSaveStatusMessage({ type: 'error', text: parseResult.error || 'Archivo de guardado corrupto o no compatible.' });
+      }
+      setTimeout(() => setSaveStatusMessage(null), 5000);
+    };
+    reader.readAsText(file);
+    // Limpiar el input para permitir volver a seleccionar el mismo archivo
+    e.target.value = '';
+  };
+
+  // 4. Aplicar código pegado
+  const handleApplyPastedCode = () => {
+    if (!pastedText.trim()) return;
+    const parseResult = parseSaveFromString(pastedText);
+    if (parseResult.valid && parseResult.data) {
+      onRestoreSave(parseResult.data);
+      setShowPasteModal(false);
+      setPastedText('');
+      setSaveStatusMessage({ type: 'success', text: '¡Partida restaurada con éxito desde el código!' });
+    } else {
+      setSaveStatusMessage({ type: 'error', text: parseResult.error || 'El texto no es un código válido de Paplitz.' });
+    }
+    setTimeout(() => setSaveStatusMessage(null), 5000);
+  };
+
+  // 5. Guardar en la nube (Supabase)
+  const handleSaveToCloud = async () => {
+    if (!cloudAlias.trim() || !cloudPin.trim()) return;
+    setCloudLoading(true);
+    setCloudMessage(null);
+
+    const saveData = buildCurrentSaveData(units, streak, xp, scoresHistory);
+    const result = await saveProgressToCloud(cloudAlias, cloudPin, saveData);
+    setCloudLoading(false);
+
+    if (result.success) {
+      setCloudMessage({ type: 'success', text: `¡Progreso guardado en la nube para "${cloudAlias.toLowerCase()}"!` });
+    } else {
+      setCloudMessage({ type: 'error', text: result.error || 'Error al guardar en la nube.' });
+    }
+  };
+
+  // 6. Cargar de la nube (Supabase)
+  const handleLoadFromCloud = async () => {
+    if (!cloudAlias.trim() || !cloudPin.trim()) return;
+    setCloudLoading(true);
+    setCloudMessage(null);
+
+    const result = await loadProgressFromCloud(cloudAlias, cloudPin);
+    setCloudLoading(false);
+
+    if (result.success && result.data) {
+      onRestoreSave(result.data);
+      setCloudMessage({ type: 'success', text: `¡Partida de "${cloudAlias.toLowerCase()}" descargada y restaurada con éxito!` });
+    } else {
+      setCloudMessage({ type: 'error', text: result.error || 'No se pudo cargar la partida.' });
+    }
+  };
 
   return (
     <div className="max-w-2xl w-full mx-auto py-8 px-4">
@@ -297,6 +422,191 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
       </div>
 
+      {/* SECCIÓN: GESTIÓN DE PROGRESO & COPIAS DE SEGURIDAD (LOCAL Y NUBE) */}
+      <div className="border-2 border-black p-5 mb-8 bg-white shadow-[3px_3px_0px_#000000]">
+        <div className="flex items-center justify-between border-b-2 border-black pb-3 mb-4">
+          <div className="flex items-center gap-2">
+            <Save className="w-5 h-5 stroke-[2.5]" />
+            <h3 className="text-lg font-bold font-display">Guardado de Progreso & Sincronización</h3>
+          </div>
+          <span className="text-[10px] font-mono uppercase bg-black text-white px-2 py-0.5 font-bold">
+            PORTABILIDAD
+          </span>
+        </div>
+
+        <p className="text-xs text-neutral-600 font-sans mb-5 leading-relaxed">
+          Tu progreso se guarda automáticamente en este navegador. Para jugar en otro dispositivo (PC, tablet o móvil), o conservar tu partida si limpias el navegador, puedes usar una copia local en archivo o sincronizar con tu Alias en la nube.
+        </p>
+
+        {/* Notificaciones globales de guardado */}
+        {saveStatusMessage && (
+          <div
+            className={`p-3 border-2 mb-4 text-xs font-mono font-bold flex items-center gap-2 ${
+              saveStatusMessage.type === 'success'
+                ? 'bg-neutral-100 border-black text-black'
+                : 'bg-red-50 border-red-500 text-red-700'
+            }`}
+          >
+            {saveStatusMessage.type === 'success' ? (
+              <CheckCircle className="w-4 h-4 shrink-0" />
+            ) : (
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+            )}
+            <span>{saveStatusMessage.text}</span>
+          </div>
+        )}
+
+        {/* 1. COPIA LOCAL (ARCHIVOS / PORTAPAPELES) */}
+        <div className="border border-black p-4 bg-neutral-50 mb-5">
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center gap-1.5 font-mono font-bold text-xs">
+              <HardDrive className="w-4 h-4" />
+              <span>Copia Local (100% Privado y Offline)</span>
+            </div>
+            <span className="text-[9px] font-mono text-neutral-500 uppercase bg-neutral-200 px-1 py-0.5">
+              Sin servidor
+            </span>
+          </div>
+
+          <p className="text-[11px] text-neutral-600 font-sans mb-3">
+            Descarga tu partida en un archivo <code>.json</code> o copia el código para restaurarla en el .exe de Windows, en la app de Android o en otro navegador.
+          </p>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={handleDownloadSave}
+              className="btn-ink px-3 py-1.5 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] hover:scale-[1.01] transition-transform"
+              title="Descargar archivo paplitz_progreso.json"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Descargar .json</span>
+            </button>
+
+            <button
+              onClick={handleCopySave}
+              className="btn-ink-outline px-3 py-1.5 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer hover:bg-neutral-200"
+              title="Copiar código de guardado al portapapeles"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              <span>{copied ? '¡Copiado!' : 'Copiar Código'}</span>
+            </button>
+
+            <label className="btn-ink-outline px-3 py-1.5 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer hover:bg-neutral-200">
+              <Upload className="w-3.5 h-3.5" />
+              <span>Cargar Archivo .json</span>
+              <input
+                type="file"
+                accept=".json"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+            </label>
+
+            <button
+              onClick={() => setShowPasteModal(true)}
+              className="btn-ink-outline px-3 py-1.5 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer hover:bg-neutral-200"
+              title="Pegar código de guardado en texto"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>Pegar Código</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 2. SINCRONIZACIÓN EN LA NUBE (SUPABASE) */}
+        <div className="border border-black p-4 bg-neutral-50">
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center gap-1.5 font-mono font-bold text-xs">
+              <Cloud className="w-4 h-4" />
+              <span>Sincronización en la Nube (Alias + PIN)</span>
+            </div>
+            {cloudConfig.isConfigured ? (
+              <span className="text-[9px] font-mono text-white bg-black px-1.5 py-0.5 font-bold uppercase flex items-center gap-1">
+                <CheckCircle className="w-2.5 h-2.5" /> Nube Conectada
+              </span>
+            ) : (
+              <span className="text-[9px] font-mono text-neutral-600 bg-neutral-200 px-1.5 py-0.5 uppercase" title="Configura VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY para habilitar">
+                Modo Offline
+              </span>
+            )}
+          </div>
+
+          <p className="text-[11px] text-neutral-600 font-sans mb-3">
+            Sin correos ni contraseñas. Solo introduce tu <strong>Alias</strong> y un <strong>PIN de 4 dígitos</strong> (ej. 1234) para subir tu partida o recuperarla en otro dispositivo.
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-2.5 items-start sm:items-end mb-3">
+            <div className="w-full sm:w-48">
+              <label className="block text-[10px] font-mono uppercase font-bold text-neutral-600 mb-1">
+                Alias de Jugador
+              </label>
+              <input
+                type="text"
+                value={cloudAlias}
+                onChange={(e) => setCloudAlias(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
+                placeholder="ej: lazaro_pro"
+                maxLength={24}
+                className="w-full border-2 border-black px-2.5 py-1 text-xs font-mono font-bold bg-white focus:outline-none"
+              />
+            </div>
+
+            <div className="w-full sm:w-28">
+              <label className="block text-[10px] font-mono uppercase font-bold text-neutral-600 mb-1">
+                PIN (4 cifras)
+              </label>
+              <input
+                type="password"
+                inputMode="numeric"
+                maxLength={6}
+                value={cloudPin}
+                onChange={(e) => setCloudPin(e.target.value.replace(/[^0-9]/g, ''))}
+                placeholder="••••"
+                className="w-full border-2 border-black px-2.5 py-1 text-xs font-mono font-bold bg-white focus:outline-none tracking-widest text-center"
+              />
+            </div>
+
+            <div className="flex gap-2 w-full sm:w-auto">
+              <button
+                disabled={cloudLoading || !cloudAlias.trim() || !cloudPin.trim()}
+                onClick={handleSaveToCloud}
+                className="btn-ink px-3 py-1.5 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Subir partida actual a la nube"
+              >
+                <CloudUpload className="w-3.5 h-3.5" />
+                <span>{cloudLoading ? 'Guardando...' : 'Subir a Nube'}</span>
+              </button>
+
+              <button
+                disabled={cloudLoading || !cloudAlias.trim() || !cloudPin.trim()}
+                onClick={handleLoadFromCloud}
+                className="btn-ink-outline px-3 py-1.5 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer hover:bg-neutral-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Descargar partida desde la nube"
+              >
+                <CloudDownload className="w-3.5 h-3.5" />
+                <span>{cloudLoading ? 'Cargando...' : 'Cargar de Nube'}</span>
+              </button>
+            </div>
+          </div>
+
+          {cloudMessage && (
+            <div
+              className={`p-2.5 border text-xs font-mono flex items-center gap-2 ${
+                cloudMessage.type === 'success'
+                  ? 'bg-neutral-100 border-black text-black font-bold'
+                  : 'bg-red-50 border-red-500 text-red-700'
+              }`}
+            >
+              {cloudMessage.type === 'success' ? (
+                <CheckCircle className="w-4 h-4 shrink-0" />
+              ) : (
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+              )}
+              <span>{cloudMessage.text}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* TARJETA CÓDIGO ABIERTO / GITHUB */}
       <div className="border-2 border-black p-5 mb-8 bg-neutral-50 shadow-[3px_3px_0px_#000000]">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -351,6 +661,41 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           Reiniciar Progreso
         </button>
       </div>
+
+      {/* Modal para Pegar Código de Guardado */}
+      {showPasteModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-white border-2 border-black p-6 max-w-lg w-full shadow-[6px_6px_0px_#000000]">
+            <h3 className="font-display font-bold text-lg mb-2">Pegar Código de Guardado</h3>
+            <p className="text-xs text-neutral-600 mb-3 font-sans">
+              Pega a continuación el código JSON de tu partida copiado previamente para restaurar tu progreso:
+            </p>
+            <textarea
+              value={pastedText}
+              onChange={(e) => setPastedText(e.target.value)}
+              placeholder='{"appName": "Paplitz", "version": 1, ...}'
+              className="w-full h-36 border-2 border-black p-2 font-mono text-[11px] bg-neutral-50 mb-4 focus:outline-none"
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setShowPasteModal(false);
+                  setPastedText('');
+                }}
+                className="btn-ink-outline px-3 py-1.5 text-xs font-mono font-bold cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleApplyPastedCode}
+                className="btn-ink px-4 py-1.5 text-xs font-mono font-bold cursor-pointer shadow-[2px_2px_0px_#000000]"
+              >
+                Restaurar Partida
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

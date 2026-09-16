@@ -13,6 +13,7 @@ import { calculatePlayerLevel } from './lib/levelSystem';
 import { SenseiCubo } from './components/avatar/SenseiCubo';
 import { AvatarMood } from './lib/avatarTypes';
 import { Flame, Printer, Compass, Map, User, RefreshCw, Filter, PenTool, Gamepad2, BookOpen } from 'lucide-react';
+import { PaplitzSaveData, applySaveDataToLocalStorage } from './lib/saveSystem';
 
 function GithubIcon({ className = 'w-3.5 h-3.5' }: { className?: string }) {
   return (
@@ -231,6 +232,25 @@ export function App() {
     const firstNode = MODULE_PARALLELEPIPEDS.units[0].nodes[0];
     setActiveNode(firstNode);
     handleNewPracticeCube(firstNode);
+  };
+
+  // Restaurar progreso desde copia de seguridad o desde la nube
+  const handleRestoreSave = (saveData: PaplitzSaveData) => {
+    applySaveDataToLocalStorage(saveData);
+    setUnits(saveData.units);
+    setStreak(saveData.streak);
+    setXp(saveData.xp);
+    setScoresHistory(saveData.scoresHistory);
+
+    const unlocked = saveData.units.flatMap((u) => u.nodes).filter((n) => n.status !== 'locked');
+    const currentOrLast =
+      unlocked.find((n) => n.status === 'current') ||
+      unlocked[unlocked.length - 1] ||
+      saveData.units[0]?.nodes[0] ||
+      MODULE_PARALLELEPIPEDS.units[0].nodes[0];
+
+    setActiveNode(currentOrLast);
+    handleNewPracticeCube(currentOrLast);
   };
 
   // Comprobar si todos los nodos están desbloqueados
@@ -564,6 +584,8 @@ export function App() {
         {/* PESTAÑA 3: PERFIL */}
         {activeTab === 'profile' && (
           <ProfileView
+            units={units}
+            scoresHistory={scoresHistory}
             streak={streak}
             xp={xp}
             completedNodesCount={completedNodesCount}
@@ -574,6 +596,7 @@ export function App() {
             onLockAllNodes={handleLockAllExceptFirst}
             onResetProgress={handleResetProgress}
             onOpenGuide={() => setShowLevelGuide(true)}
+            onRestoreSave={handleRestoreSave}
           />
         )}
       </main>
