@@ -951,35 +951,43 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
       </div>
 
       {/* BARRA DE HERRAMIENTAS Y ACCIONES INMEDIATA (TODO AL ALCANCE EN 1 SOLA LÍNEA) */}
-      <div className="w-full mt-2 flex items-center justify-between gap-1.5 sm:gap-2 border-2 border-black bg-white p-2 shadow-[3px_3px_0px_#000000] flex-nowrap min-w-0">
-        {/* Herramientas de trazo a la izquierda */}
-        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-          <button
-            onClick={undoLastStroke}
-            disabled={strokes.length === 0 || showSolution}
-            className="btn-ink-outline px-2 py-1.5 text-xs font-mono disabled:opacity-30 cursor-pointer flex items-center gap-1 shrink-0 shadow-[1px_1px_0px_#000000]"
-            title="Deshacer último trazo (Ctrl+Z)"
-          >
-            <Undo2 className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Deshacer</span>
-          </button>
-          <button
-            onClick={clearStrokes}
-            disabled={strokes.length === 0 || showSolution}
-            className="btn-ink-outline px-2 py-1.5 text-xs font-mono disabled:opacity-30 cursor-pointer flex items-center gap-1 shrink-0 shadow-[1px_1px_0px_#000000]"
-            title="Borrar todos los trazos"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Borrar</span>
-          </button>
-          <span className="text-[11px] font-mono text-neutral-600 pl-0.5 font-bold shrink-0">
-            {countDetectedAristas(strokes)}/{challenge.targetEdges.length}
-            <span className="hidden md:inline font-normal"> {challenge.isShadowLevel ? 'sombras' : 'aristas'}</span>
-          </span>
-        </div>
+      <div className="w-full mt-2 flex items-center justify-between gap-2 border-2 border-black bg-white p-2 shadow-[3px_3px_0px_#000000] flex-nowrap min-w-0">
+        {/* Lado Izquierdo: Herramientas de dibujo (o resumen si está comprobado) */}
+        {!feedback ? (
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              onClick={undoLastStroke}
+              disabled={strokes.length === 0 || showSolution}
+              className="btn-ink-outline px-2.5 py-1.5 text-xs font-mono disabled:opacity-30 cursor-pointer flex items-center gap-1 shrink-0 shadow-[1px_1px_0px_#000000]"
+              title="Deshacer último trazo (Ctrl+Z)"
+            >
+              <Undo2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Deshacer</span>
+            </button>
+            <button
+              onClick={clearStrokes}
+              disabled={strokes.length === 0 || showSolution}
+              className="btn-ink-outline px-2.5 py-1.5 text-xs font-mono disabled:opacity-30 cursor-pointer flex items-center gap-1 shrink-0 shadow-[1px_1px_0px_#000000]"
+              title="Borrar todos los trazos"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Borrar</span>
+            </button>
+            <span className="text-[11px] font-mono text-neutral-600 pl-1 font-bold shrink-0">
+              {countDetectedAristas(strokes)}/{challenge.targetEdges.length}
+              <span className="hidden md:inline font-normal"> {challenge.isShadowLevel ? 'sombras' : 'aristas'}</span>
+            </span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-[11px] font-mono font-bold text-neutral-700 bg-neutral-100 px-2 py-1 border border-black shadow-[1px_1px_0px_#000000]">
+              {countDetectedAristas(strokes)}/{challenge.targetEdges.length} {challenge.isShadowLevel ? 'aristas sombra' : 'aristas'}
+            </span>
+          </div>
+        )}
 
-        {/* Botón de Acción Principal (Comprobar o Siguiente) + Botón de Reporte a la derecha */}
-        <div className="flex items-center gap-1.5 shrink-0">
+        {/* Lado Derecho: Acciones (Comprobar o Siguiente) + Botón Report */}
+        <div className="flex items-center gap-2 shrink-0">
           {/* Botón de Reporte (pequeño con icono de triángulo para exportar / depurar) */}
           <button
             onClick={handleGenerateReport}
@@ -991,8 +999,8 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
           </button>
 
           {feedback ? (
-            <div className="flex items-center gap-1.5 shrink-0">
-              <div className="flex items-center gap-1 border-2 border-black bg-neutral-100 px-2 py-1 font-mono text-xs font-bold shadow-[1px_1px_0px_#000000] shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-1.5 border-2 border-black bg-neutral-100 px-2.5 py-1 font-mono text-xs font-bold shadow-[1px_1px_0px_#000000] shrink-0">
                 {feedback.passed ? (
                   <CheckCircle className="w-3.5 h-3.5 text-black stroke-[2.5]" />
                 ) : (
@@ -1011,7 +1019,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
               </div>
               <button
                 onClick={onNextCube}
-                className="btn-ink px-3 sm:px-4 py-1.5 text-xs font-mono uppercase font-bold flex items-center gap-1 cursor-pointer shadow-[2px_2px_0px_#000000] shrink-0"
+                className="btn-ink px-4 sm:px-5 py-1.5 text-xs font-mono uppercase font-bold flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] shrink-0"
                 title="Siguiente ejercicio (Enter)"
               >
                 <span>Siguiente</span>
@@ -1022,7 +1030,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
             <button
               onClick={handleValidateClick}
               disabled={strokes.length === 0}
-              className="btn-ink px-4 sm:px-6 py-1.5 text-xs font-mono uppercase font-bold disabled:opacity-30 cursor-pointer shadow-[3px_3px_0px_#000000] flex items-center gap-1.5 shrink-0"
+              className="btn-ink px-5 sm:px-7 py-1.5 text-xs font-mono uppercase font-bold disabled:opacity-30 cursor-pointer shadow-[3px_3px_0px_#000000] flex items-center gap-1.5 shrink-0"
               title={challenge.isShadowLevel ? "Comprobar proyección de sombra (Enter)" : "Comprobar perspectiva (Enter)"}
             >
               <span>Comprobar</span>
