@@ -90,13 +90,13 @@ export function validateSaveData(data: unknown): { valid: boolean; error?: strin
 /**
  * Descarga el archivo paplitz_progreso_YYYY-MM-DD.json en el dispositivo
  */
-export function downloadSaveFile(saveData: PaplitzSaveData): void {
+export function downloadSaveFile(saveData: PaplitzSaveData, customFilename?: string): void {
   const jsonString = JSON.stringify(saveData, null, 2);
   const blob = new Blob([jsonString], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   
   const dateStr = new Date().toISOString().split('T')[0];
-  const filename = `paplitz_progreso_${dateStr}.json`;
+  const filename = customFilename || `paplitz_progreso_${dateStr}.json`;
 
   const link = document.createElement('a');
   link.href = url;
@@ -145,3 +145,64 @@ export function applySaveDataToLocalStorage(data: PaplitzSaveData): void {
     localStorage.setItem('paplitz_minigame_records', JSON.stringify(data.minigames));
   }
 }
+
+/**
+ * Convalida y desbloquea el currículum hasta un nodo objetivo (Fast-Forward / Salto de Nivel).
+ * Marca como 'completed' todas las lecciones previas al nodo objetivo (con la nota indicada),
+ * coloca el nodo objetivo como 'current' (o 'completed' si ya lo estaba), y calcula los XP acumulados.
+ */
+export function fastForwardCurriculum(
+  currentUnits: Unit[],
+  targetNodeId: string,
+  defaultScore: number = 80
+): {
+  updatedUnits: Unit[];
+  addedXp: number;
+  unlockedCount: number;
+} {
+  let passedTarget = false;
+  let addedXp = 0;
+  let unlockedCount = 0;
+
+  const updatedUnits = currentUnits.map((unit) => ({
+    ...unit,
+    nodes: unit.nodes.map((node) => {
+      if (passedTarget) {
+        // Todo lo posterior al nodo objetivo se mantiene como bloqueado
+        return {
+          ...node,
+          status: 'locked' as const,
+        };
+      }
+
+      if (node.id === targetNodeId) {
+        passedTarget = true;
+        // El nodo objetivo se fija como el actual en curso
+        return {
+          ...node,
+          status: 'current' as const,
+        };
+      }
+
+      // Nodos anteriores al objetivo: convalidar como completados
+      const wasCompleted = node.status === 'completed';
+      if (!wasCompleted) {
+        addedXp += node.xpReward || 15;
+        unlockedCount++;
+      }
+
+      return {
+        ...node,
+        status: 'completed' as const,
+        score: node.score || defaultScore,
+      };
+    }),
+  }));
+
+  return {
+    updatedUnits,
+    addedXp,
+    unlockedCount,
+  };
+}
+

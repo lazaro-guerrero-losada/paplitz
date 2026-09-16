@@ -23,6 +23,9 @@ import {
   AlertTriangle,
   School,
   Users,
+  Key,
+  Trash2,
+  FastForward,
 } from 'lucide-react';
 import { calculatePlayerLevel } from '../lib/levelSystem';
 import { Avatar } from '@bible-strong/avatar-react';
@@ -40,6 +43,8 @@ import {
   getSupabaseConfig,
   saveProgressToCloud,
   loadProgressFromCloud,
+  recoverProgressWithKey,
+  deleteCloudAccount,
 } from '../lib/cloudSync';
 import { ClassroomSection } from './profile/ClassroomSection';
 import { FriendsSection } from './profile/FriendsSection';
@@ -77,6 +82,7 @@ interface ProfileViewProps {
   onResetProgress: () => void;
   onOpenGuide?: () => void;
   onRestoreSave: (data: PaplitzSaveData) => void;
+  onOpenPlacementModal?: () => void;
 }
 
 export const ProfileView: React.FC<ProfileViewProps> = ({
@@ -93,6 +99,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   onResetProgress,
   onOpenGuide,
   onRestoreSave,
+  onOpenPlacementModal,
 }) => {
   const levelInfo = calculatePlayerLevel(xp);
   const [testAnimation, setTestAnimation] = useState<string>('celebrate');
@@ -112,6 +119,27 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const [cloudPin, setCloudPin] = useState<string>('');
   const [cloudLoading, setCloudLoading] = useState<boolean>(false);
   const [cloudMessage, setCloudMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Clave de recuperación activa
+  const [activeRecoveryKey, setActiveRecoveryKey] = useState<string | null>(() => {
+    const alias = localStorage.getItem('paplitz_cloud_alias') || '';
+    return alias ? localStorage.getItem(`paplitz_recovery_${alias}`) : null;
+  });
+  const [keyCopied, setKeyCopied] = useState(false);
+
+  // Estados modal de Recuperación con Clave
+  const [showRecoveryModal, setShowRecoveryModal] = useState(false);
+  const [recoveryAlias, setRecoveryAlias] = useState('');
+  const [recoveryKeyInput, setRecoveryKeyInput] = useState('');
+  const [recoveryLoading, setRecoveryLoading] = useState(false);
+  const [recoveryMessage, setRecoveryMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Estados modal de Eliminar Cuenta Vieja
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteAlias, setDeleteAlias] = useState('');
+  const [deletePinOrKey, setDeletePinOrKey] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteMessage, setDeleteMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // 1. Descargar archivo de guardado local
   const handleDownloadSave = () => {
@@ -182,6 +210,12 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     setCloudLoading(false);
 
     if (result.success) {
+      if (result.recoveryKey) {
+        setActiveRecoveryKey(result.recoveryKey);
+      } else {
+        const stored = localStorage.getItem(`paplitz_recovery_${cloudAlias.trim().toLowerCase()}`);
+        if (stored) setActiveRecoveryKey(stored);
+      }
       setCloudMessage({ type: 'success', text: `¡Progreso guardado en la nube para "${cloudAlias.toLowerCase()}"!` });
     } else {
       setCloudMessage({ type: 'error', text: result.error || 'Error al guardar en la nube.' });
@@ -199,9 +233,77 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
     if (result.success && result.data) {
       onRestoreSave(result.data);
+      if (result.recoveryKey) {
+        setActiveRecoveryKey(result.recoveryKey);
+      } else {
+        const stored = localStorage.getItem(`paplitz_recovery_${cloudAlias.trim().toLowerCase()}`);
+        if (stored) setActiveRecoveryKey(stored);
+      }
       setCloudMessage({ type: 'success', text: `¡Partida de "${cloudAlias.toLowerCase()}" descargada y restaurada con éxito!` });
     } else {
       setCloudMessage({ type: 'error', text: result.error || 'No se pudo cargar la partida.' });
+    }
+  };
+
+  // 7. Recuperar partida mediante Clave de Emergencia
+  const handleExecuteRecovery = async () => {
+    if (!recoveryAlias.trim() || !recoveryKeyInput.trim()) return;
+    setRecoveryLoading(true);
+    setRecoveryMessage(null);
+
+    const res = await recoverProgressWithKey(recoveryAlias, recoveryKeyInput);
+    setRecoveryLoading(false);
+
+    if (res.success && res.data) {
+      downloadSaveFile(res.data, `paplitz_recuperado_${recoveryAlias.trim().toLowerCase()}.json`);
+      onRestoreSave(res.data);
+      setRecoveryMessage({
+        type: 'success',
+        text: `¡Cuenta "${recoveryAlias}" recuperada! Se ha descargado tu archivo .json y cargado tu progreso. Ahora puedes crear un nuevo usuario con PIN fresco si lo deseas.`,
+      });
+      setTimeout(() => {
+        setShowRecoveryModal(false);
+        setRecoveryMessage(null);
+      }, 4500);
+    } else {
+      setRecoveryMessage({
+        type: 'error',
+        text: res.error || 'No se pudo recuperar la partida con esa clave.',
+      });
+    }
+  };
+
+  // 8. Eliminar cuenta antigua para liberar espacio
+  const handleExecuteDelete = async () => {
+    if (!deleteAlias.trim() || !deletePinOrKey.trim()) return;
+    setDeleteLoading(true);
+    setDeleteMessage(null);
+
+    const res = await deleteCloudAccount(deleteAlias, deletePinOrKey);
+    setDeleteLoading(false);
+
+    if (res.success) {
+      const normalized = deleteAlias.trim().toLowerCase();
+      if (cloudAlias.toLowerCase() === normalized) {
+        setCloudAlias('');
+        setCloudPin('');
+        setActiveRecoveryKey(null);
+        localStorage.removeItem('paplitz_cloud_alias');
+        localStorage.removeItem(`paplitz_recovery_${normalized}`);
+      }
+      setDeleteMessage({
+        type: 'success',
+        text: `La cuenta "${normalized}" ha sido eliminada permanentemente de la nube. El espacio ha sido liberado.`,
+      });
+      setTimeout(() => {
+        setShowDeleteModal(false);
+        setDeleteMessage(null);
+      }, 3500);
+    } else {
+      setDeleteMessage({
+        type: 'error',
+        text: res.error || 'Error al eliminar la cuenta.',
+      });
     }
   };
 
@@ -632,8 +734,97 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   <span>{cloudMessage.text}</span>
                 </div>
               )}
+
+              {/* Clave de Emergencia Activa */}
+              {activeRecoveryKey && (
+                <div className="mt-3 p-3 border-2 border-dashed border-black bg-neutral-50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[9px] font-mono uppercase bg-black text-white px-1.5 py-0.2 font-bold inline-flex items-center gap-1">
+                        <Key className="w-2.5 h-2.5" /> Clave de Emergencia
+                      </span>
+                      <span className="text-[10px] font-mono text-neutral-500 font-bold">
+                        (Guardado en Nube)
+                      </span>
+                    </div>
+                    <p className="text-xs font-mono font-bold mt-1 tracking-wider text-black select-all break-all">
+                      {activeRecoveryKey}
+                    </p>
+                    <p className="text-[10px] text-neutral-500 font-sans">
+                      Apunta esta clave. Si olvidas tu PIN, podrás recuperar tu partida completa en un archivo .json.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(activeRecoveryKey);
+                      setKeyCopied(true);
+                      setTimeout(() => setKeyCopied(false), 2500);
+                    }}
+                    className="btn-ink-outline px-2.5 py-1 text-xs font-mono font-bold flex items-center gap-1 cursor-pointer shrink-0"
+                    title="Copiar Clave de Emergencia"
+                  >
+                    <Copy className="w-3 h-3" />
+                    <span>{keyCopied ? '¡Copiada!' : 'Copiar'}</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Botones de Utilidad de Nube: Recuperar por clave & Eliminar cuenta vieja */}
+              <div className="mt-3 pt-3 border-t border-neutral-200 flex flex-wrap items-center justify-between gap-2">
+                <button
+                  onClick={() => setShowRecoveryModal(true)}
+                  className="text-xs font-mono font-bold text-neutral-700 hover:text-black flex items-center gap-1.5 cursor-pointer underline hover:no-underline"
+                >
+                  <Key className="w-3.5 h-3.5" />
+                  <span>¿Olvidaste tu PIN? Recuperar por Clave</span>
+                </button>
+
+                <button
+                  onClick={() => setShowDeleteModal(true)}
+                  className="text-xs font-mono text-neutral-500 hover:text-black flex items-center gap-1 cursor-pointer hover:underline"
+                  title="Eliminar un usuario antiguo para no saturar el servidor"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span>Eliminar cuenta vieja en la nube</span>
+                </button>
+              </div>
             </div>
           </div>
+
+          {/* Tarjeta Saltar a mi Nivel / Convalidar Camino */}
+          {onOpenPlacementModal && (
+            <div className="border-2 border-black p-5 bg-white shadow-[3px_3px_0px_#000000]">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 border-2 border-black bg-black text-white flex items-center justify-center shrink-0 shadow-[2px_2px_0px_#000000]">
+                    <FastForward className="w-5 h-5 stroke-[2.5]" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-display font-bold text-base">Saltar a mi Nivel / Recuperar Camino</h3>
+                      <span className="text-[10px] font-mono uppercase bg-neutral-200 text-black px-1.5 py-0.2 font-bold border border-black">
+                        CONVALIDACIÓN
+                      </span>
+                    </div>
+                    <p className="text-xs text-neutral-600 font-sans mt-1">
+                      ¿Has cambiado de dispositivo o se borró tu cuenta? Elige directamente hasta qué lección convalidar sin tener que repetir el camino una por una, o haz un examen rápido para certificar tu nivel.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                  <button
+                    onClick={onOpenPlacementModal}
+                    className="btn-ink px-4 py-2 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
+                    title="Abrir selector de salto de nivel"
+                  >
+                    <FastForward className="w-3.5 h-3.5" />
+                    <span>Saltar Nivel</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Tarjeta Desbloquear Todos los Niveles */}
           <div className="border-2 border-black p-5 bg-white shadow-[3px_3px_0px_#000000]">
@@ -767,6 +958,176 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 className="btn-ink px-4 py-1.5 text-xs font-mono font-bold cursor-pointer shadow-[2px_2px_0px_#000000]"
               >
                 Restaurar Partida
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para Recuperar Partida por Clave de Emergencia */}
+      {showRecoveryModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-white border-3 border-black p-5 sm:p-6 max-w-lg w-full shadow-[6px_6px_0px_#000000]">
+            <div className="flex items-center gap-2 border-b-2 border-black pb-2 mb-3">
+              <div className="w-7 h-7 bg-black text-white flex items-center justify-center border border-black shrink-0">
+                <Key className="w-4 h-4" />
+              </div>
+              <h3 className="font-display font-bold text-base sm:text-lg uppercase">
+                Recuperación por Clave de Emergencia
+              </h3>
+            </div>
+
+            <p className="text-xs text-neutral-600 mb-3 font-sans leading-relaxed">
+              Si has olvidado el PIN de tu cuenta en la nube, introduce tu <strong>Alias</strong> y tu <strong>Clave de Emergencia</strong> (ej. REC-XXXX-XXXX). El sistema descargará tu archivo <code className="bg-neutral-100 px-1 border border-neutral-300">.json</code> de guardado y restaurará tu partida para que puedas jugar y registrar un usuario nuevo si lo deseas.
+            </p>
+
+            <div className="flex flex-col gap-2.5 mb-4">
+              <div>
+                <label className="block text-[10px] font-mono uppercase font-bold text-neutral-600 mb-1">
+                  Alias de la cuenta
+                </label>
+                <input
+                  type="text"
+                  value={recoveryAlias}
+                  onChange={(e) => setRecoveryAlias(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
+                  placeholder="ej: lazaro_pro"
+                  className="w-full border-2 border-black px-2.5 py-1.5 text-xs font-mono font-bold bg-white focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-mono uppercase font-bold text-neutral-600 mb-1">
+                  Clave de Emergencia (ej. REC-XXXX-XXXX)
+                </label>
+                <input
+                  type="text"
+                  value={recoveryKeyInput}
+                  onChange={(e) => setRecoveryKeyInput(e.target.value.toUpperCase())}
+                  placeholder="REC-XXXX-XXXX"
+                  className="w-full border-2 border-black px-2.5 py-1.5 text-xs font-mono font-bold bg-white focus:outline-none tracking-wider"
+                />
+              </div>
+            </div>
+
+            {recoveryMessage && (
+              <div
+                className={`p-2.5 border text-xs font-mono mb-4 flex items-center gap-2 ${
+                  recoveryMessage.type === 'success'
+                    ? 'bg-neutral-100 border-black text-black font-bold'
+                    : 'bg-red-50 border-red-500 text-red-700'
+                }`}
+              >
+                {recoveryMessage.type === 'success' ? (
+                  <CheckCircle className="w-4 h-4 shrink-0" />
+                ) : (
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                )}
+                <span>{recoveryMessage.text}</span>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setShowRecoveryModal(false);
+                  setRecoveryMessage(null);
+                }}
+                className="btn-ink-outline px-3 py-1.5 text-xs font-mono font-bold cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                disabled={recoveryLoading || !recoveryAlias.trim() || !recoveryKeyInput.trim()}
+                onClick={handleExecuteRecovery}
+                className="btn-ink px-4 py-1.5 text-xs font-mono font-bold cursor-pointer shadow-[2px_2px_0px_#000000] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>{recoveryLoading ? 'Recuperando...' : 'Recuperar y Descargar JSON'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para Eliminar Cuenta Antigua en la Nube */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-white border-3 border-black p-5 sm:p-6 max-w-lg w-full shadow-[6px_6px_0px_#000000]">
+            <div className="flex items-center gap-2 border-b-2 border-black pb-2 mb-3">
+              <div className="w-7 h-7 bg-black text-white flex items-center justify-center border border-black shrink-0">
+                <Trash2 className="w-4 h-4" />
+              </div>
+              <h3 className="font-display font-bold text-base sm:text-lg uppercase">
+                Eliminar Cuenta en la Nube
+              </h3>
+            </div>
+
+            <p className="text-xs text-neutral-600 mb-3 font-sans leading-relaxed">
+              Si ya no usas un usuario antiguo o has migrado a una cuenta nueva, puedes liberarlo para que no ocupe espacio en el servidor de Supabase. Se requiere el PIN de la cuenta o su Clave de Emergencia.
+            </p>
+
+            <div className="flex flex-col gap-2.5 mb-4">
+              <div>
+                <label className="block text-[10px] font-mono uppercase font-bold text-neutral-600 mb-1">
+                  Alias a eliminar
+                </label>
+                <input
+                  type="text"
+                  value={deleteAlias}
+                  onChange={(e) => setDeleteAlias(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
+                  placeholder="ej: usuario_antiguo"
+                  className="w-full border-2 border-black px-2.5 py-1.5 text-xs font-mono font-bold bg-white focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-mono uppercase font-bold text-neutral-600 mb-1">
+                  PIN (4-6 dígitos) o Clave de Emergencia (REC-XXXX-XXXX)
+                </label>
+                <input
+                  type="text"
+                  value={deletePinOrKey}
+                  onChange={(e) => setDeletePinOrKey(e.target.value)}
+                  placeholder="PIN o Clave"
+                  className="w-full border-2 border-black px-2.5 py-1.5 text-xs font-mono font-bold bg-white focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {deleteMessage && (
+              <div
+                className={`p-2.5 border text-xs font-mono mb-4 flex items-center gap-2 ${
+                  deleteMessage.type === 'success'
+                    ? 'bg-neutral-100 border-black text-black font-bold'
+                    : 'bg-red-50 border-red-500 text-red-700'
+                }`}
+              >
+                {deleteMessage.type === 'success' ? (
+                  <CheckCircle className="w-4 h-4 shrink-0" />
+                ) : (
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                )}
+                <span>{deleteMessage.text}</span>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setDeleteMessage(null);
+                }}
+                className="btn-ink-outline px-3 py-1.5 text-xs font-mono font-bold cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                disabled={deleteLoading || !deleteAlias.trim() || !deletePinOrKey.trim()}
+                onClick={handleExecuteDelete}
+                className="btn-ink px-4 py-1.5 text-xs font-mono font-bold cursor-pointer shadow-[2px_2px_0px_#000000] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{deleteLoading ? 'Eliminando...' : 'Eliminar de la Nube'}</span>
               </button>
             </div>
           </div>

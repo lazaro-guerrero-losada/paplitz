@@ -9,11 +9,12 @@ import { AnalogSheetsModal } from './components/AnalogSheetsModal';
 import { ProfileView } from './components/ProfileView';
 import { MinigamesView } from './components/MinigamesView';
 import { LevelGuideModal } from './components/LevelGuideModal';
+import { PlacementModal } from './components/PlacementModal';
 import { calculatePlayerLevel } from './lib/levelSystem';
 import { SenseiCubo } from './components/avatar/SenseiCubo';
 import { AvatarMood } from './lib/avatarTypes';
-import { Flame, Printer, Compass, Map, User, RefreshCw, Filter, PenTool, Gamepad2, BookOpen } from 'lucide-react';
-import { PaplitzSaveData, applySaveDataToLocalStorage } from './lib/saveSystem';
+import { Flame, Printer, Compass, Map, User, RefreshCw, Filter, PenTool, Gamepad2, BookOpen, Zap } from 'lucide-react';
+import { PaplitzSaveData, applySaveDataToLocalStorage, fastForwardCurriculum } from './lib/saveSystem';
 
 function GithubIcon({ className = 'w-3.5 h-3.5' }: { className?: string }) {
   return (
@@ -99,6 +100,8 @@ export function App() {
     return saved ? JSON.parse(saved) : [];
   });
   const [showLevelGuide, setShowLevelGuide] = useState<boolean>(false);
+  const [isPlacementModalOpen, setIsPlacementModalOpen] = useState<boolean>(false);
+  const [placementTestNode, setPlacementTestNode] = useState<LessonNode | null>(null);
   const playerLevel = calculatePlayerLevel(xp);
 
   // Guardar en LocalStorage
@@ -128,10 +131,37 @@ export function App() {
     setAvatarMood('neutral');
   };
 
+  // Convalidación directa de niveles (Fast-Forward)
+  const handleDirectPlacement = (targetNodeId: string) => {
+    const result = fastForwardCurriculum(units, targetNodeId, 80);
+    setUnits(result.updatedUnits);
+    if (result.addedXp > 0) {
+      setXp((prev) => prev + result.addedXp);
+    }
+    const all = result.updatedUnits.flatMap((u) => u.nodes);
+    const target = all.find((n) => n.id === targetNodeId) || all[0];
+    setPlacementTestNode(null);
+    setActiveNode(target);
+    handleNewPracticeCube(target);
+    setAvatarMood('success-stars');
+    setTimeout(() => setAvatarMood('neutral'), 3000);
+  };
+
+  // Iniciar reto de examen de nivelación
+  const handleStartPlacementTest = (targetNode: LessonNode) => {
+    setPlacementTestNode(targetNode);
+    setActiveNode(targetNode);
+    handleNewPracticeCube(targetNode);
+    setActiveTab('practice');
+    setAvatarMood('speed-lightning');
+    setTimeout(() => setAvatarMood('neutral'), 2500);
+  };
+
   // Al seleccionar una lección desde el filtro desplegable
   const handleSelectLessonById = (nodeId: string) => {
     const node = allNodes.find((n) => n.id === nodeId);
     if (node) {
+      setPlacementTestNode(null);
       setActiveNode(node);
       handleNewPracticeCube(node);
     }
@@ -139,6 +169,7 @@ export function App() {
 
   // Al hacer clic en un nodo del Camino
   const handleSelectNode = (node: LessonNode) => {
+    setPlacementTestNode(null);
     setActiveNode(node);
     handleNewPracticeCube(node);
     setActiveTab('practice');
@@ -191,6 +222,17 @@ export function App() {
       setXp((prev) => prev + totalXp);
       setStreak((prev) => (prev === 0 ? 1 : prev));
       setScoresHistory((prev) => [...prev, recordedScore]);
+
+      // Si se estaba realizando un examen de nivelación y se ha aprobado
+      if (placementTestNode && placementTestNode.id === activeNode?.id) {
+        const ffResult = fastForwardCurriculum(units, placementTestNode.id, Math.round(recordedScore));
+        setUnits(ffResult.updatedUnits);
+        const placementBonusXp = 50 + ffResult.addedXp;
+        setXp((prev) => prev + placementBonusXp);
+        setPlacementTestNode(null);
+        setActiveNode((prev) => (prev ? { ...prev, status: 'current' } : prev));
+        return;
+      }
 
       // Desbloquear siguiente nodo en el camino si el actual estaba en curso
       if (activeNode) {
@@ -478,6 +520,26 @@ export function App() {
                 </div>
               </div>
 
+              {/* Banner de Examen de Nivelación Activo */}
+              {placementTestNode && placementTestNode.id === activeNode?.id && (
+                <div className="w-full mb-2 px-3 py-1.5 border-2 border-black bg-neutral-100 flex items-center justify-between text-xs shadow-[2px_2px_0px_#000000]">
+                  <div className="flex items-center gap-2">
+                    <span className="bg-black text-white px-1.5 py-0.2 font-mono font-bold text-[10px] flex items-center gap-1">
+                      <Zap className="w-3 h-3" /> EXAMEN
+                    </span>
+                    <span className="font-mono font-bold text-xs">
+                      Supera este reto (≥75%) para convalidar lecciones anteriores (+50 XP bonus).
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setPlacementTestNode(null)}
+                    className="text-[10px] font-mono uppercase font-bold text-neutral-600 hover:text-black underline cursor-pointer"
+                  >
+                    Cancelar Examen
+                  </button>
+                </div>
+              )}
+
               {/* Banner de Guía Activa compacto */}
               {activeNode && (
                 <div className="w-full mb-2 px-3 py-1.5 border border-black bg-neutral-50 flex items-center justify-between text-xs">
@@ -576,6 +638,7 @@ export function App() {
               units={units}
               onSelectNode={handleSelectNode}
               onOpenGuidebook={(unit) => setGuidebookUnit(unit)}
+              onOpenPlacementModal={() => setIsPlacementModalOpen(true)}
             />
           </div>
         )}
@@ -596,11 +659,19 @@ export function App() {
             onResetProgress={handleResetProgress}
             onOpenGuide={() => setShowLevelGuide(true)}
             onRestoreSave={handleRestoreSave}
+            onOpenPlacementModal={() => setIsPlacementModalOpen(true)}
           />
         )}
       </main>
 
       {/* MODALES */}
+      <PlacementModal
+        isOpen={isPlacementModalOpen}
+        onClose={() => setIsPlacementModalOpen(false)}
+        units={units}
+        onDirectUnlock={handleDirectPlacement}
+        onStartPlacementTest={handleStartPlacementTest}
+      />
       {guidebookUnit && (
         <GuidebookModal unit={guidebookUnit} onClose={() => setGuidebookUnit(null)} />
       )}

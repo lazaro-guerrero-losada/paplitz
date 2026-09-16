@@ -1,17 +1,19 @@
 import React from 'react';
 import { Unit, LessonNode } from '../lib/curriculumData';
-import { Check, Lock, BookOpen } from 'lucide-react';
+import { Check, Lock, BookOpen, FastForward } from 'lucide-react';
 
 interface LearningPathProps {
   units: Unit[];
   onSelectNode: (node: LessonNode) => void;
   onOpenGuidebook: (unit: Unit) => void;
+  onOpenPlacementModal?: () => void;
 }
 
 export const LearningPath: React.FC<LearningPathProps> = ({
   units,
   onSelectNode,
   onOpenGuidebook,
+  onOpenPlacementModal,
 }) => {
   // Desplazamiento horizontal en zigzag tipo Duolingo
   const getOffsetClass = (index: number) => {
@@ -22,6 +24,29 @@ export const LearningPath: React.FC<LearningPathProps> = ({
 
   return (
     <div className="w-full max-w-xl mx-auto py-8 px-4 flex flex-col items-center">
+      {/* Barra de acceso rápido superior: Recuperar nivel / Saltar camino */}
+      {onOpenPlacementModal && (
+        <div className="w-full mb-6 p-3 border-2 border-black bg-white shadow-[3px_3px_0px_#000000] flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 bg-black text-white flex items-center justify-center border border-black shrink-0">
+              <FastForward className="w-3.5 h-3.5" />
+            </div>
+            <div className="leading-tight">
+              <div className="text-xs font-bold font-display uppercase">¿Ya has practicado o perdiste tu cuenta?</div>
+              <div className="text-[11px] text-neutral-500 font-sans hidden sm:block">Salta directamente a tu lección o haz un examen rápido de nivelación.</div>
+            </div>
+          </div>
+          <button
+            onClick={onOpenPlacementModal}
+            className="btn-ink px-3 py-1.5 text-xs font-mono font-bold flex items-center gap-1.5 shrink-0 cursor-pointer shadow-[2px_2px_0px_#000000]"
+            title="Saltar a tu nivel alcanzado"
+          >
+            <FastForward className="w-3.5 h-3.5" />
+            <span>Saltar Nivel</span>
+          </button>
+        </div>
+      )}
+
       {units.map((unit) => (
         <div key={unit.id} className="w-full mb-16">
           {/* Cabecera de la Unidad con estética de caja entintada */}
