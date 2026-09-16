@@ -958,11 +958,11 @@ export const MinigamesView: React.FC<MinigamesViewProps> = ({
   return (
     <div className="flex-1 w-full grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] items-center justify-items-center px-4 py-2 select-none overflow-x-hidden">
       {/* Columna izquierda espaciadora para centrar matemáticamente el lienzo en el centro de la pantalla */}
-      <div className="hidden lg:block w-full" aria-hidden="true" />
+      <div className="hidden lg:block w-full min-w-0" aria-hidden="true" />
 
       <div
         data-canvas-zone="true"
-        className="w-full flex flex-col items-center relative shrink-0 justify-self-center"
+        className="w-full min-w-0 flex flex-col items-center relative shrink-0 justify-self-center"
         style={{
           maxWidth: 'min(100%, 600px, max(280px, calc((100vh - 290px) * 600 / 540)))',
         }}
@@ -1325,7 +1325,7 @@ export const MinigamesView: React.FC<MinigamesViewProps> = ({
       )}
 
       {/* Columna Lateral Derecha: Cubito en Minijuegos (lateral, sin desplazar el centro del lienzo) */}
-      <div className="w-full flex flex-col items-center justify-center shrink-0">
+      <div className="w-full min-w-0 flex flex-col items-center justify-center shrink-0 overflow-hidden">
         <SenseiCubo
           isDrawing={isDrawing}
           size={240}
