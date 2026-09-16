@@ -1,7 +1,30 @@
 import React, { useState } from 'react';
-import { Flame, Trophy, RotateCcw, Award, CheckCircle, BarChart2, BookOpen, Unlock, Lock, Sparkles, ShoppingBag, ExternalLink, Save, HardDrive, Download, Upload, Copy, FileText, Cloud, CloudUpload, CloudDownload, AlertTriangle } from 'lucide-react';
+import {
+  Flame,
+  Trophy,
+  RotateCcw,
+  Award,
+  CheckCircle,
+  BarChart2,
+  BookOpen,
+  Unlock,
+  Lock,
+  Sparkles,
+  ExternalLink,
+  Save,
+  HardDrive,
+  Download,
+  Upload,
+  Copy,
+  FileText,
+  Cloud,
+  CloudUpload,
+  CloudDownload,
+  AlertTriangle,
+  School,
+  Users,
+} from 'lucide-react';
 import { calculatePlayerLevel } from '../lib/levelSystem';
-import { DEFAULT_COSMETICS } from '../lib/avatarTypes';
 import { Avatar } from '@bible-strong/avatar-react';
 import type { AvatarDefinition } from '@bible-strong/avatar-core';
 import cubeeDefinitionRaw from '../lib/cubee.avatar.json';
@@ -18,10 +41,20 @@ import {
   saveProgressToCloud,
   loadProgressFromCloud,
 } from '../lib/cloudSync';
+import { ClassroomSection } from './profile/ClassroomSection';
+import { FriendsSection } from './profile/FriendsSection';
 
 function GithubIcon({ className = 'w-4 h-4' }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4" />
       <path d="M9 18c-4.51 2-5-2-7-2" />
     </svg>
@@ -63,6 +96,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 }) => {
   const levelInfo = calculatePlayerLevel(xp);
   const [testAnimation, setTestAnimation] = useState<string>('celebrate');
+
+  // Sub-pestaña activa en Perfil: 'progress' | 'classroom' | 'friends' | 'settings'
+  const [subTab, setSubTab] = useState<'progress' | 'classroom' | 'friends' | 'settings'>('progress');
 
   // Estados para Copia de Seguridad y Sincronización
   const [copied, setCopied] = useState(false);
@@ -117,7 +153,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       setTimeout(() => setSaveStatusMessage(null), 5000);
     };
     reader.readAsText(file);
-    // Limpiar el input para permitir volver a seleccionar el mismo archivo
     e.target.value = '';
   };
 
@@ -171,496 +206,537 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   };
 
   return (
-    <div className="max-w-2xl w-full mx-auto py-8 px-4">
+    <div className="max-w-3xl w-full mx-auto py-6 sm:py-8 px-4">
       {/* Título de Perfil */}
-      <div className="flex items-center justify-between border-b-2 border-black pb-4 mb-6">
+      <div className="flex items-center justify-between border-b-2 border-black pb-4 mb-5">
         <div>
           <span className="text-[10px] font-mono uppercase tracking-widest bg-black text-white px-2 py-0.5 font-bold">
             CUADERNO DE DIBUJANTE
           </span>
-          <h2 className="text-3xl font-bold font-display mt-1">Mi Perfil & Estadísticas</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold font-display mt-1">Mi Perfil & Comunidad</h2>
         </div>
-        <div className="w-12 h-12 border-2 border-black pattern-dots-dense flex items-center justify-center">
-          <Award className="w-6 h-6 stroke-[2]" />
-        </div>
-      </div>
-
-      {/* Tarjeta de Rango & Nivel de Dibujante */}
-      <div className="border-2 border-black p-4 mb-6 bg-white shadow-[3px_3px_0px_#000000]">
-        <div className="flex flex-wrap items-center justify-between gap-2 mb-2 font-mono">
-          <div className="flex items-center gap-2">
-            <span className="text-xs bg-black text-white px-2 py-0.5 font-bold">
-              NIVEL {levelInfo.level}
-            </span>
-            <span className="font-bold text-sm">{levelInfo.title}</span>
-          </div>
-          {onOpenGuide && (
-            <button
-              onClick={onOpenGuide}
-              className="btn-ink-outline px-2.5 py-1 text-xs font-mono font-bold flex items-center gap-1 cursor-pointer"
-            >
-              <BookOpen className="w-3.5 h-3.5" />
-              <span>Guía de Niveles</span>
-            </button>
-          )}
-        </div>
-
-        {/* Barra de progreso de XP */}
-        <div className="w-full h-3 border-2 border-black bg-neutral-100 overflow-hidden relative mb-1.5">
-          <div
-            className="h-full bg-black transition-all duration-300"
-            style={{ width: `${levelInfo.progressPercent}%` }}
-          />
-        </div>
-        <div className="flex justify-between items-center text-[10px] font-mono text-neutral-500">
-          <span>
-            {levelInfo.xpInCurrentLevel} / {levelInfo.xpNeededForCurrentLevel} XP ({levelInfo.progressPercent}%)
-          </span>
-          {levelInfo.xpRemaining > 0 ? (
-            <span>Faltan {levelInfo.xpRemaining} XP para Nivel {levelInfo.level + 1}</span>
-          ) : (
-            <span className="font-bold text-black">¡Nivel Máximo de Maestro!</span>
-          )}
+        <div className="w-11 h-11 sm:w-12 sm:h-12 border-2 border-black pattern-dots-dense flex items-center justify-center">
+          <Award className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2]" />
         </div>
       </div>
 
-      {/* Tarjetas de Estadísticas Principales */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-        {/* Racha */}
-        <div className="card-ink p-4 text-center bg-white">
-          <Flame className="w-6 h-6 mx-auto mb-1 text-black stroke-[2.5]" />
-          <div className="text-2xl font-bold font-display">{streak}</div>
-          <div className="text-[10px] font-mono uppercase text-neutral-500">Días de Racha</div>
-        </div>
+      {/* SUB-PESTAÑAS DE NAVEGACIÓN (INK STYLE) */}
+      <div className="flex items-center gap-1 border-2 border-black p-1 bg-white shadow-[2px_2px_0px_#000000] mb-6 overflow-x-auto">
+        <button
+          onClick={() => setSubTab('progress')}
+          className={`px-3 py-1.5 text-xs font-mono uppercase font-bold flex items-center gap-1.5 cursor-pointer transition-colors shrink-0 ${
+            subTab === 'progress' ? 'bg-black text-white' : 'hover:bg-neutral-100 text-black'
+          }`}
+        >
+          <Award className="w-3.5 h-3.5" />
+          <span>Mi Progreso</span>
+        </button>
 
-        {/* XP Total */}
-        <div className="card-ink p-4 text-center bg-white">
-          <Trophy className="w-6 h-6 mx-auto mb-1 text-black stroke-[2]" />
-          <div className="text-2xl font-bold font-display">{xp}</div>
-          <div className="text-[10px] font-mono uppercase text-neutral-500">XP Acumulado</div>
-        </div>
+        <button
+          onClick={() => setSubTab('classroom')}
+          className={`px-3 py-1.5 text-xs font-mono uppercase font-bold flex items-center gap-1.5 cursor-pointer transition-colors shrink-0 ${
+            subTab === 'classroom' ? 'bg-black text-white' : 'hover:bg-neutral-100 text-black'
+          }`}
+        >
+          <School className="w-3.5 h-3.5" />
+          <span>Aulas & Clases</span>
+        </button>
 
-        {/* Ejercicios Completados */}
-        <div className="card-ink p-4 text-center bg-white">
-          <CheckCircle className="w-6 h-6 mx-auto mb-1 text-black stroke-[2]" />
-          <div className="text-2xl font-bold font-display">
-            {completedNodesCount} / {totalNodesCount}
-          </div>
-          <div className="text-[10px] font-mono uppercase text-neutral-500">Niveles Superados</div>
-        </div>
+        <button
+          onClick={() => setSubTab('friends')}
+          className={`px-3 py-1.5 text-xs font-mono uppercase font-bold flex items-center gap-1.5 cursor-pointer transition-colors shrink-0 ${
+            subTab === 'friends' ? 'bg-black text-white' : 'hover:bg-neutral-100 text-black'
+          }`}
+        >
+          <Users className="w-3.5 h-3.5" />
+          <span>Amigos</span>
+        </button>
 
-        {/* Precisión Media */}
-        <div className="card-ink p-4 text-center bg-white">
-          <BarChart2 className="w-6 h-6 mx-auto mb-1 text-black stroke-[2]" />
-          <div className="text-2xl font-bold font-display">{accuracyAverage}%</div>
-          <div className="text-[10px] font-mono uppercase text-neutral-500">Precisión Media</div>
-        </div>
+        <button
+          onClick={() => setSubTab('settings')}
+          className={`px-3 py-1.5 text-xs font-mono uppercase font-bold flex items-center gap-1.5 cursor-pointer transition-colors shrink-0 ${
+            subTab === 'settings' ? 'bg-black text-white' : 'hover:bg-neutral-100 text-black'
+          }`}
+        >
+          <Save className="w-3.5 h-3.5" />
+          <span>Guardado & Nube</span>
+        </button>
       </div>
 
-      {/* Sección Didáctica: Consejos Personalizados de Koos Eissen */}
-      <div className="card-ink p-6 mb-8 bg-white">
-        <h3 className="text-lg font-bold font-display mb-3">Consejos para tu Memoria Muscular</h3>
-        <ul className="space-y-3">
-          <li className="text-xs font-sans p-3 border border-black bg-neutral-50 flex items-start gap-2">
-            <span className="font-mono font-bold text-sm">01</span>
-            <span>
-              <strong>Técnica de Ghosting:</strong> Antes de apoyar la punta del lápiz o stylus, haz 2 pasadas rápidas en el aire siguiendo la trayectoria de la arista.
-            </span>
-          </li>
-          <li className="text-xs font-sans p-3 border border-black bg-neutral-50 flex items-start gap-2">
-            <span className="font-mono font-bold text-sm">02</span>
-            <span>
-              <strong>Dibuja con el Codo y Hombro:</strong> Bloquea la muñeca para trazos largos de perspectiva. La muñeca solo sirve para detalles diminutos.
-            </span>
-          </li>
-          <li className="text-xs font-sans p-3 border border-black bg-neutral-50 flex items-start gap-2">
-            <span className="font-mono font-bold text-sm">03</span>
-            <span>
-              <strong>Ejes de Perspectiva (X, Y, Z):</strong> La arista frontal más cercana es tu ancla (Eje Z). Las demás líneas deben converger hacia sus respectivos puntos de fuga en el horizonte sin abrirse en abanico.
-            </span>
-          </li>
-        </ul>
-      </div>
-
-      {/* SECCIÓN DEL AVATAR COMPAÑERO: CUBITO */}
-      <div className="card-ink p-6 mb-8 bg-white border-2 border-black shadow-[3px_3px_0px_#000000]">
-        <div className="flex items-center justify-between border-b-2 border-black pb-3 mb-4">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 stroke-[2.5]" />
-            <h3 className="text-xl font-bold font-display">Compañero de Dibujo: Cubito</h3>
-          </div>
-          <span className="text-[10px] font-mono bg-black text-white px-2 py-0.5 font-bold">
-            PROBADOR DE EMOCIONES
-          </span>
-        </div>
-
-        <div className="flex flex-col sm:flex-row items-center gap-6 mb-6">
-          {/* Vista previa de Cubito con el motor oficial */}
-          <div className="w-36 h-36 border-2 border-black bg-neutral-900 flex items-center justify-center relative shadow-[3px_3px_0px_#000000] overflow-hidden p-1">
-            <Avatar
-              definition={cubeeDefinition}
-              animation={testAnimation}
-              size={135}
-            />
-            <div className="absolute bottom-1 right-2 text-[9px] font-mono font-bold bg-black text-white px-1 border border-white">
-              {testAnimation}
-            </div>
-          </div>
-
-          {/* Selector interactivo de animaciones */}
-          <div className="flex-1">
-            <span className="text-xs font-mono font-bold block mb-2">
-              Probar animaciones nativas del motor (Cubo y ojos orgánicos):
-            </span>
-            <div className="flex flex-wrap gap-1.5">
-              {[
-                { id: 'idle', label: 'Idle (Natural)' },
-                { id: 'celebrate', label: '★ Aprobado (Celebrate)' },
-                { id: 'sad', label: '🌀 Suspenso (Sad)' },
-                { id: 'working', label: 'Concentrado (Working)' },
-                { id: 'excited', label: '⚡ Rápido (Excited)' },
-                { id: 'happy', label: 'Feliz (Happy)' },
-                { id: 'sleeping', label: '💤 Dormido (Sleeping)' },
-                { id: 'waking', label: 'Despertar (Waking)' },
-                { id: 'surprised', label: 'Sorpresa (Surprised)' },
-                { id: 'playful', label: 'Juguetón (Playful)' },
-                { id: 'thinking', label: 'Pensativo (Thinking)' },
-                { id: 'curious', label: 'Curioso (Curious)' },
-                { id: 'angry', label: '😠 Cabreado (Angry)' },
-                { id: 'scared', label: '😨 Miedo (Scared)' },
-              ].map((m) => (
+      {/* ========================================================= */}
+      {/* 1. SUB-PESTAÑA: MI PROGRESO */}
+      {/* ========================================================= */}
+      {subTab === 'progress' && (
+        <div className="space-y-6">
+          {/* Tarjeta de Rango & Nivel de Dibujante */}
+          <div className="border-2 border-black p-4 bg-white shadow-[3px_3px_0px_#000000]">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2 font-mono">
+              <div className="flex items-center gap-2">
+                <span className="text-xs bg-black text-white px-2 py-0.5 font-bold">
+                  NIVEL {levelInfo.level}
+                </span>
+                <span className="font-bold text-sm">{levelInfo.title}</span>
+              </div>
+              {onOpenGuide && (
                 <button
-                  key={m.id}
-                  onClick={() => setTestAnimation(m.id)}
-                  className={`text-xs font-mono px-2.5 py-1 border border-black cursor-pointer transition-all ${
-                    testAnimation === m.id
-                      ? 'bg-black text-white font-bold shadow-[1px_1px_0px_#000000]'
-                      : 'bg-white hover:bg-neutral-100 text-black'
-                  }`}
+                  onClick={onOpenGuide}
+                  className="btn-ink-outline px-2.5 py-1 text-xs font-mono font-bold flex items-center gap-1 cursor-pointer"
                 >
-                  {m.label}
+                  <BookOpen className="w-3.5 h-3.5" />
+                  <span>Guía de Niveles</span>
                 </button>
-              ))}
+              )}
+            </div>
+
+            {/* Barra de progreso de XP */}
+            <div className="w-full h-3 border-2 border-black bg-neutral-100 overflow-hidden relative mb-1.5">
+              <div
+                className="h-full bg-black transition-all duration-300"
+                style={{ width: `${levelInfo.progressPercent}%` }}
+              />
+            </div>
+            <div className="flex justify-between items-center text-[10px] font-mono text-neutral-500">
+              <span>
+                {levelInfo.xpInCurrentLevel} / {levelInfo.xpNeededForCurrentLevel} XP ({levelInfo.progressPercent}%)
+              </span>
+              {levelInfo.xpRemaining > 0 ? (
+                <span>Faltan {levelInfo.xpRemaining} XP para Nivel {levelInfo.level + 1}</span>
+              ) : (
+                <span className="font-bold text-black">¡Nivel Máximo de Maestro!</span>
+              )}
+            </div>
+          </div>
+
+          {/* Tarjetas de Estadísticas Principales */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+            {/* Racha */}
+            <div className="card-ink p-4 text-center bg-white">
+              <Flame className="w-6 h-6 mx-auto mb-1 text-black stroke-[2.5]" />
+              <div className="text-2xl font-bold font-display">{streak}</div>
+              <div className="text-[10px] font-mono uppercase text-neutral-500">Días de Racha</div>
+            </div>
+
+            {/* XP Total */}
+            <div className="card-ink p-4 text-center bg-white">
+              <Trophy className="w-6 h-6 mx-auto mb-1 text-black stroke-[2]" />
+              <div className="text-2xl font-bold font-display">{xp}</div>
+              <div className="text-[10px] font-mono uppercase text-neutral-500">XP Acumulado</div>
+            </div>
+
+            {/* Ejercicios Completados */}
+            <div className="card-ink p-4 text-center bg-white">
+              <CheckCircle className="w-6 h-6 mx-auto mb-1 text-black stroke-[2]" />
+              <div className="text-2xl font-bold font-display">
+                {completedNodesCount} / {totalNodesCount}
+              </div>
+              <div className="text-[10px] font-mono uppercase text-neutral-500">Niveles Superados</div>
+            </div>
+
+            {/* Precisión Media */}
+            <div className="card-ink p-4 text-center bg-white">
+              <BarChart2 className="w-6 h-6 mx-auto mb-1 text-black stroke-[2]" />
+              <div className="text-2xl font-bold font-display">{accuracyAverage}%</div>
+              <div className="text-[10px] font-mono uppercase text-neutral-500">Precisión Media</div>
+            </div>
+          </div>
+
+          {/* Sección Didáctica: Consejos Personalizados de Koos Eissen */}
+          <div className="card-ink p-5 sm:p-6 bg-white">
+            <h3 className="text-base sm:text-lg font-bold font-display mb-3">Consejos para tu Memoria Muscular</h3>
+            <ul className="space-y-3">
+              <li className="text-xs font-sans p-3 border border-black bg-neutral-50 flex items-start gap-2">
+                <span className="font-mono font-bold text-sm">01</span>
+                <span>
+                  <strong>Técnica de Ghosting:</strong> Antes de apoyar la punta del lápiz o stylus, haz 2 pasadas rápidas en el aire siguiendo la trayectoria de la arista.
+                </span>
+              </li>
+              <li className="text-xs font-sans p-3 border border-black bg-neutral-50 flex items-start gap-2">
+                <span className="font-mono font-bold text-sm">02</span>
+                <span>
+                  <strong>Dibuja con el Codo y Hombro:</strong> Bloquea la muñeca para trazos largos de perspectiva. La muñeca solo sirve para detalles diminutos.
+                </span>
+              </li>
+              <li className="text-xs font-sans p-3 border border-black bg-neutral-50 flex items-start gap-2">
+                <span className="font-mono font-bold text-sm">03</span>
+                <span>
+                  <strong>Ejes de Perspectiva (X, Y, Z):</strong> La arista frontal más cercana es tu ancla (Eje Z). Las demás líneas deben converger hacia sus respectivos puntos de fuga en el horizonte sin abrirse en abanico.
+                </span>
+              </li>
+            </ul>
+          </div>
+
+          {/* SECCIÓN DEL AVATAR COMPAÑERO: CUBITO */}
+          <div className="card-ink p-5 sm:p-6 bg-white border-2 border-black shadow-[3px_3px_0px_#000000]">
+            <div className="flex items-center justify-between border-b-2 border-black pb-3 mb-4">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 stroke-[2.5]" />
+                <h3 className="text-lg sm:text-xl font-bold font-display">Compañero de Dibujo: Cubito</h3>
+              </div>
+              <span className="text-[10px] font-mono bg-black text-white px-2 py-0.5 font-bold">
+                PROBADOR DE EMOCIONES
+              </span>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center gap-5 sm:gap-6">
+              {/* Vista previa de Cubito */}
+              <div className="w-32 h-32 sm:w-36 sm:h-36 border-2 border-black bg-neutral-900 flex items-center justify-center relative shadow-[3px_3px_0px_#000000] overflow-hidden p-1 shrink-0">
+                <Avatar
+                  definition={cubeeDefinition}
+                  animation={testAnimation}
+                  size={125}
+                />
+                <div className="absolute bottom-1 right-2 text-[9px] font-mono font-bold bg-black text-white px-1 border border-white">
+                  {testAnimation}
+                </div>
+              </div>
+
+              {/* Selector interactivo de animaciones */}
+              <div className="flex-1 w-full">
+                <span className="text-xs font-mono font-bold block mb-2 text-neutral-800">
+                  Probar animaciones nativas del motor (Cubo y ojos orgánicos):
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { id: 'idle', label: 'Idle' },
+                    { id: 'celebrate', label: '★ Aprobado' },
+                    { id: 'sad', label: '🌀 Suspenso' },
+                    { id: 'working', label: 'Concentrado' },
+                    { id: 'excited', label: '⚡ Rápido' },
+                    { id: 'happy', label: 'Feliz' },
+                    { id: 'sleeping', label: '💤 Dormido' },
+                    { id: 'waking', label: 'Despertar' },
+                    { id: 'surprised', label: 'Sorpresa' },
+                    { id: 'playful', label: 'Juguetón' },
+                    { id: 'thinking', label: 'Pensativo' },
+                    { id: 'curious', label: 'Curioso' },
+                    { id: 'angry', label: 'Angry' },
+                    { id: 'scared', label: 'Miedo' },
+                  ].map((m) => (
+                    <button
+                      key={m.id}
+                      onClick={() => setTestAnimation(m.id)}
+                      className={`text-xs font-mono px-2 py-1 border border-black cursor-pointer transition-all ${
+                        testAnimation === m.id
+                          ? 'bg-black text-white font-bold shadow-[1px_1px_0px_#000000]'
+                          : 'bg-white hover:bg-neutral-100 text-black'
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>
+      )}
 
-        {/* Vitrina de Atuendos con XP (Preparación a Futuro) */}
-        <div className="border-t border-black/20 pt-4">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5">
-              <ShoppingBag className="w-4 h-4" />
-              <span>Armario de Atuendos (Próximamente con XP)</span>
-            </span>
-            <span className="text-[10px] font-mono text-neutral-500">
-              Tu saldo: <strong>{xp} XP</strong>
-            </span>
-          </div>
+      {/* ========================================================= */}
+      {/* 2. SUB-PESTAÑA: AULAS & CLASES DIDÁCTICAS */}
+      {/* ========================================================= */}
+      {subTab === 'classroom' && (
+        <ClassroomSection currentAlias={cloudAlias} />
+      )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            {DEFAULT_COSMETICS.map((cosmetic) => (
+      {/* ========================================================= */}
+      {/* 3. SUB-PESTAÑA: AMIGOS */}
+      {/* ========================================================= */}
+      {subTab === 'friends' && (
+        <FriendsSection currentAlias={cloudAlias} />
+      )}
+
+      {/* ========================================================= */}
+      {/* 4. SUB-PESTAÑA: GUARDADO, NUBE & AJUSTES */}
+      {/* ========================================================= */}
+      {subTab === 'settings' && (
+        <div className="space-y-6">
+          {/* SECCIÓN: GESTIÓN DE PROGRESO & COPIAS DE SEGURIDAD (LOCAL Y NUBE) */}
+          <div className="border-2 border-black p-5 bg-white shadow-[3px_3px_0px_#000000]">
+            <div className="flex items-center justify-between border-b-2 border-black pb-3 mb-4">
+              <div className="flex items-center gap-2">
+                <Save className="w-5 h-5 stroke-[2.5]" />
+                <h3 className="text-lg font-bold font-display">Guardado de Progreso & Sincronización</h3>
+              </div>
+              <span className="text-[10px] font-mono uppercase bg-black text-white px-2 py-0.5 font-bold">
+                PORTABILIDAD
+              </span>
+            </div>
+
+            <p className="text-xs text-neutral-600 font-sans mb-5 leading-relaxed">
+              Tu progreso se guarda automáticamente en este navegador. Para jugar en otro dispositivo (PC, tablet o móvil), o conservar tu partida si limpias el navegador, puedes usar una copia local en archivo o sincronizar con tu Alias en la nube.
+            </p>
+
+            {/* Notificaciones globales de guardado */}
+            {saveStatusMessage && (
               <div
-                key={cosmetic.id}
-                className="p-2.5 border border-black bg-neutral-50 flex items-center justify-between text-xs font-mono"
+                className={`p-3 border-2 mb-4 text-xs font-mono font-bold flex items-center gap-2 ${
+                  saveStatusMessage.type === 'success'
+                    ? 'bg-neutral-100 border-black text-black'
+                    : 'bg-red-50 border-red-500 text-red-700'
+                }`}
               >
-                <div>
-                  <div className="font-bold font-sans">{cosmetic.name}</div>
-                  <div className="text-[10px] text-neutral-500 font-sans">{cosmetic.description}</div>
+                {saveStatusMessage.type === 'success' ? (
+                  <CheckCircle className="w-4 h-4 shrink-0" />
+                ) : (
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                )}
+                <span>{saveStatusMessage.text}</span>
+              </div>
+            )}
+
+            {/* 1. COPIA LOCAL (ARCHIVOS / PORTAPAPELES) */}
+            <div className="border border-black p-4 bg-neutral-50 mb-5">
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-1.5 font-mono font-bold text-xs">
+                  <HardDrive className="w-4 h-4" />
+                  <span>Copia Local (100% Privado y Offline)</span>
                 </div>
-                <span className="text-[11px] font-bold border border-black px-2 py-0.5 bg-white shrink-0 ml-2">
-                  {cosmetic.priceXP} XP
+                <span className="text-[9px] font-mono text-neutral-500 uppercase bg-neutral-200 px-1 py-0.5">
+                  Sin servidor
                 </span>
               </div>
-            ))}
-          </div>
-        </div>
-      </div>
 
-      {/* MODO MAESTRO / DESBLOQUEO DE TODOS LOS NIVELES */}
-      <div className="border-2 border-black p-5 mb-8 bg-white shadow-[3px_3px_0px_#000000]">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 border-2 border-black bg-neutral-100 flex items-center justify-center shrink-0 shadow-[2px_2px_0px_#000000]">
-              <Unlock className="w-5 h-5 stroke-[2.5]" />
+              <p className="text-[11px] text-neutral-600 font-sans mb-3">
+                Descarga tu partida en un archivo <code>.json</code> o copia el código para restaurarla en el .exe de Windows, en la app de Android o en otro navegador.
+              </p>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={handleDownloadSave}
+                  className="btn-ink px-3 py-1.5 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] hover:scale-[1.01] transition-transform"
+                  title="Descargar archivo paplitz_progreso.json"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Descargar .json</span>
+                </button>
+
+                <button
+                  onClick={handleCopySave}
+                  className="btn-ink-outline px-3 py-1.5 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer hover:bg-neutral-200"
+                  title="Copiar código de guardado al portapapeles"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>{copied ? '¡Copiado!' : 'Copiar Código'}</span>
+                </button>
+
+                <label className="btn-ink-outline px-3 py-1.5 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer hover:bg-neutral-200">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Cargar Archivo .json</span>
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                </label>
+
+                <button
+                  onClick={() => setShowPasteModal(true)}
+                  className="btn-ink-outline px-3 py-1.5 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer hover:bg-neutral-200"
+                  title="Pegar código de guardado en texto"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Pegar Código</span>
+                </button>
+              </div>
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-display font-bold text-base">Desbloquear Todos los Niveles</h3>
-                {areAllNodesUnlocked && (
-                  <span className="text-[10px] font-mono uppercase bg-black text-white px-1.5 py-0.2 font-bold">
-                    TODO DESBLOQUEADO
+
+            {/* 2. SINCRONIZACIÓN EN LA NUBE (SUPABASE) */}
+            <div className="border border-black p-4 bg-neutral-50">
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-1.5 font-mono font-bold text-xs">
+                  <Cloud className="w-4 h-4" />
+                  <span>Sincronización en la Nube (Alias + PIN)</span>
+                </div>
+                {cloudConfig.isConfigured ? (
+                  <span className="text-[9px] font-mono text-white bg-black px-1.5 py-0.5 font-bold uppercase flex items-center gap-1">
+                    <CheckCircle className="w-2.5 h-2.5" /> Nube Conectada
+                  </span>
+                ) : (
+                  <span className="text-[9px] font-mono text-neutral-600 bg-neutral-200 px-1.5 py-0.5 uppercase" title="Configura VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY para habilitar">
+                    Modo Offline
                   </span>
                 )}
               </div>
-              <p className="text-xs text-neutral-600 font-sans mt-1">
-                Desbloquea al instante todas las lecciones del Camino y filtros de minijuegos para comprobar cualquier ejercicio o practicar libremente sin tener que superar cada nivel previo uno por uno.
+
+              <p className="text-[11px] text-neutral-600 font-sans mb-3">
+                Sin correos ni contraseñas. Solo introduce tu <strong>Alias</strong> y un <strong>PIN de 4 dígitos</strong> (ej. 1234) para subir tu partida o recuperarla en otro dispositivo.
               </p>
-            </div>
-          </div>
 
-          <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-            {areAllNodesUnlocked ? (
-              <button
-                onClick={onLockAllNodes}
-                className="btn-ink-outline px-3.5 py-2 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer hover:bg-black hover:text-white"
-                title="Restablecer el bloqueo progresivo estándar"
-              >
-                <Lock className="w-3.5 h-3.5" />
-                <span>Restablecer Bloqueo</span>
-              </button>
-            ) : (
-              <button
-                onClick={onUnlockAllNodes}
-                className="btn-ink px-4 py-2 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
-                title="Desbloquear todas las lecciones y exámenes"
-              >
-                <Unlock className="w-3.5 h-3.5 stroke-[2.5]" />
-                <span>Desbloquear Todo</span>
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
+              <div className="flex flex-col sm:flex-row gap-2.5 items-start sm:items-end mb-3">
+                <div className="w-full sm:w-48">
+                  <label className="block text-[10px] font-mono uppercase font-bold text-neutral-600 mb-1">
+                    Alias de Jugador
+                  </label>
+                  <input
+                    type="text"
+                    value={cloudAlias}
+                    onChange={(e) => setCloudAlias(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
+                    placeholder="ej: lazaro_pro"
+                    maxLength={24}
+                    className="w-full border-2 border-black px-2.5 py-1 text-xs font-mono font-bold bg-white focus:outline-none"
+                  />
+                </div>
 
-      {/* SECCIÓN: GESTIÓN DE PROGRESO & COPIAS DE SEGURIDAD (LOCAL Y NUBE) */}
-      <div className="border-2 border-black p-5 mb-8 bg-white shadow-[3px_3px_0px_#000000]">
-        <div className="flex items-center justify-between border-b-2 border-black pb-3 mb-4">
-          <div className="flex items-center gap-2">
-            <Save className="w-5 h-5 stroke-[2.5]" />
-            <h3 className="text-lg font-bold font-display">Guardado de Progreso & Sincronización</h3>
-          </div>
-          <span className="text-[10px] font-mono uppercase bg-black text-white px-2 py-0.5 font-bold">
-            PORTABILIDAD
-          </span>
-        </div>
+                <div className="w-full sm:w-28">
+                  <label className="block text-[10px] font-mono uppercase font-bold text-neutral-600 mb-1">
+                    PIN (4 cifras)
+                  </label>
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={cloudPin}
+                    onChange={(e) => setCloudPin(e.target.value.replace(/[^0-9]/g, ''))}
+                    placeholder="••••"
+                    className="w-full border-2 border-black px-2.5 py-1 text-xs font-mono font-bold bg-white focus:outline-none tracking-widest text-center"
+                  />
+                </div>
 
-        <p className="text-xs text-neutral-600 font-sans mb-5 leading-relaxed">
-          Tu progreso se guarda automáticamente en este navegador. Para jugar en otro dispositivo (PC, tablet o móvil), o conservar tu partida si limpias el navegador, puedes usar una copia local en archivo o sincronizar con tu Alias en la nube.
-        </p>
+                <div className="flex gap-2 w-full sm:w-auto">
+                  <button
+                    disabled={cloudLoading || !cloudAlias.trim() || !cloudPin.trim()}
+                    onClick={handleSaveToCloud}
+                    className="btn-ink px-3 py-1.5 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] disabled:opacity-40 disabled:cursor-not-allowed"
+                    title="Subir partida actual a la nube"
+                  >
+                    <CloudUpload className="w-3.5 h-3.5" />
+                    <span>{cloudLoading ? 'Guardando...' : 'Subir a Nube'}</span>
+                  </button>
 
-        {/* Notificaciones globales de guardado */}
-        {saveStatusMessage && (
-          <div
-            className={`p-3 border-2 mb-4 text-xs font-mono font-bold flex items-center gap-2 ${
-              saveStatusMessage.type === 'success'
-                ? 'bg-neutral-100 border-black text-black'
-                : 'bg-red-50 border-red-500 text-red-700'
-            }`}
-          >
-            {saveStatusMessage.type === 'success' ? (
-              <CheckCircle className="w-4 h-4 shrink-0" />
-            ) : (
-              <AlertTriangle className="w-4 h-4 shrink-0" />
-            )}
-            <span>{saveStatusMessage.text}</span>
-          </div>
-        )}
-
-        {/* 1. COPIA LOCAL (ARCHIVOS / PORTAPAPELES) */}
-        <div className="border border-black p-4 bg-neutral-50 mb-5">
-          <div className="flex items-center justify-between mb-1.5">
-            <div className="flex items-center gap-1.5 font-mono font-bold text-xs">
-              <HardDrive className="w-4 h-4" />
-              <span>Copia Local (100% Privado y Offline)</span>
-            </div>
-            <span className="text-[9px] font-mono text-neutral-500 uppercase bg-neutral-200 px-1 py-0.5">
-              Sin servidor
-            </span>
-          </div>
-
-          <p className="text-[11px] text-neutral-600 font-sans mb-3">
-            Descarga tu partida en un archivo <code>.json</code> o copia el código para restaurarla en el .exe de Windows, en la app de Android o en otro navegador.
-          </p>
-
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={handleDownloadSave}
-              className="btn-ink px-3 py-1.5 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] hover:scale-[1.01] transition-transform"
-              title="Descargar archivo paplitz_progreso.json"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Descargar .json</span>
-            </button>
-
-            <button
-              onClick={handleCopySave}
-              className="btn-ink-outline px-3 py-1.5 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer hover:bg-neutral-200"
-              title="Copiar código de guardado al portapapeles"
-            >
-              <Copy className="w-3.5 h-3.5" />
-              <span>{copied ? '¡Copiado!' : 'Copiar Código'}</span>
-            </button>
-
-            <label className="btn-ink-outline px-3 py-1.5 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer hover:bg-neutral-200">
-              <Upload className="w-3.5 h-3.5" />
-              <span>Cargar Archivo .json</span>
-              <input
-                type="file"
-                accept=".json"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-            </label>
-
-            <button
-              onClick={() => setShowPasteModal(true)}
-              className="btn-ink-outline px-3 py-1.5 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer hover:bg-neutral-200"
-              title="Pegar código de guardado en texto"
-            >
-              <FileText className="w-3.5 h-3.5" />
-              <span>Pegar Código</span>
-            </button>
-          </div>
-        </div>
-
-        {/* 2. SINCRONIZACIÓN EN LA NUBE (SUPABASE) */}
-        <div className="border border-black p-4 bg-neutral-50">
-          <div className="flex items-center justify-between mb-1.5">
-            <div className="flex items-center gap-1.5 font-mono font-bold text-xs">
-              <Cloud className="w-4 h-4" />
-              <span>Sincronización en la Nube (Alias + PIN)</span>
-            </div>
-            {cloudConfig.isConfigured ? (
-              <span className="text-[9px] font-mono text-white bg-black px-1.5 py-0.5 font-bold uppercase flex items-center gap-1">
-                <CheckCircle className="w-2.5 h-2.5" /> Nube Conectada
-              </span>
-            ) : (
-              <span className="text-[9px] font-mono text-neutral-600 bg-neutral-200 px-1.5 py-0.5 uppercase" title="Configura VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY para habilitar">
-                Modo Offline
-              </span>
-            )}
-          </div>
-
-          <p className="text-[11px] text-neutral-600 font-sans mb-3">
-            Sin correos ni contraseñas. Solo introduce tu <strong>Alias</strong> y un <strong>PIN de 4 dígitos</strong> (ej. 1234) para subir tu partida o recuperarla en otro dispositivo.
-          </p>
-
-          <div className="flex flex-col sm:flex-row gap-2.5 items-start sm:items-end mb-3">
-            <div className="w-full sm:w-48">
-              <label className="block text-[10px] font-mono uppercase font-bold text-neutral-600 mb-1">
-                Alias de Jugador
-              </label>
-              <input
-                type="text"
-                value={cloudAlias}
-                onChange={(e) => setCloudAlias(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
-                placeholder="ej: lazaro_pro"
-                maxLength={24}
-                className="w-full border-2 border-black px-2.5 py-1 text-xs font-mono font-bold bg-white focus:outline-none"
-              />
-            </div>
-
-            <div className="w-full sm:w-28">
-              <label className="block text-[10px] font-mono uppercase font-bold text-neutral-600 mb-1">
-                PIN (4 cifras)
-              </label>
-              <input
-                type="password"
-                inputMode="numeric"
-                maxLength={6}
-                value={cloudPin}
-                onChange={(e) => setCloudPin(e.target.value.replace(/[^0-9]/g, ''))}
-                placeholder="••••"
-                className="w-full border-2 border-black px-2.5 py-1 text-xs font-mono font-bold bg-white focus:outline-none tracking-widest text-center"
-              />
-            </div>
-
-            <div className="flex gap-2 w-full sm:w-auto">
-              <button
-                disabled={cloudLoading || !cloudAlias.trim() || !cloudPin.trim()}
-                onClick={handleSaveToCloud}
-                className="btn-ink px-3 py-1.5 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] disabled:opacity-40 disabled:cursor-not-allowed"
-                title="Subir partida actual a la nube"
-              >
-                <CloudUpload className="w-3.5 h-3.5" />
-                <span>{cloudLoading ? 'Guardando...' : 'Subir a Nube'}</span>
-              </button>
-
-              <button
-                disabled={cloudLoading || !cloudAlias.trim() || !cloudPin.trim()}
-                onClick={handleLoadFromCloud}
-                className="btn-ink-outline px-3 py-1.5 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer hover:bg-neutral-200 disabled:opacity-40 disabled:cursor-not-allowed"
-                title="Descargar partida desde la nube"
-              >
-                <CloudDownload className="w-3.5 h-3.5" />
-                <span>{cloudLoading ? 'Cargando...' : 'Cargar de Nube'}</span>
-              </button>
-            </div>
-          </div>
-
-          {cloudMessage && (
-            <div
-              className={`p-2.5 border text-xs font-mono flex items-center gap-2 ${
-                cloudMessage.type === 'success'
-                  ? 'bg-neutral-100 border-black text-black font-bold'
-                  : 'bg-red-50 border-red-500 text-red-700'
-              }`}
-            >
-              {cloudMessage.type === 'success' ? (
-                <CheckCircle className="w-4 h-4 shrink-0" />
-              ) : (
-                <AlertTriangle className="w-4 h-4 shrink-0" />
-              )}
-              <span>{cloudMessage.text}</span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* TARJETA CÓDIGO ABIERTO / GITHUB */}
-      <div className="border-2 border-black p-5 mb-8 bg-neutral-50 shadow-[3px_3px_0px_#000000]">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 border-2 border-black bg-black text-white flex items-center justify-center shrink-0 shadow-[2px_2px_0px_#000000]">
-              <GithubIcon className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-display font-bold text-base">Proyecto Open Source</h3>
-                <span className="text-[10px] font-mono uppercase bg-black text-white px-1.5 py-0.2 font-bold">
-                  MIT LICENSE
-                </span>
+                  <button
+                    disabled={cloudLoading || !cloudAlias.trim() || !cloudPin.trim()}
+                    onClick={handleLoadFromCloud}
+                    className="btn-ink-outline px-3 py-1.5 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer hover:bg-neutral-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                    title="Descargar partida desde la nube"
+                  >
+                    <CloudDownload className="w-3.5 h-3.5" />
+                    <span>{cloudLoading ? 'Cargando...' : 'Cargar de Nube'}</span>
+                  </button>
+                </div>
               </div>
-              <p className="text-xs text-neutral-600 font-sans mt-1">
-                Paplitz es un software libre y gratuito. Puedes explorar el código, reportar sugerencias o descargar los ejecutables de escritorio y Android en GitHub.
-              </p>
+
+              {cloudMessage && (
+                <div
+                  className={`p-2.5 border text-xs font-mono flex items-center gap-2 ${
+                    cloudMessage.type === 'success'
+                      ? 'bg-neutral-100 border-black text-black font-bold'
+                      : 'bg-red-50 border-red-500 text-red-700'
+                  }`}
+                >
+                  {cloudMessage.type === 'success' ? (
+                    <CheckCircle className="w-4 h-4 shrink-0" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                  )}
+                  <span>{cloudMessage.text}</span>
+                </div>
+              )}
             </div>
           </div>
 
-          <a
-            href="https://github.com/lazaro-guerrero-losada/paplitz"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-ink px-4 py-2 text-xs font-mono font-bold flex items-center gap-2 cursor-pointer shrink-0 shadow-[2px_2px_0px_#000000] hover:scale-[1.02] transition-transform"
-          >
-            <GithubIcon className="w-4 h-4" />
-            <span>Ver en GitHub</span>
-            <ExternalLink className="w-3 h-3 opacity-70" />
-          </a>
-        </div>
-      </div>
+          {/* Tarjeta Desbloquear Todos los Niveles */}
+          <div className="border-2 border-black p-5 bg-white shadow-[3px_3px_0px_#000000]">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 border-2 border-black bg-neutral-100 flex items-center justify-center shrink-0 shadow-[2px_2px_0px_#000000]">
+                  <Unlock className="w-5 h-5 stroke-[2.5]" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-display font-bold text-base">Desbloquear Todos los Niveles</h3>
+                    {areAllNodesUnlocked && (
+                      <span className="text-[10px] font-mono uppercase bg-black text-white px-1.5 py-0.2 font-bold">
+                        TODO DESBLOQUEADO
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-neutral-600 font-sans mt-1">
+                    Desbloquea al instante todas las lecciones del Camino y filtros de minijuegos para comprobar cualquier ejercicio o practicar libremente sin tener que superar cada nivel previo uno por uno.
+                  </p>
+                </div>
+              </div>
 
-      {/* Zona de peligro: Reiniciar progreso */}
-      <div className="border-2 border-dashed border-neutral-400 p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div>
-          <div className="font-display font-bold text-base">Reiniciar Progreso de la Cuenta</div>
-          <div className="text-xs text-neutral-500 font-sans">
-            Borra las estadísticas, racha, puntos XP y vuelve a bloquear los niveles del camino.
+              <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                {areAllNodesUnlocked ? (
+                  <button
+                    onClick={onLockAllNodes}
+                    className="btn-ink-outline px-3.5 py-2 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer hover:bg-black hover:text-white"
+                    title="Restablecer el bloqueo progresivo estándar"
+                  >
+                    <Lock className="w-3.5 h-3.5" />
+                    <span>Restablecer Bloqueo</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={onUnlockAllNodes}
+                    className="btn-ink px-4 py-2 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
+                    title="Desbloquear todas las lecciones y exámenes"
+                  >
+                    <Unlock className="w-3.5 h-3.5 stroke-[2.5]" />
+                    <span>Desbloquear Todo</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* TARJETA CÓDIGO ABIERTO / GITHUB */}
+          <div className="border-2 border-black p-5 bg-neutral-50 shadow-[3px_3px_0px_#000000]">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 border-2 border-black bg-black text-white flex items-center justify-center shrink-0 shadow-[2px_2px_0px_#000000]">
+                  <GithubIcon className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-display font-bold text-base">Proyecto Open Source</h3>
+                    <span className="text-[10px] font-mono uppercase bg-black text-white px-1.5 py-0.2 font-bold">
+                      MIT LICENSE
+                    </span>
+                  </div>
+                  <p className="text-xs text-neutral-600 font-sans mt-1">
+                    Paplitz es un software libre y gratuito. Puedes explorar el código, reportar sugerencias o descargar los ejecutables de escritorio y Android en GitHub.
+                  </p>
+                </div>
+              </div>
+
+              <a
+                href="https://github.com/lazaro-guerrero-losada/paplitz"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-ink px-4 py-2 text-xs font-mono font-bold flex items-center gap-2 cursor-pointer shrink-0 shadow-[2px_2px_0px_#000000] hover:scale-[1.02] transition-transform"
+              >
+                <GithubIcon className="w-4 h-4" />
+                <span>Ver en GitHub</span>
+                <ExternalLink className="w-3 h-3 opacity-70" />
+              </a>
+            </div>
+          </div>
+
+          {/* Zona de peligro: Reiniciar progreso */}
+          <div className="border-2 border-dashed border-neutral-400 p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div>
+              <div className="font-display font-bold text-base">Reiniciar Progreso de la Cuenta</div>
+              <div className="text-xs text-neutral-500 font-sans">
+                Borra las estadísticas, racha, puntos XP y vuelve a bloquear los niveles del camino.
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                if (window.confirm('¿Seguro que quieres reiniciar todo tu progreso a 0?')) {
+                  onResetProgress();
+                }
+              }}
+              className="btn-ink-outline px-4 py-2 text-xs flex items-center gap-1.5 cursor-pointer shrink-0 font-mono hover:bg-black hover:text-white"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Reiniciar Progreso
+            </button>
           </div>
         </div>
-
-        <button
-          onClick={() => {
-            if (window.confirm('¿Seguro que quieres reiniciar todo tu progreso a 0?')) {
-              onResetProgress();
-            }
-          }}
-          className="btn-ink-outline px-4 py-2 text-xs flex items-center gap-1.5 cursor-pointer shrink-0 font-mono hover:bg-black hover:text-white"
-        >
-          <RotateCcw className="w-4 h-4" />
-          Reiniciar Progreso
-        </button>
-      </div>
+      )}
 
       {/* Modal para Pegar Código de Guardado */}
       {showPasteModal && (

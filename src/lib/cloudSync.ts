@@ -16,7 +16,7 @@ export function getSupabaseConfig(): { url: string; anonKey: string; isConfigure
 /**
  * Genera un hash criptográfico SHA-256 para el PIN utilizando la Web Crypto API nativa
  */
-async function hashPin(pin: string): Promise<string> {
+export async function hashPin(pin: string): Promise<string> {
   const msgUint8 = new TextEncoder().encode(`paplitz-salt-v1:${pin.trim()}`);
   const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
