@@ -283,80 +283,80 @@ export function App() {
     <div className="min-h-screen bg-white text-black flex flex-col antialiased">
       {/* 1. BARRA SUPERIOR CON PESTAÑAS PRINCIPALES */}
       <header className="sticky top-0 z-40 bg-white border-b-2 border-black">
-        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
+        <div className="max-w-6xl xl:max-w-7xl mx-auto px-3 sm:px-4 h-16 flex items-center justify-between gap-2 sm:gap-4">
           {/* Logo Paplitz */}
           <div
             onClick={() => setActiveTab('practice')}
-            className="flex items-center gap-3 cursor-pointer group select-none"
+            className="flex items-center gap-2 sm:gap-3 cursor-pointer group select-none shrink-0"
           >
             <img
               src="/paplitz-logo.svg"
               alt="Paplitz Logo"
-              className="w-10 h-10 group-hover:scale-105 transition-transform"
+              className="w-9 h-9 sm:w-10 sm:h-10 group-hover:scale-105 transition-transform"
             />
             <div>
-              <span className="text-2xl font-bold font-display tracking-tight block leading-none">
+              <span className="text-xl sm:text-2xl font-bold font-display tracking-tight block leading-none">
                 Paplitz
               </span>
-              <span className="text-[9px] font-mono tracking-widest uppercase text-neutral-500 block">
+              <span className="text-[8px] sm:text-[9px] font-mono tracking-widest uppercase text-neutral-500 block">
                 Drawing Practice
               </span>
             </div>
           </div>
 
           {/* Selector de Pestañas Principales (Home, Camino, Perfil) */}
-          <nav className="flex items-center gap-1 border-2 border-black p-1 bg-white shadow-[2px_2px_0px_#000000]">
+          <nav className="shrink-0 flex items-center gap-0.5 sm:gap-1 border-2 border-black p-0.5 sm:p-1 bg-white shadow-[2px_2px_0px_#000000]">
             <button
               onClick={() => setActiveTab('practice')}
-              className={`px-3 py-1.5 text-xs font-mono uppercase font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+              className={`px-2 sm:px-3 py-1.5 text-xs font-mono uppercase font-bold flex items-center gap-1 sm:gap-1.5 transition-colors cursor-pointer ${
                 activeTab === 'practice' ? 'bg-black text-white' : 'hover:bg-neutral-100 text-black'
               }`}
             >
-              <Compass className="w-4 h-4" />
+              <Compass className="w-4 h-4 shrink-0" />
               <span className="hidden sm:inline">Práctica</span>
             </button>
             <button
               onClick={() => setActiveTab('minigames')}
-              className={`px-3 py-1.5 text-xs font-mono uppercase font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+              className={`px-2 sm:px-3 py-1.5 text-xs font-mono uppercase font-bold flex items-center gap-1 sm:gap-1.5 transition-colors cursor-pointer ${
                 activeTab === 'minigames' ? 'bg-black text-white' : 'hover:bg-neutral-100 text-black'
               }`}
             >
-              <Gamepad2 className="w-4 h-4 stroke-[2.5]" />
+              <Gamepad2 className="w-4 h-4 stroke-[2.5] shrink-0" />
               <span className="hidden sm:inline">Minijuegos</span>
             </button>
             <button
               onClick={() => setActiveTab('path')}
-              className={`px-3 py-1.5 text-xs font-mono uppercase font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+              className={`px-2 sm:px-3 py-1.5 text-xs font-mono uppercase font-bold flex items-center gap-1 sm:gap-1.5 transition-colors cursor-pointer ${
                 activeTab === 'path' ? 'bg-black text-white' : 'hover:bg-neutral-100 text-black'
               }`}
             >
-              <Map className="w-4 h-4" />
+              <Map className="w-4 h-4 shrink-0" />
               <span className="hidden sm:inline">El Camino</span>
             </button>
             <button
               onClick={() => setActiveTab('profile')}
-              className={`px-3 py-1.5 text-xs font-mono uppercase font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+              className={`px-2 sm:px-3 py-1.5 text-xs font-mono uppercase font-bold flex items-center gap-1 sm:gap-1.5 transition-colors cursor-pointer ${
                 activeTab === 'profile' ? 'bg-black text-white' : 'hover:bg-neutral-100 text-black'
               }`}
             >
-              <User className="w-4 h-4" />
-              <span className="hidden sm:inline">Perfil</span>
+              <User className="w-4 h-4 shrink-0" />
+              <span className="hidden xs:inline sm:inline">Perfil</span>
             </button>
           </nav>
 
           {/* Estadísticas de Gamificación & Hojas A4 */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <button
               onClick={() => setShowAnalogModal(true)}
-              className="btn-ink-outline px-2.5 py-1 text-xs flex items-center gap-1 cursor-pointer font-mono"
+              className="btn-ink-outline px-2 sm:px-2.5 py-1 text-xs flex items-center gap-1 cursor-pointer font-mono"
               title="Descargar plantillas A4 o validar escaneos"
             >
-              <Printer className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">A4</span>
+              <Printer className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden xl:inline">A4</span>
             </button>
 
             {/* Racha */}
-            <div className="flex items-center gap-1 border-2 border-black px-2.5 py-1 text-xs font-mono font-bold shadow-[2px_2px_0px_#000000]">
+            <div className="flex items-center gap-1 border-2 border-black px-2 py-1 text-xs font-mono font-bold shadow-[2px_2px_0px_#000000]">
               <Flame className="w-3.5 h-3.5 stroke-[2.5]" />
               <span>{streak}</span>
             </div>
@@ -364,27 +364,27 @@ export function App() {
             {/* XP y Nivel con Barrita de Progreso */}
             <div
               onClick={() => setShowLevelGuide(true)}
-              className="flex items-center gap-1.5 border-2 border-black px-2 py-1 text-xs font-mono font-bold shadow-[2px_2px_0px_#000000] bg-white cursor-pointer hover:bg-neutral-100 transition-colors"
+              className="flex items-center gap-1 sm:gap-1.5 border-2 border-black px-1.5 sm:px-2 py-1 text-xs font-mono font-bold shadow-[2px_2px_0px_#000000] bg-white cursor-pointer hover:bg-neutral-100 transition-colors"
               title={`Nivel ${playerLevel.level}: ${playerLevel.title} (${playerLevel.progressPercent}% hacia Nivel ${playerLevel.level + 1}) — Clic para abrir guía`}
             >
               <span className="bg-black text-white px-1 text-[10px]">NV.{playerLevel.level}</span>
-              <div className="w-8 sm:w-12 h-2 border border-black bg-neutral-100 overflow-hidden relative" title={`${playerLevel.progressPercent}% completado`}>
+              <div className="w-6 sm:w-10 h-2 border border-black bg-neutral-100 overflow-hidden relative" title={`${playerLevel.progressPercent}% completado`}>
                 <div
                   className="h-full bg-black transition-all duration-300"
                   style={{ width: `${playerLevel.progressPercent}%` }}
                 />
               </div>
-              <span className="text-[11px] tabular-nums hidden xs:inline">{xp} XP</span>
+              <span className="text-[10px] sm:text-[11px] tabular-nums hidden xs:inline">{xp} XP</span>
             </div>
 
             {/* Botón de Guía a la derecha de XP */}
             <button
               onClick={() => setShowLevelGuide(true)}
-              className="btn-ink-outline px-2.5 py-1 text-xs flex items-center gap-1.5 cursor-pointer font-mono font-bold shadow-[2px_2px_0px_#000000] hover:bg-neutral-100"
+              className="btn-ink-outline px-2 sm:px-2.5 py-1 text-xs flex items-center gap-1 cursor-pointer font-mono font-bold shadow-[2px_2px_0px_#000000] hover:bg-neutral-100"
               title="Guía: cómo funcionan los niveles, exámenes y XP"
             >
               <BookOpen className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span className="hidden sm:inline">Guía</span>
+              <span className="hidden md:inline">Guía</span>
             </button>
 
             {/* Enlace al repositorio de GitHub */}
@@ -392,11 +392,11 @@ export function App() {
               href="https://github.com/lazaro-guerrero-losada/paplitz"
               target="_blank"
               rel="noopener noreferrer"
-              className="btn-ink-outline px-2.5 py-1 text-xs flex items-center gap-1.5 font-mono font-bold shadow-[2px_2px_0px_#000000] hover:bg-black hover:text-white transition-colors"
+              className="btn-ink-outline p-1.5 sm:px-2.5 sm:py-1 text-xs flex items-center gap-1 font-mono font-bold shadow-[2px_2px_0px_#000000] hover:bg-black hover:text-white transition-colors"
               title="Ver código abierto en GitHub"
             >
               <GithubIcon className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">GitHub</span>
+              <span className="hidden lg:inline">GitHub</span>
             </a>
           </div>
         </div>
