@@ -674,7 +674,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     type="text"
                     value={cloudAlias}
                     onChange={(e) => setCloudAlias(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
-                    placeholder="ej: lazaro_pro"
+                    placeholder="ej: cubito_123"
                     maxLength={24}
                     className="w-full border-2 border-black px-2.5 py-1 text-xs font-mono font-bold bg-white focus:outline-none"
                   />
@@ -990,7 +990,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   type="text"
                   value={recoveryAlias}
                   onChange={(e) => setRecoveryAlias(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
-                  placeholder="ej: lazaro_pro"
+                  placeholder="ej: cubito_123"
                   className="w-full border-2 border-black px-2.5 py-1.5 text-xs font-mono font-bold bg-white focus:outline-none"
                 />
               </div>
