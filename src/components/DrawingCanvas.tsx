@@ -983,8 +983,9 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
           </div>
         ) : (
           <div className="flex items-center gap-1.5 shrink-0">
-            <span className="text-[11px] font-mono font-bold text-neutral-700 bg-neutral-100 px-2 py-1 border border-black shadow-[1px_1px_0px_#000000]">
-              {countDetectedAristas(strokes)}/{challenge.targetEdges.length} {challenge.isShadowLevel ? 'aristas sombra' : 'aristas'}
+            <span className="text-[11px] font-mono font-bold text-neutral-700 bg-neutral-100 px-1.5 sm:px-2 py-1 border border-black shadow-[1px_1px_0px_#000000]">
+              {countDetectedAristas(strokes)}/{challenge.targetEdges.length}
+              <span className="hidden xs:inline"> {challenge.isShadowLevel ? 'aristas sombra' : 'aristas'}</span>
             </span>
           </div>
         )}
@@ -1062,7 +1063,8 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
               {feedback.passed && (feedback.speedBonus ?? 0) > 0 ? (
                 <span className="bg-neutral-200 border border-black px-1.5 py-0.5 font-bold flex items-center gap-1">
                   <Zap className="w-3 h-3 fill-black text-black shrink-0" />
-                  <span>Base {feedback.score}% + Vel. +{feedback.speedBonus}% ({feedback.timeRemainingSeconds?.toFixed(1)}s)</span>
+                  <span className="hidden sm:inline">Base {feedback.score}% + Vel. +{feedback.speedBonus}% ({feedback.timeRemainingSeconds?.toFixed(1)}s)</span>
+                  <span className="sm:hidden">+{feedback.speedBonus}% vel</span>
                 </span>
               ) : (
                 <span className="text-neutral-500">Mínimo: 75%</span>

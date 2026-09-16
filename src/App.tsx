@@ -13,7 +13,7 @@ import { PlacementModal } from './components/PlacementModal';
 import { calculatePlayerLevel } from './lib/levelSystem';
 import { SenseiCubo } from './components/avatar/SenseiCubo';
 import { AvatarMood } from './lib/avatarTypes';
-import { Flame, Printer, Compass, Map, User, RefreshCw, Filter, PenTool, Gamepad2, BookOpen, Zap } from 'lucide-react';
+import { Flame, Printer, Compass, Map, User, RefreshCw, Filter, PenTool, Gamepad2, BookOpen, Zap, Menu, X, ChevronRight } from 'lucide-react';
 import { PaplitzSaveData, applySaveDataToLocalStorage, fastForwardCurriculum } from './lib/saveSystem';
 
 function GithubIcon({ className = 'w-3.5 h-3.5' }: { className?: string }) {
@@ -28,6 +28,12 @@ function GithubIcon({ className = 'w-3.5 h-3.5' }: { className?: string }) {
 export function App() {
   // Pestañas principales: 'practice' (Home / Práctica Rápida), 'path' (El Camino), 'minigames' (Minijuegos), 'profile' (Perfil)
   const [activeTab, setActiveTab] = useState<'practice' | 'path' | 'minigames' | 'profile'>('practice');
+
+  // Estado del Menú Lateral Móvil (Drawer) y Detección de Orientación
+  const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
+  const [showRotatePrompt, setShowRotatePrompt] = useState<boolean>(true);
+  const [isPortraitMobile, setIsPortraitMobile] = useState<boolean>(false);
+  const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
 
   // Estado del Avatar Acompañante Cúbico ("Cubito")
   const [avatarMood, setAvatarMood] = useState<AvatarMood>('neutral');
@@ -111,6 +117,35 @@ export function App() {
     localStorage.setItem('paplitz_xp', xp.toString());
     localStorage.setItem('paplitz_scores', JSON.stringify(scoresHistory));
   }, [units, streak, xp, scoresHistory]);
+
+  // Detección de tamaño de pantalla y orientación para móvil
+  useEffect(() => {
+    const handleDimensions = () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      setWindowWidth(w);
+      setIsPortraitMobile(w <= 768 && h > w);
+    };
+    handleDimensions();
+    window.addEventListener('resize', handleDimensions);
+    window.addEventListener('orientationchange', handleDimensions);
+    return () => {
+      window.removeEventListener('resize', handleDimensions);
+      window.removeEventListener('orientationchange', handleDimensions);
+    };
+  }, []);
+
+  // Intento de bloqueo a horizontal mediante API de orientación
+  const tryLockLandscape = async () => {
+    try {
+      const anyScreen = window.screen as unknown as { orientation?: { lock?: (o: string) => Promise<void> } };
+      if (anyScreen.orientation?.lock) {
+        await anyScreen.orientation.lock('landscape');
+      }
+    } catch {
+      // Ignorar restricciones en navegadores móviles estándar
+    }
+  };
 
   // Generar nuevo cubo de práctica basado en la lección activa
   const handleNewPracticeCube = (nodeToUse?: LessonNode) => {
@@ -345,29 +380,29 @@ export function App() {
     <div className="min-h-screen bg-white text-black flex flex-col antialiased">
       {/* 1. BARRA SUPERIOR CON PESTAÑAS PRINCIPALES */}
       <header className="sticky top-0 z-40 bg-white border-b-2 border-black">
-        <div className="max-w-6xl xl:max-w-7xl mx-auto px-3 sm:px-4 h-16 flex items-center justify-between gap-2 sm:gap-4">
+        <div className="max-w-6xl xl:max-w-7xl mx-auto px-3 sm:px-4 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4">
           {/* Logo Paplitz */}
           <div
-            onClick={() => setActiveTab('practice')}
+            onClick={() => { setActiveTab('practice'); setMobileMenuOpen(false); }}
             className="flex items-center gap-2 sm:gap-3 cursor-pointer group select-none shrink-0"
           >
             <img
               src="/paplitz-logo.svg"
               alt="Paplitz Logo"
-              className="w-9 h-9 sm:w-10 sm:h-10 group-hover:scale-105 transition-transform"
+              className="w-8 h-8 sm:w-10 sm:h-10 group-hover:scale-105 transition-transform"
             />
             <div>
-              <span className="text-xl sm:text-2xl font-bold font-display tracking-tight block leading-none">
+              <span className="text-lg sm:text-2xl font-bold font-display tracking-tight block leading-none">
                 Paplitz
               </span>
-              <span className="text-[8px] sm:text-[9px] font-mono tracking-widest uppercase text-neutral-500 block">
+              <span className="text-[7px] sm:text-[9px] font-mono tracking-widest uppercase text-neutral-500 block">
                 Drawing Practice
               </span>
             </div>
           </div>
 
-          {/* Selector de Pestañas Principales (Home, Camino, Perfil) */}
-          <nav className="shrink-0 flex items-center gap-0.5 sm:gap-1 border-2 border-black p-0.5 sm:p-1 bg-white shadow-[2px_2px_0px_#000000]">
+          {/* Selector de Pestañas Principales en Desktop (>= lg) */}
+          <nav className="hidden lg:flex shrink-0 items-center gap-0.5 sm:gap-1 border-2 border-black p-0.5 sm:p-1 bg-white shadow-[2px_2px_0px_#000000]">
             <button
               onClick={() => setActiveTab('practice')}
               className={`px-2 sm:px-3 py-1.5 text-xs font-mono uppercase font-bold flex items-center gap-1 sm:gap-1.5 transition-colors cursor-pointer ${
@@ -375,7 +410,7 @@ export function App() {
               }`}
             >
               <Compass className="w-4 h-4 shrink-0" />
-              <span className="hidden sm:inline">Práctica</span>
+              <span>Práctica</span>
             </button>
             <button
               onClick={() => setActiveTab('minigames')}
@@ -384,7 +419,7 @@ export function App() {
               }`}
             >
               <Gamepad2 className="w-4 h-4 stroke-[2.5] shrink-0" />
-              <span className="hidden sm:inline">Minijuegos</span>
+              <span>Minijuegos</span>
             </button>
             <button
               onClick={() => setActiveTab('path')}
@@ -393,7 +428,7 @@ export function App() {
               }`}
             >
               <Map className="w-4 h-4 shrink-0" />
-              <span className="hidden sm:inline">El Camino</span>
+              <span>El Camino</span>
             </button>
             <button
               onClick={() => setActiveTab('profile')}
@@ -402,12 +437,12 @@ export function App() {
               }`}
             >
               <User className="w-4 h-4 shrink-0" />
-              <span className="hidden xs:inline sm:inline">Perfil</span>
+              <span>Perfil</span>
             </button>
           </nav>
 
-          {/* Estadísticas de Gamificación & Hojas A4 */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Estadísticas de Gamificación & Hojas A4 en Desktop (>= lg) */}
+          <div className="hidden lg:flex items-center gap-1.5 sm:gap-2 shrink-0">
             <button
               onClick={() => setShowAnalogModal(true)}
               className="btn-ink-outline px-2 sm:px-2.5 py-1 text-xs flex items-center gap-1 cursor-pointer font-mono"
@@ -446,7 +481,7 @@ export function App() {
               title="Guía: cómo funcionan los niveles, exámenes y XP"
             >
               <BookOpen className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span className="hidden md:inline">Guía</span>
+              <span className="hidden lg:inline">Guía</span>
             </button>
 
             {/* Enlace al repositorio de GitHub */}
@@ -458,14 +493,219 @@ export function App() {
               title="Ver código abierto en GitHub"
             >
               <GithubIcon className="w-3.5 h-3.5" />
-              <span className="hidden lg:inline">GitHub</span>
+              <span className="hidden xl:inline">GitHub</span>
             </a>
+          </div>
+
+          {/* Barra de Acciones Móvil (< lg): Racha + Nivel + Botón Hamburguesa */}
+          <div className="flex lg:hidden items-center gap-1.5 shrink-0">
+            {/* Racha compacta */}
+            <div className="flex items-center gap-0.5 border-2 border-black px-1.5 py-1 text-[11px] font-mono font-bold shadow-[1px_1px_0px_#000000]">
+              <Flame className="w-3 h-3 stroke-[2.5]" />
+              <span>{streak}</span>
+            </div>
+
+            {/* Nivel compacto */}
+            <div
+              onClick={() => setShowLevelGuide(true)}
+              className="flex items-center gap-1 border-2 border-black px-1.5 py-1 text-[11px] font-mono font-bold shadow-[1px_1px_0px_#000000] bg-white cursor-pointer"
+            >
+              <span className="bg-black text-white px-1 text-[9px]">NV.{playerLevel.level}</span>
+            </div>
+
+            {/* Botón Menú Lateral (Drawer) */}
+            <button
+              onClick={() => setMobileMenuOpen(true)}
+              className="btn-ink-outline p-1.5 text-xs font-mono font-bold flex items-center justify-center cursor-pointer shadow-[2px_2px_0px_#000000] hover:bg-black hover:text-white"
+              aria-label="Abrir menú de navegación"
+            >
+              <Menu className="w-4 h-4 stroke-[2.5]" />
+            </button>
           </div>
         </div>
       </header>
 
-      {/* 2. CONTENIDO SEGÚN LA PESTAÑA ACTIVA */}
+      {/* 2. MENÚ LATERAL DESPLEGABLE (INK DRAWER MÓVIL) */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-50 flex justify-end lg:hidden">
+          {/* Backdrop oscuro translúcido */}
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+
+          {/* Panel Lateral Drawer */}
+          <div className="relative w-[85vw] max-w-xs bg-white border-l-[3px] border-black shadow-[-6px_0px_0px_#000000] h-full flex flex-col justify-between p-4 z-10 overflow-y-auto font-sans">
+            <div>
+              {/* Cabecera del Menú Lateral */}
+              <div className="flex items-center justify-between border-b-2 border-black pb-3 mb-4">
+                <div className="flex items-center gap-2">
+                  <img src="/paplitz-logo.svg" alt="Paplitz" className="w-6 h-6" />
+                  <div>
+                    <h2 className="font-display font-bold text-base tracking-tight leading-none">
+                      Paplitz
+                    </h2>
+                    <span className="text-[9px] font-mono uppercase text-neutral-500 tracking-wider">
+                      Menú Principal
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-1 border border-black hover:bg-neutral-100 cursor-pointer shadow-[1px_1px_0px_#000000]"
+                  aria-label="Cerrar menú"
+                >
+                  <X className="w-4 h-4 text-black stroke-[2.5]" />
+                </button>
+              </div>
+
+              {/* Lista de Pestañas de Navegación */}
+              <div className="space-y-2 mb-6">
+                <span className="text-[10px] font-mono uppercase tracking-widest text-neutral-500 font-bold block mb-1">
+                  Secciones
+                </span>
+
+                <button
+                  onClick={() => { setActiveTab('practice'); setMobileMenuOpen(false); }}
+                  className={`w-full p-2.5 text-xs font-mono font-bold flex items-center justify-between border-2 border-black shadow-[2px_2px_0px_#000000] transition-colors cursor-pointer ${
+                    activeTab === 'practice' ? 'bg-black text-white' : 'bg-white text-black hover:bg-neutral-100'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Compass className="w-4 h-4 stroke-[2.5]" />
+                    <span className="uppercase">Práctica Rápida</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab('minigames'); setMobileMenuOpen(false); }}
+                  className={`w-full p-2.5 text-xs font-mono font-bold flex items-center justify-between border-2 border-black shadow-[2px_2px_0px_#000000] transition-colors cursor-pointer ${
+                    activeTab === 'minigames' ? 'bg-black text-white' : 'bg-white text-black hover:bg-neutral-100'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Gamepad2 className="w-4 h-4 stroke-[2.5]" />
+                    <span className="uppercase">Minijuegos</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab('path'); setMobileMenuOpen(false); }}
+                  className={`w-full p-2.5 text-xs font-mono font-bold flex items-center justify-between border-2 border-black shadow-[2px_2px_0px_#000000] transition-colors cursor-pointer ${
+                    activeTab === 'path' ? 'bg-black text-white' : 'bg-white text-black hover:bg-neutral-100'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Map className="w-4 h-4 stroke-[2.5]" />
+                    <span className="uppercase">El Camino</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab('profile'); setMobileMenuOpen(false); }}
+                  className={`w-full p-2.5 text-xs font-mono font-bold flex items-center justify-between border-2 border-black shadow-[2px_2px_0px_#000000] transition-colors cursor-pointer ${
+                    activeTab === 'profile' ? 'bg-black text-white' : 'bg-white text-black hover:bg-neutral-100'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <User className="w-4 h-4 stroke-[2.5]" />
+                    <span className="uppercase">Perfil & Nube</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Herramientas y Acciones Didácticas */}
+              <div className="space-y-2 mb-6">
+                <span className="text-[10px] font-mono uppercase tracking-widest text-neutral-500 font-bold block mb-1">
+                  Herramientas
+                </span>
+
+                <button
+                  onClick={() => { setShowAnalogModal(true); setMobileMenuOpen(false); }}
+                  className="btn-ink-outline w-full p-2 text-xs font-mono flex items-center gap-2 justify-start cursor-pointer shadow-[2px_2px_0px_#000000]"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>Plantillas A4 & Escaneo</span>
+                </button>
+
+                <button
+                  onClick={() => { setShowLevelGuide(true); setMobileMenuOpen(false); }}
+                  className="btn-ink-outline w-full p-2 text-xs font-mono flex items-center gap-2 justify-start cursor-pointer shadow-[2px_2px_0px_#000000]"
+                >
+                  <BookOpen className="w-4 h-4" />
+                  <span>Guía de Niveles y Exámenes</span>
+                </button>
+
+                <a
+                  href="https://github.com/lazaro-guerrero-losada/paplitz"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-ink-outline w-full p-2 text-xs font-mono flex items-center gap-2 justify-start cursor-pointer shadow-[2px_2px_0px_#000000]"
+                >
+                  <GithubIcon className="w-4 h-4" />
+                  <span>Repositorio GitHub</span>
+                </a>
+              </div>
+            </div>
+
+            {/* Resumen Inferior del Jugador */}
+            <div className="border-t-2 border-black pt-3 bg-neutral-50 p-2.5 border-2 border-black shadow-[2px_2px_0px_#000000]">
+              <div className="flex items-center justify-between text-xs font-mono mb-1.5">
+                <span className="font-bold">Nivel {playerLevel.level}: {playerLevel.title}</span>
+                <span className="font-mono text-[11px] font-bold">{xp} XP</span>
+              </div>
+              <div className="w-full h-2 border border-black bg-white overflow-hidden mb-2">
+                <div
+                  className="h-full bg-black transition-all duration-300"
+                  style={{ width: `${playerLevel.progressPercent}%` }}
+                />
+              </div>
+              <div className="flex items-center justify-between text-[10px] font-mono text-neutral-600">
+                <span className="flex items-center gap-1 font-bold text-black">
+                  <Flame className="w-3 h-3 text-black stroke-[2.5]" />
+                  Racha: {streak} días
+                </span>
+                <span>{playerLevel.progressPercent}% progreso</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. CONTENIDO SEGÚN LA PESTAÑA ACTIVA */}
       <main className="flex-1 flex flex-col overflow-x-hidden">
+        {/* Banner Didáctico: Sugerencia de Modo Horizontal en Móviles */}
+        {isPortraitMobile && showRotatePrompt && (
+          <div className="w-full bg-neutral-100 border-b-2 border-black px-3 py-1.5 flex items-center justify-between text-xs font-mono shadow-[0_2px_0px_#000000] z-20">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <span className="text-sm shrink-0">🔄</span>
+              <span className="text-[11px] leading-tight font-sans truncate">
+                <strong>Gira tu pantalla:</strong> Se recomienda dibujar en horizontal.
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0 ml-2">
+              <button
+                onClick={tryLockLandscape}
+                className="btn-ink px-2 py-0.5 text-[10px] uppercase font-bold cursor-pointer"
+                title="Intentar cambiar a horizontal"
+              >
+                Girar
+              </button>
+              <button
+                onClick={() => setShowRotatePrompt(false)}
+                className="p-1 hover:bg-neutral-200 border border-black cursor-pointer text-[10px] font-bold"
+                title="Descartar"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* PESTAÑA 1: HOME / PRÁCTICA RÁPIDA (TODO AL ALCANCE, SIN SCROLL) */}
         {activeTab === 'practice' && (
           <div className="flex-1 w-full practice-grid px-4 py-2 sm:py-3">
@@ -506,7 +746,8 @@ export function App() {
                           : 'bg-white text-black border-black'
                       }`}
                     >
-                      {activeNode.status === 'completed' ? 'Superado ✓' : 'En curso ★'}
+                      <span className="hidden xs:inline">{activeNode.status === 'completed' ? 'Superado ✓' : 'En curso ★'}</span>
+                      <span className="xs:hidden">{activeNode.status === 'completed' ? '✓' : '★'}</span>
                     </span>
                   )}
                   <button
@@ -591,11 +832,11 @@ export function App() {
             </div>
 
             {/* Columna Lateral Derecha: Cubito (en el lateral derecho sin empujar el centro del lienzo) */}
-            <div className="w-full min-w-0 flex flex-col items-center justify-center shrink-0 pt-16 sm:pt-20">
+            <div className="w-full min-w-0 flex flex-col items-center justify-center shrink-0 pt-4 sm:pt-6 lg:pt-20">
               <SenseiCubo
                 mood={avatarMood}
                 isDrawing={isUserDrawing}
-                size={185}
+                size={windowWidth < 640 ? 140 : 185}
                 onPoke={() => {
                   setAvatarMood('poked');
                   setTimeout(() => setAvatarMood('neutral'), 1800);
