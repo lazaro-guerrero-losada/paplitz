@@ -468,7 +468,7 @@ export function App() {
       <main className="flex-1 flex flex-col overflow-x-hidden">
         {/* PESTAÑA 1: HOME / PRÁCTICA RÁPIDA (TODO AL ALCANCE, SIN SCROLL) */}
         {activeTab === 'practice' && (
-          <div className="flex-1 w-full grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] items-center justify-items-center px-4 py-2 sm:py-3">
+          <div className="flex-1 w-full practice-grid px-4 py-2 sm:py-3">
             {/* Columna izquierda espaciadora para centrar matemáticamente el lienzo en el centro de la pantalla */}
             <div className="hidden lg:block w-full min-w-0" aria-hidden="true" />
 
@@ -476,7 +476,7 @@ export function App() {
             <div
               className="w-full min-w-0 flex flex-col items-center shrink-0 justify-self-center"
               style={{
-                maxWidth: 'min(100%, 600px, max(280px, calc((100vh - 290px) * 600 / 540)))',
+                width: 'min(100%, 600px, max(280px, calc((100vh - 330px) * 600 / 540)))',
               }}
             >
               {/* Barra superior compacta con Selector de Lección alineado 1:1 con el Camino */}
@@ -591,7 +591,7 @@ export function App() {
             </div>
 
             {/* Columna Lateral Derecha: Cubito (en el lateral derecho sin empujar el centro del lienzo) */}
-            <div className="w-full min-w-0 flex flex-col items-center justify-center shrink-0">
+            <div className="w-full min-w-0 flex flex-col items-center justify-center shrink-0 pt-16 sm:pt-20">
               <SenseiCubo
                 mood={avatarMood}
                 isDrawing={isUserDrawing}

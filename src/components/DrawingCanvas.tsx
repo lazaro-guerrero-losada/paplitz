@@ -881,7 +881,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
     <div
       className="flex flex-col items-center select-none w-full mx-auto"
       style={{
-        maxWidth: 'min(100%, 600px, max(280px, calc((100vh - 290px) * 600 / 540)))',
+        width: 'min(100%, 600px, max(280px, calc((100vh - 330px) * 600 / 540)))',
       }}
     >
       {/* Contenedor responsivo del lienzo: aspecto 600/540 bloqueado 1:1 sin deformación ni márgenes invisibles */}
@@ -1044,7 +1044,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
 
       {/* Feedback técnico si se ha comprobado */}
       {feedback && (
-        <div className="w-full mt-1.5 px-3 py-1.5 border-2 border-black bg-neutral-50 flex flex-col gap-0.5 text-xs shadow-[2px_2px_0px_#000000] min-w-0">
+        <div className="w-full mt-1.5 px-3 py-1.5 border-2 border-black bg-neutral-50 flex flex-col gap-0.5 text-xs shadow-[2px_2px_0px_#000000] min-w-0 max-w-full overflow-hidden">
           <div className="flex items-center justify-between gap-2 min-w-0">
             <div className="flex items-center gap-2 truncate min-w-0 flex-1">
               <span

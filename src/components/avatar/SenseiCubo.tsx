@@ -240,34 +240,39 @@ export const SenseiCubo: React.FC<SenseiCuboProps> = ({
     };
   }, []);
 
-  // Re-validar posición ante cambio de tamaño de ventana para que nunca quede fuera
-  useEffect(() => {
-    const handleResize = () => {
-      if (!containerRef.current) return;
-      if (dragOffsetRef.current.x === 0 && dragOffsetRef.current.y === 0) return;
+  // Re-validar posición ante cambio de tamaño de ventana o validación para que nunca quede fuera
+  const clampCurrentPosition = useCallback(() => {
+    if (!containerRef.current) return;
+    if (dragOffsetRef.current.x === 0 && dragOffsetRef.current.y === 0) return;
 
-      const rect = containerRef.current.getBoundingClientRect();
-      const curLeft = rect.left;
-      const curTop = rect.top;
-      const width = rect.width || size;
-      const height = rect.height || size;
+    const rect = containerRef.current.getBoundingClientRect();
+    const curLeft = rect.left;
+    const curTop = rect.top;
+    const width = rect.width || size;
+    const height = rect.height || size;
 
-      const resolved = clampAndResolvePosition(curLeft, curTop, width, height);
-      const diffX = resolved.x - curLeft;
-      const diffY = resolved.y - curTop;
+    const resolved = clampAndResolvePosition(curLeft, curTop, width, height);
+    const diffX = resolved.x - curLeft;
+    const diffY = resolved.y - curTop;
 
-      if (Math.abs(diffX) > 1 || Math.abs(diffY) > 1) {
-        const newOffsetX = dragOffsetRef.current.x + diffX;
-        const newOffsetY = dragOffsetRef.current.y + diffY;
-        dragOffsetRef.current = { x: newOffsetX, y: newOffsetY };
-        setDragOffset({ x: newOffsetX, y: newOffsetY });
-        containerRef.current.style.transform = `translate3d(${newOffsetX.toFixed(1)}px, ${newOffsetY.toFixed(1)}px, 0)`;
-      }
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    if (Math.abs(diffX) > 1 || Math.abs(diffY) > 1) {
+      const newOffsetX = dragOffsetRef.current.x + diffX;
+      const newOffsetY = dragOffsetRef.current.y + diffY;
+      dragOffsetRef.current = { x: newOffsetX, y: newOffsetY };
+      setDragOffset({ x: newOffsetX, y: newOffsetY });
+      containerRef.current.style.transform = `translate3d(${newOffsetX.toFixed(1)}px, ${newOffsetY.toFixed(1)}px, 0)`;
+    }
   }, [size]);
+
+  useEffect(() => {
+    window.addEventListener('resize', clampCurrentPosition);
+    return () => window.removeEventListener('resize', clampCurrentPosition);
+  }, [clampCurrentPosition]);
+
+  // Asegurar que tras corregir (cambio de ánimo externo) Cubito permanezca en los límites válidos
+  useEffect(() => {
+    clampCurrentPosition();
+  }, [externalMood, clampCurrentPosition]);
 
   // ==========================================
   // GESTIÓN DE ARRASTRE (DRAGGING)

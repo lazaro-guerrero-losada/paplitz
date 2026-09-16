@@ -130,3 +130,18 @@
 .cubito-tremor {
   animation: cubito-shiver 0.08s infinite ease-in-out;
 }
+
+/* Layout estable para la zona de práctica y minijuegos que bloquea el ancho del lienzo y la posición de Cubito */
+.practice-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: start;
+  justify-items: center;
+}
+
+@media (min-width: 1024px) {
+  .practice-grid {
+    grid-template-columns: 1fr min(100%, 600px, max(280px, calc((100vh - 330px) * 600 / 540))) 1fr;
+  }
+}
+
