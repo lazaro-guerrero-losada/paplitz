@@ -961,7 +961,6 @@ export const MinigamesView: React.FC<MinigamesViewProps> = ({
       <div className="hidden lg:block w-full min-w-0" aria-hidden="true" />
 
       <div
-        data-canvas-zone="true"
         className="w-full min-w-0 flex flex-col items-center relative shrink-0 justify-self-center"
         style={{
           maxWidth: 'min(100%, 600px, max(280px, calc((100vh - 290px) * 600 / 540)))',
@@ -1078,7 +1077,10 @@ export const MinigamesView: React.FC<MinigamesViewProps> = ({
         </div>
 
         {/* LIENZO DE DIBUJO RESPONSIVO */}
-        <div className="relative border-4 border-black bg-white shadow-[4px_4px_0px_#000000] w-full aspect-[600/540] overflow-hidden">
+        <div
+          data-canvas-zone="true"
+          className="relative border-4 border-black bg-white shadow-[4px_4px_0px_#000000] w-full aspect-[600/540] overflow-hidden"
+        >
           {/* Barra de progreso de tiempo según modo */}
           {gameMode === 'fever' && (
             <div className="absolute top-0 left-0 right-0 h-1.5 bg-neutral-200 pointer-events-none z-10">
@@ -1325,10 +1327,10 @@ export const MinigamesView: React.FC<MinigamesViewProps> = ({
       )}
 
       {/* Columna Lateral Derecha: Cubito en Minijuegos (lateral, sin desplazar el centro del lienzo) */}
-      <div className="w-full min-w-0 flex flex-col items-center justify-center shrink-0 overflow-hidden">
+      <div className="w-full min-w-0 flex flex-col items-center justify-center shrink-0">
         <SenseiCubo
           isDrawing={isDrawing}
-          size={240}
+          size={185}
         />
       </div>
     </div>

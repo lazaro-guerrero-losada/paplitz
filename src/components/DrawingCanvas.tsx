@@ -885,7 +885,10 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
       }}
     >
       {/* Contenedor responsivo del lienzo: aspecto 600/540 bloqueado 1:1 sin deformación ni márgenes invisibles */}
-      <div className="relative border-4 border-black bg-white shadow-[4px_4px_0px_#000000] w-full aspect-[600/540] overflow-hidden">
+      <div
+        data-canvas-zone="true"
+        className="relative border-4 border-black bg-white shadow-[4px_4px_0px_#000000] w-full aspect-[600/540] overflow-hidden"
+      >
         {/* Barra superior de progreso del temporizador */}
         <div className="absolute top-0 left-0 right-0 h-1 bg-neutral-200 pointer-events-none z-10">
           <div
@@ -962,7 +965,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
               title="Deshacer último trazo (Ctrl+Z)"
             >
               <Undo2 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Deshacer</span>
+              <span className="hidden md:inline">Deshacer</span>
             </button>
             <button
               onClick={clearStrokes}
@@ -971,7 +974,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
               title="Borrar todos los trazos"
             >
               <Trash2 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Borrar</span>
+              <span className="hidden md:inline">Borrar</span>
             </button>
             <span className="text-[11px] font-mono text-neutral-600 pl-0.5 font-bold shrink-0">
               {countDetectedAristas(strokes)}/{challenge.targetEdges.length}
@@ -1018,7 +1021,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
               </div>
               <button
                 onClick={onNextCube}
-                className="btn-ink px-3.5 sm:px-4 py-1.5 text-xs font-mono uppercase font-bold flex items-center gap-1 cursor-pointer shadow-[2px_2px_0px_#000000] shrink-0"
+                className="btn-ink px-3 sm:px-4 py-1.5 text-xs font-mono uppercase font-bold flex items-center gap-1 cursor-pointer shadow-[2px_2px_0px_#000000] shrink-0"
                 title="Siguiente ejercicio (Enter)"
               >
                 <span>Siguiente</span>
@@ -1029,7 +1032,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
             <button
               onClick={handleValidateClick}
               disabled={strokes.length === 0}
-              className="btn-ink px-3 sm:px-4 py-1.5 text-xs font-mono uppercase font-bold disabled:opacity-30 cursor-pointer shadow-[2px_2px_0px_#000000] flex items-center gap-1 shrink-0"
+              className="btn-ink px-2.5 sm:px-3.5 py-1.5 text-xs font-mono uppercase font-bold disabled:opacity-30 cursor-pointer shadow-[2px_2px_0px_#000000] flex items-center gap-1 shrink-0"
               title={challenge.isShadowLevel ? "Comprobar proyección de sombra (Enter)" : "Comprobar perspectiva (Enter)"}
             >
               <span>Comprobar</span>

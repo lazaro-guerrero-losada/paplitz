@@ -28,7 +28,7 @@ function clampAndResolvePosition(
   width: number,
   height: number
 ): { x: number; y: number } {
-  const pad = 12;
+  const pad = 8;
   const viewportW = window.innerWidth;
   const viewportH = window.innerHeight;
 
@@ -127,7 +127,7 @@ export const SenseiCubo: React.FC<SenseiCuboProps> = ({
   mood: externalMood,
   isDrawing = false,
   onPoke,
-  size = 270,
+  size = 185,
   className = '',
 }) => {
   const [currentAnimation, setCurrentAnimation] = useState<string>('idle');
