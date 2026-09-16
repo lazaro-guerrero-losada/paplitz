@@ -104,14 +104,18 @@ export async function checkCloudCapacityAndCleanup(
 
     // 2. Si se aproxima al tope (> 90% del límite), intentar purgar inactivos de más de 60 días
     if (totalCount >= MAX_CLOUD_USERS * 0.9) {
-      const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
-      await fetch(`${config.url}/rest/v1/user_saves?last_active_at=lt.${encodeURIComponent(sixtyDaysAgo)}`, {
-        method: 'DELETE',
-        headers: {
-          apikey: config.anonKey,
-          Authorization: `Bearer ${config.anonKey}`,
-        },
-      }).catch(() => {});
+      try {
+        const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
+        await fetch(`${config.url}/rest/v1/user_saves?last_active_at=lt.${encodeURIComponent(sixtyDaysAgo)}`, {
+          method: 'DELETE',
+          headers: {
+            apikey: config.anonKey,
+            Authorization: `Bearer ${config.anonKey}`,
+          },
+        });
+      } catch {
+        // Silencioso si la columna no existe en Supabase
+      }
     }
 
     // 3. Si aún se supera el aforo estricto
@@ -156,8 +160,8 @@ export async function saveProgressToCloud(
     const pinHash = await hashPin(pin);
     const nowIso = new Date().toISOString();
 
-    // 1. Comprobar si ya existe el usuario para verificar el PIN o crear clave de recuperación
-    const checkUrl = `${config.url}/rest/v1/user_saves?alias=eq.${encodeURIComponent(normalizedAlias)}&select=alias,pin_hash,recovery_key_hash`;
+    // 1. Comprobar si ya existe el usuario (select=* compatible tanto si existen las nuevas columnas como si no)
+    const checkUrl = `${config.url}/rest/v1/user_saves?alias=eq.${encodeURIComponent(normalizedAlias)}&select=*`;
     const checkRes = await fetch(checkUrl, {
       method: 'GET',
       headers: {
@@ -200,20 +204,25 @@ export async function saveProgressToCloud(
       ? await hashRecoveryKey(newGeneratedRecoveryKey)
       : existingRecoveryHash;
 
-    // 3. Guardar o actualizar la partida (Upsert)
+    // 3. Guardar o actualizar la partida (Upsert con fallback automático a esquema base)
     const upsertUrl = `${config.url}/rest/v1/user_saves`;
-    const payload: Record<string, unknown> = {
+    const basePayload: Record<string, unknown> = {
       alias: normalizedAlias,
       pin_hash: pinHash,
       save_data: saveData,
       updated_at: nowIso,
+    };
+
+    const fullPayload: Record<string, unknown> = {
+      ...basePayload,
       last_active_at: nowIso,
     };
     if (recoveryHashToSave) {
-      payload.recovery_key_hash = recoveryHashToSave;
+      fullPayload.recovery_key_hash = recoveryHashToSave;
     }
 
-    const upsertRes = await fetch(upsertUrl, {
+    // Intento 1: con campos extendidos de ciclo de vida
+    let upsertRes = await fetch(upsertUrl, {
       method: 'POST',
       headers: {
         apikey: config.anonKey,
@@ -221,15 +230,35 @@ export async function saveProgressToCloud(
         'Content-Type': 'application/json',
         Prefer: 'resolution=merge-duplicates',
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(fullPayload),
     });
+
+    // Intento 2 (Fallback): si da error 400 (porque en Supabase aún no se han añadido las columnas nuevas recovery_key_hash o last_active_at), reintentar con el esquema base
+    if (!upsertRes.ok && upsertRes.status === 400) {
+      console.warn('[CloudSync] Reintentando upsert con esquema base de Supabase...');
+      upsertRes = await fetch(upsertUrl, {
+        method: 'POST',
+        headers: {
+          apikey: config.anonKey,
+          Authorization: `Bearer ${config.anonKey}`,
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates',
+        },
+        body: JSON.stringify(basePayload),
+      });
+    }
 
     if (!upsertRes.ok) {
       const errText = await upsertRes.text();
       console.error('[CloudSync] Error HTTP en Supabase:', upsertRes.status, errText);
+      let detail = '';
+      try {
+        const errJson = JSON.parse(errText);
+        if (errJson.message) detail = `: ${errJson.message}`;
+      } catch {}
       return {
         success: false,
-        error: `Error al guardar en la nube (código ${upsertRes.status}). Comprueba la conexión o permisos.`,
+        error: `Error al guardar en la nube (código ${upsertRes.status})${detail}. Comprueba la conexión o permisos.`,
       };
     }
 
@@ -276,7 +305,7 @@ export async function loadProgressFromCloud(
     const normalizedAlias = alias.trim().toLowerCase();
     const pinHash = await hashPin(pin);
 
-    const queryUrl = `${config.url}/rest/v1/user_saves?alias=eq.${encodeURIComponent(normalizedAlias)}&select=alias,pin_hash,save_data,recovery_key_hash`;
+    const queryUrl = `${config.url}/rest/v1/user_saves?alias=eq.${encodeURIComponent(normalizedAlias)}&select=*`;
     const res = await fetch(queryUrl, {
       method: 'GET',
       headers: {
@@ -286,9 +315,15 @@ export async function loadProgressFromCloud(
     });
 
     if (!res.ok) {
+      const errText = await res.text();
+      let detail = '';
+      try {
+        const errJson = JSON.parse(errText);
+        if (errJson.message) detail = `: ${errJson.message}`;
+      } catch {}
       return {
         success: false,
-        error: `Error al conectar con la nube (código ${res.status}).`,
+        error: `Error al conectar con la nube (código ${res.status})${detail}.`,
       };
     }
 
@@ -316,7 +351,7 @@ export async function loadProgressFromCloud(
       };
     }
 
-    // Actualizar timestamp de última actividad
+    // Actualizar timestamp de última actividad si la columna existe en el servidor
     fetch(`${config.url}/rest/v1/user_saves?alias=eq.${encodeURIComponent(normalizedAlias)}`, {
       method: 'PATCH',
       headers: {
@@ -329,7 +364,7 @@ export async function loadProgressFromCloud(
 
     localStorage.setItem('paplitz_cloud_alias', normalizedAlias);
 
-    const cachedKey = localStorage.getItem(`paplitz_recovery_${normalizedAlias}`) || undefined;
+    const cachedKey = localStorage.getItem(`paplitz_recovery_${normalizedAlias}`) || row.recovery_key_hash || undefined;
 
     return {
       success: true,
@@ -370,7 +405,7 @@ export async function recoverProgressWithKey(
   try {
     const keyHash = await hashRecoveryKey(cleanKey);
 
-    const queryUrl = `${config.url}/rest/v1/user_saves?alias=eq.${encodeURIComponent(cleanAlias)}&select=alias,recovery_key_hash,save_data`;
+    const queryUrl = `${config.url}/rest/v1/user_saves?alias=eq.${encodeURIComponent(cleanAlias)}&select=*`;
     const res = await fetch(queryUrl, {
       method: 'GET',
       headers: {
@@ -389,7 +424,13 @@ export async function recoverProgressWithKey(
     }
 
     const row = rows[0];
-    if (!row.recovery_key_hash || row.recovery_key_hash !== keyHash) {
+    if (!row.recovery_key_hash) {
+      return {
+        success: false,
+        error: 'Esta cuenta no tiene una clave de emergencia registrada en Supabase.',
+      };
+    }
+    if (row.recovery_key_hash !== keyHash) {
       return { success: false, error: 'La clave de recuperación no coincide con la registrada para este alias.' };
     }
 
@@ -435,8 +476,8 @@ export async function deleteCloudAccount(
   const cred = pinOrKey.trim();
 
   try {
-    // 1. Comprobar credenciales
-    const checkRes = await fetch(`${config.url}/rest/v1/user_saves?alias=eq.${encodeURIComponent(cleanAlias)}&select=alias,pin_hash,recovery_key_hash`, {
+    // 1. Comprobar credenciales (compatible select=*)
+    const checkRes = await fetch(`${config.url}/rest/v1/user_saves?alias=eq.${encodeURIComponent(cleanAlias)}&select=*`, {
       method: 'GET',
       headers: {
         apikey: config.anonKey,
