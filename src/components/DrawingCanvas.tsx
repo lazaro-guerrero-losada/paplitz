@@ -1,7 +1,8 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { CubeChallenge, Point2D } from '../lib/geometry';
 import { UserStroke, ValidationFeedback, countDetectedAristas } from '../lib/validation';
-import { Undo2, Trash2, Check, ArrowRight, AlertTriangle, CheckCircle, Clock, Zap } from 'lucide-react';
+import { Undo2, Trash2, Check, ArrowRight, AlertTriangle, CheckCircle, Clock, Zap, Copy, Download, X } from 'lucide-react';
+import { buildDebugReport, copyReportToClipboard, downloadReportJson } from '../lib/debugReport';
 
 /**
  * Dibuja trama manga screentone bilineal en perspectiva sobre una cara cuadrilátera
@@ -129,6 +130,15 @@ interface DrawingCanvasProps {
   onValidate?: (timeRemainingSeconds?: number) => void;
   onNextCube?: () => void;
   onDrawingStateChange?: (isDrawing: boolean) => void;
+  activeLesson?: {
+    id?: string;
+    code?: string;
+    title?: string;
+    perspectiveMode?: string;
+    axesMode?: string;
+    difficulty?: string;
+    isShadowLevel?: boolean;
+  } | null;
 }
 
 const TOTAL_COUNTDOWN_SECONDS = 30;
@@ -141,6 +151,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   onValidate,
   onNextCube,
   onDrawingStateChange,
+  activeLesson,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -148,6 +159,32 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   const currentStrokeRef = useRef<{ x: number; y: number; pressure?: number; time: number }[]>([]);
   const activePointerIdRef = useRef<number | null>(null);
   const activePointerTypeRef = useRef<string | null>(null);
+
+  // Estados para el reporte y diagnóstico del cubo
+  const [showReportModal, setShowReportModal] = useState<boolean>(false);
+  const [copiedReport, setCopiedReport] = useState<boolean>(false);
+  const [currentReportData, setCurrentReportData] = useState<{
+    markdownText: string;
+    jsonString: string;
+  } | null>(null);
+
+  const handleGenerateReport = async () => {
+    const report = buildDebugReport(challenge, strokes, feedback, activeLesson);
+    setCurrentReportData(report);
+
+    // 1. Copiar automáticamente al portapapeles
+    const copied = await copyReportToClipboard(report.markdownText);
+    if (copied) {
+      setCopiedReport(true);
+      setTimeout(() => setCopiedReport(false), 2500);
+    }
+
+    // 2. Descargar automáticamente el archivo .json
+    downloadReportJson(report.jsonString, challenge.seed);
+
+    // 3. Abrir el modal con resumen y acciones
+    setShowReportModal(true);
+  };
 
   // Notificar al avatar cuando el usuario está dibujando activamente
   useEffect(() => {
@@ -940,8 +977,18 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
           </span>
         </div>
 
-        {/* Botón de Acción Principal (Comprobar o Siguiente) */}
+        {/* Botón de Acción Principal (Comprobar o Siguiente) + Botón de Reporte */}
         <div className="flex items-center gap-2">
+          {/* Botón de Reporte (pequeño con icono de triángulo para exportar / depurar) */}
+          <button
+            onClick={handleGenerateReport}
+            className="btn-ink-outline p-1.5 sm:px-2.5 sm:py-1.5 text-xs font-mono font-bold flex items-center gap-1 cursor-pointer transition-transform active:scale-95 shadow-[1px_1px_0px_#000000]"
+            title="Generar reporte para depuración y revisión de nota (copiar y descargar)"
+          >
+            <AlertTriangle className="w-3.5 h-3.5 text-black stroke-[2.5]" />
+            <span className="hidden sm:inline text-[11px]">Report</span>
+          </button>
+
           {feedback ? (
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1.5 border-2 border-black bg-neutral-100 px-2.5 py-1 font-mono text-xs font-bold shadow-[1px_1px_0px_#000000]">
@@ -1014,6 +1061,96 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
           <span className="text-neutral-600 text-[11px] font-sans">
             {feedback.tipMessage}
           </span>
+        </div>
+      )}
+
+      {/* Modal de Reporte de Depuración y Diagnóstico */}
+      {showReportModal && currentReportData && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 animate-fade-in">
+          <div className="bg-white border-3 border-black p-4 sm:p-5 max-w-lg w-full shadow-[6px_6px_0px_#000000] flex flex-col gap-3 font-sans">
+            <div className="flex items-center justify-between border-b-2 border-black pb-2">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-black stroke-[2.5]" />
+                <h3 className="font-display font-bold text-sm sm:text-base uppercase tracking-tight">
+                  Reporte de Evaluación del Cubo
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowReportModal(false)}
+                className="p-1 hover:bg-neutral-100 border border-black cursor-pointer"
+                title="Cerrar modal"
+              >
+                <X className="w-4 h-4 text-black" />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between text-xs font-mono bg-neutral-50 p-2 border border-black">
+              <div>
+                <span className="text-neutral-500">Semilla:</span> <strong>#{challenge.seed}</strong>
+              </div>
+              <div>
+                <span className="text-neutral-500">Modo:</span> <strong>{challenge.mode}</strong>
+              </div>
+              <div>
+                <span className="text-neutral-500">Nota:</span>{' '}
+                <strong>{feedback ? `${feedback.totalScore ?? feedback.score}%` : 'Calculada'}</strong>
+              </div>
+            </div>
+
+            <div className="text-xs text-neutral-700 bg-neutral-100 p-2.5 border border-neutral-300 leading-relaxed">
+              <p className="font-bold text-black flex items-center gap-1.5 mb-1">
+                <CheckCircle className="w-4 h-4 text-black" />
+                <span>¡Reporte copiado y descargado en .JSON!</span>
+              </p>
+              <p>
+                El reporte completo con todos los datos geométricos, trazos y evaluación se ha copiado al portapapeles y se ha descargado a tu equipo. Puedes pegarlo directamente en el chat para revisar la calificación.
+              </p>
+            </div>
+
+            {/* Vista previa del contenido */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-mono font-bold text-neutral-600">
+                Vista previa del reporte (Markdown / JSON):
+              </label>
+              <textarea
+                readOnly
+                value={currentReportData.markdownText}
+                className="w-full h-32 p-2 font-mono text-[10px] bg-neutral-50 border border-black resize-none selection:bg-black selection:text-white"
+              />
+            </div>
+
+            {/* Acciones */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-neutral-200">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={async () => {
+                    await copyReportToClipboard(currentReportData.markdownText);
+                    setCopiedReport(true);
+                    setTimeout(() => setCopiedReport(false), 2500);
+                  }}
+                  className="btn-ink px-3 py-1.5 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
+                >
+                  {copiedReport ? <Check className="w-3.5 h-3.5 text-white stroke-[2.5]" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedReport ? '¡Copiado de nuevo!' : 'Copiar Texto'}</span>
+                </button>
+
+                <button
+                  onClick={() => downloadReportJson(currentReportData.jsonString, challenge.seed)}
+                  className="btn-ink-outline px-3 py-1.5 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Descargar JSON</span>
+                </button>
+              </div>
+
+              <button
+                onClick={() => setShowReportModal(false)}
+                className="px-3 py-1.5 text-xs font-mono text-neutral-600 hover:text-black border border-neutral-300 hover:border-black cursor-pointer ml-auto"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -419,14 +419,14 @@ export function App() {
               }}
             >
               {/* Barra superior compacta con Selector de Lección alineado 1:1 con el Camino */}
-              <div className="w-full flex flex-wrap items-center justify-between gap-2 mb-2 border-b-2 border-black pb-2">
-                <div className="flex items-center gap-2">
+              <div className="w-full flex items-center justify-between gap-2 mb-2 border-b-2 border-black pb-2 flex-nowrap">
+                <div className="flex items-center gap-1.5 min-w-0 flex-1">
                   <Filter className="w-4 h-4 text-black shrink-0" />
-                  <span className="text-xs font-mono uppercase font-bold shrink-0">Lección:</span>
+                  <span className="text-xs font-mono uppercase font-bold shrink-0 hidden xs:inline">Lección:</span>
                   <select
                     value={activeNode?.id || ''}
                     onChange={(e) => handleSelectLessonById(e.target.value)}
-                    className="border-2 border-black px-2.5 py-1 text-xs font-mono font-bold bg-white shadow-[2px_2px_0px_#000000] cursor-pointer max-w-[200px] sm:max-w-xs truncate"
+                    className="border-2 border-black px-2 py-1 text-xs font-mono font-bold bg-white shadow-[2px_2px_0px_#000000] cursor-pointer min-w-0 w-full truncate"
                   >
                     {unlockedNodes.map((n) => (
                       <option key={n.id} value={n.id}>
@@ -436,10 +436,10 @@ export function App() {
                   </select>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 shrink-0">
                   {activeNode && (
                     <span
-                      className={`text-[10px] font-mono px-2 py-0.5 font-bold border ${
+                      className={`text-[10px] font-mono px-1.5 py-0.5 font-bold border shrink-0 ${
                         activeNode.status === 'completed'
                           ? 'bg-black text-white border-black'
                           : 'bg-white text-black border-black'
@@ -450,7 +450,7 @@ export function App() {
                   )}
                   <button
                     onClick={() => handleNewPracticeCube()}
-                    className="btn-ink-outline px-2.5 py-1 text-xs font-mono flex items-center gap-1 cursor-pointer"
+                    className="btn-ink-outline px-2.5 py-1 text-xs font-mono flex items-center gap-1 cursor-pointer shrink-0"
                     title="Generar otro cubo aleatorio con la misma lección"
                   >
                     <RefreshCw className="w-3 h-3" />
