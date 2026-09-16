@@ -6,6 +6,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Live Demo](https://img.shields.io/badge/Live_Demo-paplitz.vercel.app-black?logo=vercel&logoColor=white)](https://paplitz.vercel.app/)
+[![Latest Release](https://img.shields.io/github/v/release/lazaro-guerrero-losada/paplitz?color=black&logo=github)](https://github.com/lazaro-guerrero-losada/paplitz/releases/latest)
 [![React](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=white)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-6.2-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
@@ -13,9 +14,10 @@
 
 ---
 
-### 🌐 [**👉 Click Here to Try the Live Web App (paplitz.vercel.app)**](https://paplitz.vercel.app/)
+### 📦 [**👉 Download Latest Releases (.exe for Windows & .apk for Android)**](https://github.com/lazaro-guerrero-losada/paplitz/releases/latest)
+### 🌐 [**👉 Or Try the Live Web App Online (paplitz.vercel.app)**](https://paplitz.vercel.app/)
 
-*No installation required! Works directly in modern web browsers with full graphic tablet (Wacom, Huion, Apple Pencil, S-Pen) and mouse support.*
+*No setup required! Works directly in modern desktop and mobile browsers, or download the native offline apps.*
 
 ---
 
@@ -33,14 +35,17 @@ Paplitz turns spatial perspective training into an intuitive, gamified loop:
 ## 🌟 Key Features
 
 * 🖤 **Pure Black & White Ink Aesthetic:** Designed with inspiration from industrial design manuals, technical fanzines, and screentone / halftone manga aesthetics.
-* 🗺️ **Learning Path ("The Path" - Duolingo-Style):** Progressive thematic units, stroke warm-ups, time-attack challenges, final mastery exams, and integrated theoretical guides.
+* ☁️ **Cloud Sync & Rescue Saves (Supabase):** Sync your progress, level, XP, streak, and unlocked lessons across all devices with private user recovery codes or offline JSON save backup files.
+* 👥 **Classrooms & Student Groups:** Perfect for design schools, universities, and drawing workshops. Teachers can create groups with join codes to track student practice and progress.
+* 📱 **Mobile Responsive & Landscape APK:** Dedicated mobile experience with an *Ink Drawer* navigation menu, and native Android APK locked to horizontal mode (`sensorLandscape`) for maximum drawing area.
+* 🗺️ **Learning Path ("The Path" - Duolingo-Style):** Progressive thematic units, stroke warm-ups, time-attack challenges, placement exams, and integrated theoretical guides.
 * 🧮 **Offline 3D Mathematical Engine:** Zero external AI dependencies, zero API costs, and 100% private. Conic and cylindrical perspective calculations are validated purely through analytical geometry in sub-milliseconds.
 * ✏️ **Dual Input Support:**
   * **Digital Canvas:** Highly responsive drawing canvas optimized for drawing tablets & styluses (Wacom, Apple Pencil, S-Pen, Huion) with pressure sensitivity and tilt (`PointerEvents`).
   * **Analog Worksheets (A4):** Printable vector PDF generator with 12 encoded challenge slots and an integrated camera scanner to validate real-world pencil drawings on paper.
-* 🧊 **Interactive 3D Avatar ("Sensei Cubito"):** Procedural mascot that reacts in real-time to your strokes, accuracy, mistakes, and combos.
+* 🧊 **Interactive 3D Avatar ("Sensei Cubito"):** Draggable mascot that reacts in real-time to your strokes, accuracy, mistakes, and combos.
 * 🕹️ **Arcade & Minigame Modes:** *Fever*, *Blitz*, *Survival*, and *Speed Sprint* modes for fast-paced muscle memory drills.
-* ⚡ **100% Client-Side & Local Gamification:** Daily streak tracking, XP progression, and level unlocks stored locally without requiring account registration.
+* ⚡ **Gamification & Daily Streaks:** Streak tracking, XP progression, level titles, and milestone achievements.
 
 ---
 

@@ -1,7 +1,7 @@
 {
   "name": "paplitz",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Paplitz — Simulador y Práctica de Perspectiva",
   "author": "Paplitz Team",
   "main": "electron/main.cjs",
