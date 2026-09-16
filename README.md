@@ -5,10 +5,28 @@
 ![Paplitz Logo](public/paplitz-logo.svg)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Live Demo](https://img.shields.io/badge/Live_Demo-paplitz.vercel.app-black?logo=vercel&logoColor=white)](https://paplitz.vercel.app/)
 [![React](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=white)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-6.2-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
 [![TailwindCSS](https://img.shields.io/badge/TailwindCSS-v4-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+
+---
+
+### 🌐 [**👉 Click Here to Try the Live Web App (paplitz.vercel.app)**](https://paplitz.vercel.app/)
+
+*No installation required! Works directly in modern web browsers with full graphic tablet (Wacom, Huion, Apple Pencil, S-Pen) and mouse support.*
+
+---
+
+## 🎮 How It Works & Gameplay Flow
+
+Paplitz turns spatial perspective training into an intuitive, gamified loop:
+
+| 1. Geometric Challenge | 2. Freehand Sketching | 3. Analytical Evaluation |
+| :---: | :---: | :---: |
+| ![Step 1 - Challenge](docs/assets/step1-challenge.png) | ![Step 2 - Sketching](docs/assets/step2-sketching.png) | ![Step 3 - Evaluation](docs/assets/step3-evaluation.png) |
+| **Step 1: The Setup**<br>The engine procedurally presents incomplete 3D forms with projective $X, Y, Z$ axes and vanishing guides. | **Step 2: Drawing**<br>Complete missing edges freehand using a drawing tablet, stylus, or mouse. Supports pressure sensitivity and stroke undo. | **Step 3: Instant Scoring**<br>The offline geometry engine calculates vanishing convergence, angle tolerance, and volume closure with instant feedback. |
 
 ---
 
