@@ -4,6 +4,7 @@ import { UserStroke, ValidationFeedback, validateCubeDrawing, validateShadowDraw
 export interface DebugReportData {
   reportVersion: string;
   timestamp: string;
+  userNote?: string;
   lessonInfo?: {
     id?: string;
     code?: string;
@@ -83,7 +84,8 @@ export function buildDebugReport(
     axesMode?: string;
     difficulty?: string;
     isShadowLevel?: boolean;
-  } | null
+  } | null,
+  userNote?: string
 ): { reportData: DebugReportData; markdownText: string; jsonString: string } {
   // Si no se ha evaluado aún, calculamos la evaluación al vuelo con los trazos actuales
   let evalFeedback = feedback;
@@ -121,8 +123,9 @@ export function buildDebugReport(
   });
 
   const reportData: DebugReportData = {
-    reportVersion: '1.0.0',
+    reportVersion: '1.1.0',
     timestamp: new Date().toISOString(),
+    userNote: userNote?.trim() ? userNote.trim() : undefined,
     lessonInfo: activeLesson
       ? {
           id: activeLesson.id,
@@ -187,6 +190,9 @@ export function buildDebugReport(
   const lessonLabel = activeLesson ? `${activeLesson.code} · ${activeLesson.title}` : 'Práctica Libre';
   const scoreDisplay = evalFeedback ? `${evalFeedback.totalScore ?? evalFeedback.score}%` : 'N/A';
   const passedStatus = evalFeedback ? (evalFeedback.passed ? 'APROBADO ✓' : 'NO SUPERADO ✗') : 'NO EVALUADO';
+  const noteSection = userNote?.trim()
+    ? `\n- **📝 NOTA DEL USUARIO / USER NOTE:**\n> "${userNote.trim()}"`
+    : '';
 
   const markdownText = `
 ### 📋 REPORTE DE EVALUACIÓN PAPLITZ
@@ -197,7 +203,7 @@ export function buildDebugReport(
 - **Desglose:** Rectitud: \`${evalFeedback?.straightnessScore ?? 0}%\` | Vértices: \`${evalFeedback?.vertexAccuracyScore ?? 0}%\` | Perspectiva: \`${evalFeedback?.perspectiveScore ?? 0}%\`
 - **Trazos Usuario:** ${strokes.length} trazados (${challenge.targetEdges.length} aristas esperadas)
 - **Diagnóstico:** *"${evalFeedback?.mainIssueMessage || 'N/A'}"*
-- **Consejo:** *"${evalFeedback?.tipMessage || 'N/A'}"*
+- **Consejo:** *"${evalFeedback?.tipMessage || 'N/A'}"*${noteSection}
 
 <details>
 <summary>📦 Ver JSON Completo de Diagnóstico (clic para desplegar)</summary>
@@ -245,13 +251,20 @@ export async function copyReportToClipboard(text: string): Promise<boolean> {
 /**
  * Descarga el reporte como archivo .json
  */
-export function downloadReportJson(jsonString: string, seed: number): void {
+export function downloadReportJson(jsonString: string, seed: number, noteSlug?: string): void {
   try {
     const blob = new Blob([jsonString], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `paplitz_report_seed_${seed}_${Date.now()}.json`;
+    const sanitizedSlug = noteSlug?.trim()
+      ? `_${noteSlug
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '_')
+          .slice(0, 24)}`
+      : '';
+    link.download = `paplitz_report_seed_${seed}${sanitizedSlug}_${Date.now()}.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

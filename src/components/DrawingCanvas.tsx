@@ -1,7 +1,7 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { CubeChallenge, Point2D } from '../lib/geometry';
 import { UserStroke, ValidationFeedback, countDetectedAristas } from '../lib/validation';
-import { Undo2, Trash2, Check, ArrowRight, AlertTriangle, CheckCircle, Clock, Zap, Copy, Download, X, Pen, Hand, ArrowDown, ArrowUp, Eye, EyeOff } from 'lucide-react';
+import { Undo2, Trash2, Check, ArrowRight, AlertTriangle, CheckCircle, Clock, Zap, Copy, Download, X, Pen, Hand, ArrowDown, ArrowUp, Eye, EyeOff, FileText } from 'lucide-react';
 import { buildDebugReport, copyReportToClipboard, downloadReportJson } from '../lib/debugReport';
 
 /**
@@ -164,29 +164,20 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   const [showUserDrawing, setShowUserDrawing] = useState<boolean>(true);
   const [showParametricSolution, setShowParametricSolution] = useState<boolean>(true);
 
-  // Estados para el reporte y diagnóstico del cubo
+  // Estados para el reporte y diagnóstico del cubo con notas del usuario
   const [showReportModal, setShowReportModal] = useState<boolean>(false);
+  const [userNote, setUserNote] = useState<string>('');
   const [copiedReport, setCopiedReport] = useState<boolean>(false);
-  const [currentReportData, setCurrentReportData] = useState<{
-    markdownText: string;
-    jsonString: string;
-  } | null>(null);
+  const [downloadedReport, setDownloadedReport] = useState<boolean>(false);
 
-  const handleGenerateReport = async () => {
-    const report = buildDebugReport(challenge, strokes, feedback, activeLesson);
-    setCurrentReportData(report);
+  // Reporte calculado dinámicamente con la nota del usuario incluida
+  const currentReport = useMemo(() => {
+    return buildDebugReport(challenge, strokes, feedback, activeLesson, userNote);
+  }, [challenge, strokes, feedback, activeLesson, userNote]);
 
-    // 1. Copiar automáticamente al portapapeles
-    const copied = await copyReportToClipboard(report.markdownText);
-    if (copied) {
-      setCopiedReport(true);
-      setTimeout(() => setCopiedReport(false), 2500);
-    }
-
-    // 2. Descargar automáticamente el archivo .json
-    downloadReportJson(report.jsonString, challenge.seed);
-
-    // 3. Abrir el modal con resumen y acciones
+  const handleOpenReportModal = () => {
+    setCopiedReport(false);
+    setDownloadedReport(false);
     setShowReportModal(true);
   };
 
@@ -234,6 +225,9 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
     setIsDrawing(false);
     setShowUserDrawing(true);
     setShowParametricSolution(true);
+    setUserNote('');
+    setCopiedReport(false);
+    setDownloadedReport(false);
     if (timerIntervalRef.current) {
       clearInterval(timerIntervalRef.current);
       timerIntervalRef.current = null;
@@ -1130,9 +1124,9 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {/* Botón de Reporte (pequeño con icono de triángulo para exportar / depurar) */}
           <button
-            onClick={handleGenerateReport}
+            onClick={handleOpenReportModal}
             className="btn-ink-outline p-1.5 text-xs font-mono font-bold flex items-center gap-1 cursor-pointer transition-transform active:scale-95 shadow-[1px_1px_0px_#000000] shrink-0"
-            title="Generar reporte para depuración y revisión de nota (copiar y descargar)"
+            title="Escribir nota y descargar reporte (JSON / Copiar)"
           >
             <AlertTriangle className="w-3.5 h-3.5 text-black stroke-[2.5]" />
           </button>
@@ -1219,26 +1213,28 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
         </div>
       )}
 
-      {/* Modal de Reporte de Depuración y Diagnóstico */}
-      {showReportModal && currentReportData && (
+      {/* Modal de Reporte de Depuración y Diagnóstico con Notas */}
+      {showReportModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 animate-fade-in">
-          <div className="bg-white border-3 border-black p-4 sm:p-5 max-w-lg w-full shadow-[6px_6px_0px_#000000] flex flex-col gap-3 font-sans">
+          <div className="bg-white border-4 border-black p-4 sm:p-5 max-w-lg w-full shadow-[8px_8px_0px_#000000] flex flex-col gap-3 font-sans max-h-[92vh] overflow-y-auto">
+            {/* Cabecera */}
             <div className="flex items-center justify-between border-b-2 border-black pb-2">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5 text-black stroke-[2.5]" />
                 <h3 className="font-display font-bold text-sm sm:text-base uppercase tracking-tight">
-                  Reporte de Evaluación del Cubo
+                  Reporte de Evaluación y Depuración
                 </h3>
               </div>
               <button
                 onClick={() => setShowReportModal(false)}
                 className="p-1 hover:bg-neutral-100 border border-black cursor-pointer"
-                title="Cerrar modal"
+                title="Cerrar modal (Esc)"
               >
-                <X className="w-4 h-4 text-black" />
+                <X className="w-4 h-4 text-black stroke-[2.5]" />
               </button>
             </div>
 
+            {/* Metadatos del reto */}
             <div className="flex items-center justify-between text-xs font-mono bg-neutral-50 p-2 border border-black">
               <div>
                 <span className="text-neutral-500">Semilla:</span> <strong>#{challenge.seed}</strong>
@@ -1252,53 +1248,94 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
               </div>
             </div>
 
-            <div className="text-xs text-neutral-700 bg-neutral-100 p-2.5 border border-neutral-300 leading-relaxed">
-              <p className="font-bold text-black flex items-center gap-1.5 mb-1">
-                <CheckCircle className="w-4 h-4 text-black" />
-                <span>¡Reporte copiado y descargado en .JSON!</span>
-              </p>
-              <p>
-                El reporte completo con todos los datos geométricos, trazos y evaluación se ha copiado al portapapeles y se ha descargado a tu equipo. Puedes pegarlo directamente en el chat para revisar la calificación.
-              </p>
+            {/* Campo de Nota / Explicación del problema */}
+            <div className="flex flex-col gap-1.5 bg-neutral-50 p-3 border-2 border-black">
+              <label className="text-xs font-mono font-bold text-black flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Nota o explicación del problema:</span>
+                </span>
+                <span className="text-[10px] text-neutral-500 font-normal hidden sm:inline">
+                  (Se guardará dentro del archivo .JSON y en el texto copiado)
+                </span>
+              </label>
+              <textarea
+                value={userNote}
+                onChange={(e) => setUserNote(e.target.value)}
+                placeholder="Escribe aquí qué ocurrió (ej: 'El punto 3 converge hacia VPR pero dio 0%', 'Arista no detectada', 'Fallo en la sombra proyectada')..."
+                className="w-full h-20 p-2 text-xs font-mono bg-white border border-black resize-none focus:outline-none focus:ring-2 focus:ring-black selection:bg-black selection:text-white"
+                autoFocus
+              />
+              <div className="flex flex-wrap gap-1 items-center pt-0.5">
+                <span className="text-[10px] font-mono text-neutral-500 font-bold mr-1">Rápido:</span>
+                {['Nota injusta', 'Punto de fuga desalineado', 'Arista no detectada', 'Fallo en sombra'].map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => setUserNote((prev) => (prev ? `${prev} · ${tag}` : tag))}
+                    className="text-[10px] font-mono bg-white hover:bg-black hover:text-white border border-black px-1.5 py-0.5 cursor-pointer transition-colors shadow-[1px_1px_0px_#000000]"
+                  >
+                    +{tag}
+                  </button>
+                ))}
+                {userNote && (
+                  <button
+                    type="button"
+                    onClick={() => setUserNote('')}
+                    className="text-[10px] font-mono text-neutral-500 hover:text-black ml-auto underline cursor-pointer"
+                  >
+                    Borrar nota
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Vista previa del contenido */}
             <div className="flex flex-col gap-1">
               <label className="text-[11px] font-mono font-bold text-neutral-600">
-                Vista previa del reporte (Markdown / JSON):
+                Vista previa del reporte (Markdown / JSON con tu nota):
               </label>
               <textarea
                 readOnly
-                value={currentReportData.markdownText}
-                className="w-full h-32 p-2 font-mono text-[10px] bg-neutral-50 border border-black resize-none selection:bg-black selection:text-white"
+                value={currentReport.markdownText}
+                className="w-full h-28 p-2 font-mono text-[10px] bg-neutral-50 border border-black resize-none selection:bg-black selection:text-white"
               />
             </div>
 
-            {/* Acciones */}
+            {/* Acciones de exportación */}
             <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-neutral-200">
               <div className="flex items-center gap-2">
                 <button
-                  onClick={async () => {
-                    await copyReportToClipboard(currentReportData.markdownText);
-                    setCopiedReport(true);
-                    setTimeout(() => setCopiedReport(false), 2500);
+                  type="button"
+                  onClick={() => {
+                    downloadReportJson(currentReport.jsonString, challenge.seed, userNote);
+                    setDownloadedReport(true);
+                    setTimeout(() => setDownloadedReport(false), 2500);
                   }}
                   className="btn-ink px-3 py-1.5 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
+                  title="Descargar archivo .JSON incluyendo tu nota"
                 >
-                  {copiedReport ? <Check className="w-3.5 h-3.5 text-white stroke-[2.5]" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copiedReport ? '¡Copiado de nuevo!' : 'Copiar Texto'}</span>
+                  {downloadedReport ? <Check className="w-3.5 h-3.5 stroke-[2.5]" /> : <Download className="w-3.5 h-3.5" />}
+                  <span>{downloadedReport ? '¡Descargado con tu nota!' : 'Descargar JSON'}</span>
                 </button>
 
                 <button
-                  onClick={() => downloadReportJson(currentReportData.jsonString, challenge.seed)}
+                  type="button"
+                  onClick={async () => {
+                    await copyReportToClipboard(currentReport.markdownText);
+                    setCopiedReport(true);
+                    setTimeout(() => setCopiedReport(false), 2500);
+                  }}
                   className="btn-ink-outline px-3 py-1.5 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
+                  title="Copiar texto con tu nota al portapapeles"
                 >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Descargar JSON</span>
+                  {copiedReport ? <Check className="w-3.5 h-3.5 text-black stroke-[2.5]" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedReport ? '¡Copiado con tu nota!' : 'Copiar Texto'}</span>
                 </button>
               </div>
 
               <button
+                type="button"
                 onClick={() => setShowReportModal(false)}
                 className="px-3 py-1.5 text-xs font-mono text-neutral-600 hover:text-black border border-neutral-300 hover:border-black cursor-pointer ml-auto"
               >
