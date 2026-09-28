@@ -3,7 +3,12 @@
   "private": true,
   "version": "0.1.2",
   "description": "Paplitz — Simulador y Práctica de Perspectiva",
-  "author": "Paplitz Team",
+  "author": {
+    "name": "Lázaro Guerrero Losada",
+    "email": "lazaroguerrerolosada@uma.es",
+    "url": "https://github.com/lazaro-guerrero-losada/paplitz"
+  },
+  "homepage": "https://paplitz.vercel.app/",
   "main": "electron/main.cjs",
   "type": "module",
   "scripts": {
@@ -14,9 +19,14 @@
     "cap:open": "cap open android",
     "build:android": "npm run build && cap sync android",
     "electron:dev": "concurrently -k \"vite\" \"wait-on tcp:5173 && electron .\"",
-    "electron:build": "npm run build && electron-builder --win nsis",
-    "electron:build:portable": "npm run build && electron-builder --win portable",
-    "electron:build:all": "npm run build && electron-builder --win nsis portable"
+    "electron:build": "npm run build && NODE_OPTIONS=\"--experimental-require-module\" electron-builder --win nsis",
+    "electron:build:portable": "npm run build && NODE_OPTIONS=\"--experimental-require-module\" electron-builder --win portable",
+    "electron:build:all": "npm run build && NODE_OPTIONS=\"--experimental-require-module\" electron-builder --win nsis portable",
+    "electron:build:linux": "npm run build && NODE_OPTIONS=\"--experimental-require-module\" electron-builder --linux AppImage deb",
+    "electron:build:linux:appimage": "npm run build && NODE_OPTIONS=\"--experimental-require-module\" electron-builder --linux AppImage",
+    "electron:build:linux:deb": "npm run build && NODE_OPTIONS=\"--experimental-require-module\" electron-builder --linux deb",
+    "electron:build:linux:tar": "npm run build && NODE_OPTIONS=\"--experimental-require-module\" electron-builder --linux tar.gz",
+    "electron:build:linux:all": "npm run build && NODE_OPTIONS=\"--experimental-require-module\" electron-builder --linux AppImage deb tar.gz"
   },
   "build": {
     "appId": "com.paplitz.app",
@@ -40,6 +50,22 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Paplitz"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Education",
+      "maintainer": "Lázaro Guerrero Losada <lazaroguerrerolosada@uma.es>",
+      "icon": "public/icon.png",
+      "synopsis": "Simulador y Práctica de Perspectiva",
+      "description": "Paplitz — Simulador y Práctica de Perspectiva Técnica y Sketching Industrial",
+      "executableName": "paplitz"
+    },
+    "deb": {
+      "priority": "optional",
+      "packageCategory": "education"
     }
   },
   "dependencies": {

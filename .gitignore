@@ -29,6 +29,9 @@ dist-ssr
 *.apk
 *.aab
 *.exe
+*.AppImage
+*.deb
+*.tsbuildinfo
 
 # Android build outputs
 android/.gradle/

@@ -232,7 +232,13 @@ Outputs optimized static assets to `/dist`, ready for instant deployment on **Ve
 npm run electron:build
 ```
 
-### 4. Build Android Native App (`.apk`)
+### 4. Build Linux Standalone Desktop App (`.AppImage` & `.deb`)
+```bash
+# Builds AppImage portable executable and Debian/Ubuntu .deb installer into /dist_electron
+npm run electron:build:linux
+```
+
+### 5. Build Android Native App (`.apk`)
 ```bash
 # Syncs web build with Capacitor and opens Android Studio
 npm run build:android
@@ -254,6 +260,7 @@ For in-depth architectural specifications and formulas, refer to the [`docs/`](.
 * 📄 **[Analog Worksheets & QR Scanner](./docs/ANALOG_WORKSHEETS_AND_QR.md)**
 * 📱 **[Android Porting Guide (Capacitor / S-Pen)](./docs/PORTING_GUIDE_ANDROID.md)**
 * 💻 **[Windows Executable Guide (Electron / Tauri)](./docs/PORTING_GUIDE_WINDOWS_EXE.md)**
+* 🐧 **[Linux Desktop Executable Guide (AppImage / Deb)](./docs/PORTING_GUIDE_LINUX.md)**
 
 ---
 

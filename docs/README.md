@@ -21,6 +21,7 @@ This documentation provides complete architectural, mathematical, and algorithmi
 | **[ANALOG_WORKSHEETS_AND_QR.md](./ANALOG_WORKSHEETS_AND_QR.md)** | **Paper Drawing**: Vector A4 PDF generation, QR grid indexing, and camera/scanner validation engine. |
 | **[PORTING_GUIDE_ANDROID.md](./PORTING_GUIDE_ANDROID.md)** | **Android Guide**: Step-by-step setup with Capacitor, S-Pen low-latency stylus support, and camera permissions. |
 | **[PORTING_GUIDE_WINDOWS_EXE.md](./PORTING_GUIDE_WINDOWS_EXE.md)** | **Windows Guide**: Step-by-step packaging for standalone desktop executables (`.exe`) via Electron & Tauri. |
+| **[PORTING_GUIDE_LINUX.md](./PORTING_GUIDE_LINUX.md)** | **Linux Guide**: Step-by-step packaging for Linux desktop (`.AppImage`, `.deb`, `.tar.gz`) via Electron. |
 
 ---
 
