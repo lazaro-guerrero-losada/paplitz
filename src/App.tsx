@@ -11,11 +11,13 @@ import { MinigamesView } from './components/MinigamesView';
 import { LevelGuideModal } from './components/LevelGuideModal';
 import { PlacementModal } from './components/PlacementModal';
 import { LevelUnlockedModal } from './components/LevelUnlockedModal';
+import { StreakModal } from './components/StreakModal';
 import { calculatePlayerLevel } from './lib/levelSystem';
 import { SenseiCubo } from './components/avatar/SenseiCubo';
 import { AvatarMood } from './lib/avatarTypes';
 import { Flame, Printer, Compass, Map, User, RefreshCw, Filter, PenTool, Gamepad2, BookOpen, Zap, Menu, X, ChevronRight } from 'lucide-react';
 import { PaplitzSaveData, applySaveDataToLocalStorage, fastForwardCurriculum } from './lib/saveSystem';
+import { recordDailyPractice } from './lib/streakSystem';
 
 function GithubIcon({ className = 'w-3.5 h-3.5' }: { className?: string }) {
   return (
@@ -113,6 +115,10 @@ export function App() {
     node: LessonNode;
     unitTitle?: string;
   } | null>(null);
+  const [streakModalState, setStreakModalState] = useState<{
+    isOpen: boolean;
+    isNewDayAward: boolean;
+  }>({ isOpen: false, isNewDayAward: false });
   const playerLevel = calculatePlayerLevel(xp);
 
   // Guardar en LocalStorage
@@ -261,7 +267,14 @@ export function App() {
       const recordedScore = res.totalScore ?? res.score;
 
       setXp((prev) => prev + totalXp);
-      setStreak((prev) => (prev === 0 ? 1 : prev));
+
+      // Actualizar racha diaria y comprobar si se alcanza un nuevo día consecutivo
+      const streakResult = recordDailyPractice(streak);
+      setStreak(streakResult.newStreak);
+      if (streakResult.isNewDay) {
+        setStreakModalState({ isOpen: true, isNewDayAward: true });
+      }
+
       setScoresHistory((prev) => [...prev, recordedScore]);
 
       // Si se estaba realizando un examen de nivelación y se ha aprobado
@@ -473,7 +486,11 @@ export function App() {
             </button>
 
             {/* Racha */}
-            <div className="flex items-center gap-1 border-2 border-black px-2 py-1 text-xs font-mono font-bold shadow-[2px_2px_0px_#000000]">
+            <div
+              onClick={() => setStreakModalState({ isOpen: true, isNewDayAward: false })}
+              className="flex items-center gap-1 border-2 border-black px-2 py-1 text-xs font-mono font-bold shadow-[2px_2px_0px_#000000] cursor-pointer hover:bg-neutral-100 transition-colors"
+              title={`Racha: ${streak} días seguidos — Clic para ver historial semanal`}
+            >
               <Flame className="w-3.5 h-3.5 stroke-[2.5]" />
               <span>{streak}</span>
             </div>
@@ -520,7 +537,11 @@ export function App() {
           {/* Barra de Acciones Móvil (< lg): Racha + Nivel + Botón Hamburguesa */}
           <div className="flex lg:hidden items-center gap-1.5 shrink-0">
             {/* Racha compacta */}
-            <div className="flex items-center gap-0.5 border-2 border-black px-1.5 py-1 text-[11px] font-mono font-bold shadow-[1px_1px_0px_#000000]">
+            <div
+              onClick={() => setStreakModalState({ isOpen: true, isNewDayAward: false })}
+              className="flex items-center gap-0.5 border-2 border-black px-1.5 py-1 text-[11px] font-mono font-bold shadow-[1px_1px_0px_#000000] cursor-pointer active:scale-95"
+              title={`Racha: ${streak} días seguidos — Clic para ver historial`}
+            >
               <Flame className="w-3 h-3 stroke-[2.5]" />
               <span>{streak}</span>
             </div>
@@ -975,6 +996,12 @@ export function App() {
           }}
         />
       )}
+      <StreakModal
+        streak={streak}
+        isOpen={streakModalState.isOpen}
+        isNewDayAward={streakModalState.isNewDayAward}
+        onClose={() => setStreakModalState({ isOpen: false, isNewDayAward: false })}
+      />
     </div>
   );
 }
