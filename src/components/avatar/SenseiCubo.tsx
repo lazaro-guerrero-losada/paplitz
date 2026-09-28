@@ -281,6 +281,14 @@ export const SenseiCubo: React.FC<SenseiCuboProps> = ({
     // Solo botón principal del ratón o toque
     if (e.button !== 0) return;
 
+    // En pantallas táctiles con dedo, permitir que el scroll vertical de la página fluya libremente
+    if (e.pointerType === 'touch') {
+      if (onPoke) onPoke();
+      setIsPoked(true);
+      setTimeout(() => setIsPoked(false), 1800);
+      return;
+    }
+
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
 
@@ -303,7 +311,7 @@ export const SenseiCubo: React.FC<SenseiCuboProps> = ({
     } catch {
       // Ignorar si el navegador no lo soporta
     }
-  }, [size]);
+  }, [size, onPoke]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (!isPointerDownRef.current) return;
@@ -411,7 +419,7 @@ export const SenseiCubo: React.FC<SenseiCuboProps> = ({
       style={{
         transform: `translate3d(${dragOffset.x}px, ${dragOffset.y}px, 0)`,
         transition: isResetting ? 'transform 0.38s cubic-bezier(0.18, 0.89, 0.32, 1.28)' : 'none',
-        touchAction: 'none',
+        touchAction: 'pan-y',
         cursor: isDragging ? 'grabbing' : 'grab',
         zIndex: isDragging ? 50 : 30,
       }}

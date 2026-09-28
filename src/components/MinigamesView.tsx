@@ -22,6 +22,8 @@ import {
   Zap,
   Star,
   Hourglass,
+  Pen,
+  Hand,
 } from 'lucide-react';
 
 interface MinigamesViewProps {
@@ -85,6 +87,9 @@ export const MinigamesView: React.FC<MinigamesViewProps> = ({
   // Estado del Minijuego
   const [gameMode, setGameMode] = useState<GameMode | null>(null);
   const [gameState, setGameState] = useState<'idle' | 'playing' | 'gameover'>('idle');
+
+  // Modo táctil en móviles: 'draw' | 'scroll' (desplazar con 1 dedo)
+  const [touchMode, setTouchMode] = useState<'draw' | 'scroll'>('draw');
 
   // Estadísticas de la partida activa
   const [cubesCompleted, setCubesCompleted] = useState<number>(0);
@@ -666,6 +671,10 @@ export const MinigamesView: React.FC<MinigamesViewProps> = ({
 
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (gameState !== 'playing') return;
+    // Si estamos en modo scroll y el puntero es táctil (dedo), permitir desplazamiento con 1 dedo
+    if (touchMode === 'scroll' && e.pointerType === 'touch') {
+      return;
+    }
     e.preventDefault();
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -1117,12 +1126,55 @@ export const MinigamesView: React.FC<MinigamesViewProps> = ({
             ref={canvasRef}
             width={600}
             height={540}
-            className="touch-none cursor-crosshair block w-full h-full"
+            className={`block w-full h-full ${
+              touchMode === 'scroll' ? 'touch-pan-y cursor-grab' : 'touch-none cursor-crosshair'
+            }`}
+            style={{ touchAction: touchMode === 'scroll' ? 'pan-y' : 'none' }}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerUp}
           />
+
+          {/* Selector de modo táctil móvil: Lápiz (dibujar) vs Mano (desplazar con 1 dedo) */}
+          <div className="absolute bottom-2.5 right-2 z-20 flex items-center border-2 border-black bg-white shadow-[2px_2px_0px_#000000]">
+            <button
+              type="button"
+              onClick={() => setTouchMode('draw')}
+              className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 transition-colors cursor-pointer ${
+                touchMode === 'draw'
+                  ? 'bg-black text-white'
+                  : 'text-neutral-700 hover:text-black hover:bg-neutral-100'
+              }`}
+              title="Modo Trazo: dibuja aristas con el dedo o lápiz táctil"
+            >
+              <Pen className="w-3 h-3 stroke-[2.5]" />
+              <span className="text-[10px] sm:text-xs">Trazo</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setTouchMode('scroll')}
+              className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 transition-colors cursor-pointer ${
+                touchMode === 'scroll'
+                  ? 'bg-black text-white'
+                  : 'text-neutral-700 hover:text-black hover:bg-neutral-100'
+              }`}
+              title="Modo Mover: desliza libremente la pantalla hacia abajo con 1 dedo"
+            >
+              <Hand className="w-3 h-3 stroke-[2.5]" />
+              <span className="text-[10px] sm:text-xs">Mover (1 dedo)</span>
+            </button>
+          </div>
+
+          {/* Indicador visual cuando el modo Mover con 1 dedo está activo */}
+          {touchMode === 'scroll' && (
+            <div className="absolute inset-x-2 top-11 pointer-events-none z-10 flex justify-center">
+              <div className="bg-black/90 text-white border border-white px-2.5 py-1 shadow-[2px_2px_0px_#000000] text-[11px] font-mono font-bold flex items-center gap-1.5 animate-in fade-in duration-200">
+                <Hand className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>Desliza con 1 dedo para mover la pantalla</span>
+              </div>
+            </div>
+          )}
 
           {/* Flash visual de acierto o fallo en pantalla */}
           {flashMessage && (

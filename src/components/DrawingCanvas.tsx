@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { CubeChallenge, Point2D } from '../lib/geometry';
 import { UserStroke, ValidationFeedback, countDetectedAristas } from '../lib/validation';
-import { Undo2, Trash2, Check, ArrowRight, AlertTriangle, CheckCircle, Clock, Zap, Copy, Download, X } from 'lucide-react';
+import { Undo2, Trash2, Check, ArrowRight, AlertTriangle, CheckCircle, Clock, Zap, Copy, Download, X, Pen, Hand, ArrowDown, ArrowUp } from 'lucide-react';
 import { buildDebugReport, copyReportToClipboard, downloadReportJson } from '../lib/debugReport';
 
 /**
@@ -196,6 +196,29 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   const [isTimerRunning, setIsTimerRunning] = useState<boolean>(false);
   const timeLeftRef = useRef<number>(TOTAL_COUNTDOWN_SECONDS);
   const timerIntervalRef = useRef<number | null>(null);
+
+  // Modo táctil en dispositivos móviles: 'draw' (dibujar con dedo o lápiz) | 'scroll' (desplazar la pantalla con 1 dedo)
+  const [touchMode, setTouchMode] = useState<'draw' | 'scroll'>('draw');
+
+  // Estado del scroll de la ventana para botón flotante de acceso rápido en móviles
+  const [isScrolledDown, setIsScrolledDown] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolledDown(window.scrollY > 140);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Al validarse o comprobar el cubo, activar modo scroll automáticamente para ver notas y Cubito con 1 dedo
+  useEffect(() => {
+    if (feedback) {
+      setTouchMode('scroll');
+    } else {
+      setTouchMode('draw');
+    }
+  }, [feedback]);
 
   // Limpiar trazos y resetear temporizador cuando cambia de desafío
   useEffect(() => {
@@ -788,6 +811,12 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   };
 
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    // Si estamos en modo scroll y el puntero es táctil (dedo), permitir desplazamiento nativo con 1 dedo
+    // Si es un lápiz óptico (pen / Apple Pencil / S-Pen), siempre tiene prioridad de trazo
+    if (touchMode === 'scroll' && e.pointerType === 'touch') {
+      return;
+    }
+
     e.preventDefault();
     // Rechazo de palma (Palm Rejection) y bloqueo de puntero único:
     // Si ya hay un lápiz (pen) o dedo dibujando, ignorar toques secundarios de la palma
@@ -903,7 +932,10 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
           ref={canvasRef}
           width={600}
           height={540}
-          className="touch-none cursor-crosshair block w-full h-full"
+          className={`block w-full h-full ${
+            touchMode === 'scroll' ? 'touch-pan-y cursor-grab' : 'touch-none cursor-crosshair'
+          }`}
+          style={{ touchAction: touchMode === 'scroll' ? 'pan-y' : 'none' }}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
@@ -949,6 +981,48 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
             <span className="font-bold shrink-0 hidden sm:inline ml-2 text-neutral-300">
               {challenge.hasGroundGrid ? "NIVEL 4.1" : "NIVEL 4.2"}
             </span>
+          </div>
+        )}
+
+        {/* Selector de modo táctil móvil: Lápiz (dibujar) vs Mano (desplazar con 1 dedo) */}
+        <div className={`absolute z-20 flex items-center border-2 border-black bg-white shadow-[2px_2px_0px_#000000] ${
+          challenge.isShadowLevel ? 'top-10 left-2' : 'bottom-2.5 right-2'
+        }`}>
+          <button
+            type="button"
+            onClick={() => setTouchMode('draw')}
+            className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 transition-colors cursor-pointer ${
+              touchMode === 'draw'
+                ? 'bg-black text-white'
+                : 'text-neutral-700 hover:text-black hover:bg-neutral-100'
+            }`}
+            title="Modo Trazo: dibuja aristas con el dedo o lápiz táctil"
+          >
+            <Pen className="w-3 h-3 stroke-[2.5]" />
+            <span className="text-[10px] sm:text-xs">Trazo</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setTouchMode('scroll')}
+            className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 transition-colors cursor-pointer ${
+              touchMode === 'scroll'
+                ? 'bg-black text-white'
+                : 'text-neutral-700 hover:text-black hover:bg-neutral-100'
+            }`}
+            title="Modo Mover: desliza libremente la pantalla hacia abajo con 1 dedo"
+          >
+            <Hand className="w-3 h-3 stroke-[2.5]" />
+            <span className="text-[10px] sm:text-xs">Mover (1 dedo)</span>
+          </button>
+        </div>
+
+        {/* Indicador visual cuando el modo Mover con 1 dedo está activo */}
+        {touchMode === 'scroll' && !feedback && (
+          <div className="absolute inset-x-2 top-11 pointer-events-none z-10 flex justify-center">
+            <div className="bg-black/90 text-white border border-white px-2.5 py-1 shadow-[2px_2px_0px_#000000] text-[11px] font-mono font-bold flex items-center gap-1.5 animate-in fade-in duration-200">
+              <Hand className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span>Desliza con 1 dedo para mover la pantalla</span>
+            </div>
           </div>
         )}
       </div>
@@ -1166,6 +1240,33 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
           </div>
         </div>
       )}
+      {/* Botón flotante móvil de desplazamiento rápido con 1 dedo */}
+      <div className="fixed bottom-4 right-4 z-40 sm:hidden">
+        <button
+          type="button"
+          onClick={() => {
+            if (isScrolledDown) {
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+              window.scrollBy({ top: 380, behavior: 'smooth' });
+            }
+          }}
+          className="btn-ink px-2.5 py-1.5 text-xs font-mono font-bold flex items-center gap-1.5 shadow-[2px_2px_0px_#000000] cursor-pointer active:scale-95"
+          title={isScrolledDown ? "Volver arriba al lienzo" : "Bajar a los controles"}
+        >
+          {isScrolledDown ? (
+            <>
+              <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span className="text-[11px]">Lienzo</span>
+            </>
+          ) : (
+            <>
+              <ArrowDown className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span className="text-[11px]">Controles</span>
+            </>
+          )}
+        </button>
+      </div>
     </div>
   );
 };
