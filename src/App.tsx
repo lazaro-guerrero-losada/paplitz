@@ -10,6 +10,7 @@ import { ProfileView } from './components/ProfileView';
 import { MinigamesView } from './components/MinigamesView';
 import { LevelGuideModal } from './components/LevelGuideModal';
 import { PlacementModal } from './components/PlacementModal';
+import { LevelUnlockedModal } from './components/LevelUnlockedModal';
 import { calculatePlayerLevel } from './lib/levelSystem';
 import { SenseiCubo } from './components/avatar/SenseiCubo';
 import { AvatarMood } from './lib/avatarTypes';
@@ -108,6 +109,10 @@ export function App() {
   const [showLevelGuide, setShowLevelGuide] = useState<boolean>(false);
   const [isPlacementModalOpen, setIsPlacementModalOpen] = useState<boolean>(false);
   const [placementTestNode, setPlacementTestNode] = useState<LessonNode | null>(null);
+  const [unlockedLevelNotification, setUnlockedLevelNotification] = useState<{
+    node: LessonNode;
+    unitTitle?: string;
+  } | null>(null);
   const playerLevel = calculatePlayerLevel(xp);
 
   // Guardar en LocalStorage
@@ -272,26 +277,40 @@ export function App() {
 
       // Desbloquear siguiente nodo en el camino si el actual estaba en curso
       if (activeNode) {
-        setUnits((prevUnits) => {
-          let foundCurrent = false;
-          return prevUnits.map((unit) => ({
-            ...unit,
-            nodes: unit.nodes.map((n) => {
-              if (n.id === activeNode.id) {
-                foundCurrent = true;
-                return { ...n, status: 'completed' as const, score: Math.max(n.score || 0, recordedScore) };
-              }
-              if (foundCurrent && n.status === 'locked') {
-                foundCurrent = false;
-                return { ...n, status: 'current' as const };
-              }
-              return n;
-            }),
-          }));
-        });
+        let newlyUnlocked: LessonNode | null = null;
+        let unlockedUnitTitle = '';
+        let foundCurrent = false;
+
+        const nextUnits = units.map((unit) => ({
+          ...unit,
+          nodes: unit.nodes.map((n) => {
+            if (n.id === activeNode.id) {
+              foundCurrent = true;
+              return { ...n, status: 'completed' as const, score: Math.max(n.score || 0, recordedScore) };
+            }
+            if (foundCurrent && n.status === 'locked') {
+              foundCurrent = false;
+              const unlocked = { ...n, status: 'current' as const };
+              newlyUnlocked = unlocked;
+              unlockedUnitTitle = unit.title;
+              return unlocked;
+            }
+            return n;
+          }),
+        }));
+
+        setUnits(nextUnits);
 
         // Actualizar el estado de la lección activa
         setActiveNode((prev) => (prev ? { ...prev, status: 'completed', score: Math.max(prev.score || 0, recordedScore) } : prev));
+
+        // Si se acaba de desbloquear un nuevo nivel, mostrar animación/pop-up
+        if (newlyUnlocked) {
+          setUnlockedLevelNotification({
+            node: newlyUnlocked,
+            unitTitle: unlockedUnitTitle,
+          });
+        }
       }
     } else {
       // Suspenso: avatar con espirales y sudor
@@ -938,6 +957,21 @@ export function App() {
           onGoToMinigames={() => {
             setShowLevelGuide(false);
             setActiveTab('minigames');
+          }}
+        />
+      )}
+      {unlockedLevelNotification && (
+        <LevelUnlockedModal
+          unlockedNode={unlockedLevelNotification.node}
+          unitTitle={unlockedLevelNotification.unitTitle}
+          onClose={() => setUnlockedLevelNotification(null)}
+          onStartLevel={(node) => {
+            setUnlockedLevelNotification(null);
+            handleSelectNode(node);
+          }}
+          onViewPath={() => {
+            setUnlockedLevelNotification(null);
+            setActiveTab('path');
           }}
         />
       )}

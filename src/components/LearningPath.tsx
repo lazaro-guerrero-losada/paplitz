@@ -1,6 +1,6 @@
 import React from 'react';
 import { Unit, LessonNode } from '../lib/curriculumData';
-import { Check, Lock, BookOpen, FastForward } from 'lucide-react';
+import { Check, Lock, BookOpen, FastForward, Sparkles } from 'lucide-react';
 
 interface LearningPathProps {
   units: Unit[];
@@ -96,17 +96,25 @@ export const LearningPath: React.FC<LearningPathProps> = ({
                   className="flex flex-col items-center relative z-10 transition-all duration-200"
                   style={getOffsetClass(nodeIdx)}
                 >
-                  <button
+                    <button
                     onClick={() => !isLocked && onSelectNode(node)}
                     disabled={isLocked}
                     className={`w-18 h-18 rounded-2xl relative flex flex-col items-center justify-center transition-all cursor-pointer select-none ${
                       isCompleted
                         ? 'bg-black text-white border-4 border-black shadow-[4px_4px_0px_#000000] hover:scale-105'
                         : isCurrent
-                        ? 'bg-white text-black border-4 border-black shadow-[5px_5px_0px_#000000] hover:scale-105 animate-pulse'
+                        ? 'bg-white text-black border-4 border-black shadow-[6px_6px_0px_#000000] hover:scale-105 ring-4 ring-black/15 animate-pulse'
                         : 'bg-neutral-100 text-neutral-400 border-2 border-neutral-300 cursor-not-allowed'
                     }`}
                   >
+                    {/* Badge de nivel disponible / actual */}
+                    {isCurrent && (
+                      <div className="absolute -top-3.5 px-2 py-0.5 bg-black text-white text-[9px] font-mono font-bold uppercase rounded-full shadow-[2px_2px_0px_#000000] animate-bounce flex items-center gap-1 z-20">
+                        <Sparkles className="w-2.5 h-2.5 fill-white text-white" />
+                        <span>DISPONIBLE</span>
+                      </div>
+                    )}
+
                     <span className="font-mono font-extrabold text-xl tracking-tight leading-none">
                       {node.code}
                     </span>
