@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { CubeChallenge, Point2D } from '../lib/geometry';
 import { UserStroke, ValidationFeedback, countDetectedAristas } from '../lib/validation';
-import { Undo2, Trash2, Check, ArrowRight, AlertTriangle, CheckCircle, Clock, Zap, Copy, Download, X, Pen, Hand, ArrowDown, ArrowUp } from 'lucide-react';
+import { Undo2, Trash2, Check, ArrowRight, AlertTriangle, CheckCircle, Clock, Zap, Copy, Download, X, Pen, Hand, ArrowDown, ArrowUp, Eye, EyeOff } from 'lucide-react';
 import { buildDebugReport, copyReportToClipboard, downloadReportJson } from '../lib/debugReport';
 
 /**
@@ -160,6 +160,10 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   const activePointerIdRef = useRef<number | null>(null);
   const activePointerTypeRef = useRef<string | null>(null);
 
+  // Visibilidad de trazos del usuario y solución paramétrica tras resolver el problema
+  const [showUserDrawing, setShowUserDrawing] = useState<boolean>(true);
+  const [showParametricSolution, setShowParametricSolution] = useState<boolean>(true);
+
   // Estados para el reporte y diagnóstico del cubo
   const [showReportModal, setShowReportModal] = useState<boolean>(false);
   const [copiedReport, setCopiedReport] = useState<boolean>(false);
@@ -228,6 +232,8 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
     activePointerTypeRef.current = null;
     currentStrokeRef.current = [];
     setIsDrawing(false);
+    setShowUserDrawing(true);
+    setShowParametricSolution(true);
     if (timerIntervalRef.current) {
       clearInterval(timerIntervalRef.current);
       timerIntervalRef.current = null;
@@ -313,7 +319,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
       const v = challenge.vertices2D;
 
       // 1. Si la solución está activa, dibujar en el suelo la proyección de sombra y los rayos
-      if (showSolution) {
+      if (showSolution && showParametricSolution) {
         // Línea de horizonte técnica
         ctx.save();
         ctx.strokeStyle = '#D6D6D6';
@@ -688,7 +694,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
       }
 
       // 2. Si se activa la solución (o tras comprobar), dibujar las líneas objetivo de referencia
-      if (showSolution) {
+      if (showSolution && showParametricSolution) {
         // Línea de horizonte técnica
         ctx.strokeStyle = '#D6D6D6';
         ctx.setLineDash([4, 4]);
@@ -729,37 +735,39 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
     }
 
     // 3. DIBUJAR LOS TRAZOS DEL USUARIO
-    ctx.strokeStyle = '#000000';
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    if (showUserDrawing) {
+      ctx.strokeStyle = '#000000';
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
 
-    strokes.forEach((stroke) => {
-      if (stroke.points.length < 2) return;
-      ctx.beginPath();
-      ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+      strokes.forEach((stroke) => {
+        if (stroke.points.length < 2) return;
+        ctx.beginPath();
+        ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
 
-      for (let i = 1; i < stroke.points.length; i++) {
-        const p = stroke.points[i];
-        const pressure = p.pressure ?? 0.5;
-        ctx.lineWidth = 1.8 + pressure * 2.8;
-        ctx.lineTo(p.x, p.y);
+        for (let i = 1; i < stroke.points.length; i++) {
+          const p = stroke.points[i];
+          const pressure = p.pressure ?? 0.5;
+          ctx.lineWidth = 1.8 + pressure * 2.8;
+          ctx.lineTo(p.x, p.y);
+        }
+        ctx.stroke();
+      });
+
+      // Trazo que se está dibujando actualmente
+      if (isDrawing && currentStrokeRef.current.length > 1) {
+        const pts = currentStrokeRef.current;
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) {
+          const pressure = pts[i].pressure ?? 0.5;
+          ctx.lineWidth = 1.8 + pressure * 2.8;
+          ctx.lineTo(pts[i].x, pts[i].y);
+        }
+        ctx.stroke();
       }
-      ctx.stroke();
-    });
-
-    // Trazo que se está dibujando actualmente
-    if (isDrawing && currentStrokeRef.current.length > 1) {
-      const pts = currentStrokeRef.current;
-      ctx.beginPath();
-      ctx.moveTo(pts[0].x, pts[0].y);
-      for (let i = 1; i < pts.length; i++) {
-        const pressure = pts[i].pressure ?? 0.5;
-        ctx.lineWidth = 1.8 + pressure * 2.8;
-        ctx.lineTo(pts[i].x, pts[i].y);
-      }
-      ctx.stroke();
     }
-  }, [challenge, strokes, isDrawing, showSolution]);
+  }, [challenge, strokes, isDrawing, showSolution, showUserDrawing, showParametricSolution]);
 
   useEffect(() => {
     render();
@@ -788,6 +796,12 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         undoLastStroke();
+      } else if (feedback && e.key.toLowerCase() === 'd') {
+        e.preventDefault();
+        setShowUserDrawing((prev) => !prev);
+      } else if (feedback && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        setShowParametricSolution((prev) => !prev);
       }
     };
 
@@ -811,6 +825,9 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   };
 
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    // Si la solución ya está evaluada/mostrada, no permitir trazar sobre la solución
+    if (showSolution || feedback) return;
+
     // Si estamos en modo scroll y el puntero es táctil (dedo), permitir desplazamiento nativo con 1 dedo
     // Si es un lápiz óptico (pen / Apple Pencil / S-Pen), siempre tiene prioridad de trazo
     if (touchMode === 'scroll' && e.pointerType === 'touch') {
@@ -1029,8 +1046,8 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
       </div>
 
       {/* BARRA DE HERRAMIENTAS Y ACCIONES INMEDIATA (TODO AL ALCANCE EN 1 SOLA LÍNEA) */}
-      <div className="w-full mt-2 flex items-center justify-between gap-1.5 sm:gap-2 border-2 border-black bg-white p-2 shadow-[3px_3px_0px_#000000] flex-nowrap min-w-0">
-        {/* Lado Izquierdo: Herramientas de dibujo (o resumen si está comprobado) */}
+      <div className="w-full mt-2 flex items-center justify-between gap-1.5 sm:gap-2 border-2 border-black bg-white p-2 shadow-[3px_3px_0px_#000000] flex-wrap sm:flex-nowrap min-w-0">
+        {/* Lado Izquierdo: Herramientas de dibujo (o toggle de capas si está comprobado) */}
         {!feedback ? (
           <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
             <button
@@ -1057,11 +1074,55 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
             </span>
           </div>
         ) : (
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 flex-wrap">
             <span className="text-[11px] font-mono font-bold text-neutral-700 bg-neutral-100 px-1.5 sm:px-2 py-1 border border-black shadow-[1px_1px_0px_#000000]">
               {countDetectedAristas(strokes)}/{challenge.targetEdges.length}
-              <span className="hidden xs:inline"> {challenge.isShadowLevel ? 'aristas sombra' : 'aristas'}</span>
+              <span className="hidden md:inline"> {challenge.isShadowLevel ? 'aristas sombra' : 'aristas'}</span>
             </span>
+
+            {/* Botón Ver/Ocultar Mi Dibujo */}
+            <button
+              type="button"
+              onClick={() => setShowUserDrawing((prev) => !prev)}
+              className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 cursor-pointer transition-all shadow-[1px_1px_0px_#000000] border border-black ${
+                showUserDrawing
+                  ? 'bg-black text-white hover:bg-neutral-800'
+                  : 'bg-neutral-100 text-neutral-500 border-neutral-400 hover:bg-neutral-200'
+              }`}
+              title={showUserDrawing ? 'Ocultar mi dibujo (D)' : 'Mostrar mi dibujo (D)'}
+            >
+              {showUserDrawing ? (
+                <Eye className="w-3.5 h-3.5 stroke-[2.5]" />
+              ) : (
+                <EyeOff className="w-3.5 h-3.5 stroke-[2]" />
+              )}
+              <span className={showUserDrawing ? '' : 'line-through opacity-75'}>
+                <span className="hidden sm:inline">Mi dibujo</span>
+                <span className="sm:hidden">Dibujo</span>
+              </span>
+            </button>
+
+            {/* Botón Ver/Ocultar Solución Paramétrica */}
+            <button
+              type="button"
+              onClick={() => setShowParametricSolution((prev) => !prev)}
+              className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 cursor-pointer transition-all shadow-[1px_1px_0px_#000000] border border-black ${
+                showParametricSolution
+                  ? 'bg-black text-white hover:bg-neutral-800'
+                  : 'bg-neutral-100 text-neutral-500 border-neutral-400 hover:bg-neutral-200'
+              }`}
+              title={showParametricSolution ? 'Ocultar solución paramétrica (S)' : 'Mostrar solución paramétrica (S)'}
+            >
+              {showParametricSolution ? (
+                <Eye className="w-3.5 h-3.5 stroke-[2.5]" />
+              ) : (
+                <EyeOff className="w-3.5 h-3.5 stroke-[2]" />
+              )}
+              <span className={showParametricSolution ? '' : 'line-through opacity-75'}>
+                <span className="hidden sm:inline">Solución</span>
+                <span className="sm:hidden">Solución</span>
+              </span>
+            </button>
           </div>
         )}
 
