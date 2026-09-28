@@ -776,7 +776,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
         if (feedback && onNextCube) {
           e.preventDefault();
           onNextCube();
-        } else if (!feedback && strokes.length > 0 && onValidate) {
+        } else if (!feedback && countDetectedAristas(strokes) > 0 && onValidate) {
           e.preventDefault();
           if (timerIntervalRef.current) {
             clearInterval(timerIntervalRef.current);
@@ -898,6 +898,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   };
 
   const handleValidateClick = () => {
+    if (countDetectedAristas(strokes) === 0) return;
     if (timerIntervalRef.current) {
       clearInterval(timerIntervalRef.current);
       timerIntervalRef.current = null;
@@ -1106,9 +1107,15 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
           ) : (
             <button
               onClick={handleValidateClick}
-              disabled={strokes.length === 0}
-              className="btn-ink px-2.5 sm:px-3.5 py-1.5 text-xs font-mono uppercase font-bold disabled:opacity-30 cursor-pointer shadow-[2px_2px_0px_#000000] flex items-center gap-1 shrink-0"
-              title={challenge.isShadowLevel ? "Comprobar proyección de sombra (Enter)" : "Comprobar perspectiva (Enter)"}
+              disabled={countDetectedAristas(strokes) === 0}
+              className="btn-ink px-2.5 sm:px-3.5 py-1.5 text-xs font-mono uppercase font-bold disabled:opacity-25 disabled:pointer-events-none disabled:cursor-not-allowed cursor-pointer shadow-[2px_2px_0px_#000000] flex items-center gap-1 shrink-0"
+              title={
+                countDetectedAristas(strokes) === 0
+                  ? "Dibuja al menos una arista antes de comprobar"
+                  : challenge.isShadowLevel
+                  ? "Comprobar proyección de sombra (Enter)"
+                  : "Comprobar perspectiva (Enter)"
+              }
             >
               <span>Comprobar</span>
               <Check className="w-3.5 h-3.5 stroke-[3]" />

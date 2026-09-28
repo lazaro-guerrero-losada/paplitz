@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { MODULE_PARALLELEPIPEDS, LessonNode, Unit } from './lib/curriculumData';
 import { generateCubeChallenge, CubeChallenge } from './lib/geometry';
-import { validateCubeDrawing, ValidationFeedback, UserStroke } from './lib/validation';
+import { validateCubeDrawing, ValidationFeedback, UserStroke, countDetectedAristas } from './lib/validation';
 import { DrawingCanvas } from './components/DrawingCanvas';
 import { LearningPath } from './components/LearningPath';
 import { GuidebookModal } from './components/GuidebookModal';
@@ -232,6 +232,7 @@ export function App() {
 
   // Validar dibujo
   const handleValidate = (timeRemainingSeconds?: number) => {
+    if (countDetectedAristas(strokes) === 0) return;
     const res = validateCubeDrawing(challenge, strokes, timeRemainingSeconds);
     setFeedback(res);
     setShowSolution(true);

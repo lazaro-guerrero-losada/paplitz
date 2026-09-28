@@ -334,7 +334,7 @@ export const MinigamesView: React.FC<MinigamesViewProps> = ({
 
   // Validación rápida al presionar Comprobar
   const handleValidate = () => {
-    if (strokes.length === 0 || gameState !== 'playing') return;
+    if (countDetectedAristas(strokes) === 0 || gameState !== 'playing') return;
 
     const res = validateCubeDrawing(challenge, strokes);
     setFeedback(res);
@@ -645,7 +645,9 @@ export const MinigamesView: React.FC<MinigamesViewProps> = ({
 
       if (e.key === 'Enter') {
         e.preventDefault();
-        handleValidate();
+        if (countDetectedAristas(strokes) > 0) {
+          handleValidate();
+        }
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         handleUndo();
@@ -1265,9 +1267,13 @@ export const MinigamesView: React.FC<MinigamesViewProps> = ({
 
             <button
               onClick={handleValidate}
-              disabled={strokes.length === 0}
-              className="btn-ink px-6 sm:px-8 py-1.5 text-xs font-mono uppercase font-bold disabled:opacity-30 cursor-pointer shadow-[3px_3px_0px_#000000] flex items-center gap-1.5"
-              title="Comprobar perspectiva (Enter)"
+              disabled={countDetectedAristas(strokes) === 0}
+              className="btn-ink px-6 sm:px-8 py-1.5 text-xs font-mono uppercase font-bold disabled:opacity-25 disabled:pointer-events-none disabled:cursor-not-allowed cursor-pointer shadow-[3px_3px_0px_#000000] flex items-center gap-1.5"
+              title={
+                countDetectedAristas(strokes) === 0
+                  ? "Dibuja al menos una arista antes de comprobar"
+                  : "Comprobar perspectiva (Enter)"
+              }
             >
               <span>Comprobar</span>
               <Check className="w-4 h-4 stroke-[3]" />
