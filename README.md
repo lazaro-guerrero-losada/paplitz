@@ -1,6 +1,8 @@
 # Paplitz 📐
 
-> An open-source interactive simulator and training tool for mastering technical sketching, 3D perspective, and spatial muscle memory. Inspired by **Duolingo**, **Daromeon**, and the instructional methodology of **"Sketching: The Basics"** (*Koos Eissen & Roselien Steur*).
+> **Open-Source Digital Pedagogical Ecosystem for Real-Time Analytical Feedback and Spatial Muscle Memory in Technical Perspective & Industrial Sketching.**
+> 
+> *“Transforming the frustration of self-taught learning into iterative spatial mastery through open-source technology.”*
 
 ![Paplitz Logo](public/paplitz-logo.svg)
 
@@ -15,45 +17,235 @@
 ---
 
 ### 📦 [**👉 Download Latest Releases (.exe for Windows & .apk for Android)**](https://github.com/lazaro-guerrero-losada/paplitz/releases/latest)
-### 🌐 [**👉 Or Try the Live Web App Online (paplitz.vercel.app)**](https://paplitz.vercel.app/)
+### 🌐 [**👉 Or Launch the Live Web App Online (paplitz.vercel.app)**](https://paplitz.vercel.app/)
 
-*No setup required! Works directly in modern desktop and mobile browsers, or download the native offline apps.*
+*100% free, runs client-side in any modern web browser or as native offline desktop/mobile apps. Fully optimized for graphics tablets, active styluses (Apple Pencil, S-Pen, Wacom, Huion) with pressure sensitivity, and desktop/mouse input.*
 
 ---
 
-## 🎮 How It Works & Gameplay Flow
+## 📑 Table of Contents
 
-Paplitz turns spatial perspective training into an intuitive, gamified loop:
+* [01. Background & Motivation: The Paradox of the Degree](#01-background--motivation-the-paradox-of-the-degree)
+* [02. Pedagogical Foundations & The Digital Transition](#02-pedagogical-foundations--the-digital-transition)
+* [03. Project Objectives](#03-project-objectives)
+* [04. Didactic Methodology: "The Path" & The Practice Loop](#04-didactic-methodology-the-path--the-practice-loop)
+* [05. Technical Engine: Analytical Geometric Evaluation Without Dependencies](#05-technical-engine-analytical-geometric-evaluation-without-dependencies)
+* [06. Ecosystem Innovations: Hybrid A4 Worksheets & Sensei Cubo](#06-ecosystem-innovations-hybrid-a4-worksheets--sensei-cubo)
+* [07. Open-Source Philosophy, Community & Future Roadmap](#07-open-source-philosophy-community--future-roadmap)
+* [08. Conclusions & Summary](#08-conclusions--summary)
+* [💻 Developer Quickstart & Multiplatform Builds](#-developer-quickstart--multiplatform-builds)
+* [📚 Technical Documentation Directory](#-technical-documentation-directory)
+* [👤 Authorship, Academic Affiliation & Contact](#-authorship-academic-affiliation--contact)
+
+---
+
+## 01. Background & Motivation: The Paradox of the Degree
+
+### The Academic Problem: The Myth of "Spontaneous Sketching"
+In university Industrial Design Engineering and Product Development degrees, students face a persistent pedagogical contradiction:
+* **High Expectation Without Explicit Method:** Academic curricula demand high-fidelity freehand sketches from day one, yet rarely provide step-by-step motor training or deliberate practice frameworks for 3D perspective construction.
+* **The Solitude of the Self-Taught Student:** Learners are left to practice on their own. Without real-time error correction, incorrect spatial intuition and misaligned vanishing habits solidify unnoticed over months of repetition.
+* **Frustration and Premature CAD Dependency:** High cognitive entry barriers cause students to develop sketching anxiety, abandoning pencil ideation in favor of premature 3D CAD modeling that restricts creative exploration.
+* **Absence of Quantitative Metric:** How does a student know if their box converges accurately toward the horizon line? On paper, feedback is non-existent until post-submission grading days or weeks later.
+
+### The Solution: Paplitz Manifesto — Democratizing the 3D Stroke
+Paplitz was born not merely as an application, but as a **technical and emotional manifesto**: *no design or engineering student should ever feel incapable of projecting an idea into three-dimensional space.*
+
+* **Mission:** Provide an open, accessible digital motor trainer that decomposes conic perspective into measurable, gamified micro-exercises.
+* **Vision:** Become the open-source standard for schools of industrial design, architecture, and fine arts worldwide, uniting students, educators, and researchers.
+* **Core Values:** Universal access without hardware or economic paywalls, absolute privacy via offline client-side computation, mathematical rigor, and an honest black-and-white ink aesthetic.
+
+---
+
+## 02. Pedagogical Foundations & The Digital Transition
+
+Paplitz bridges canonical design literature with modern interactive input hardware, directly resolving the friction of static physical paper.
+
+### Canonical Foundations
+* **"Sketching: The Basics"** (*Koos Eissen & Roselien Steur*):
+  The European benchmark for industrial design sketching. Supplies theoretical grounding: horizon line construction, convergent vanishing planes, spatial coordinate axes ($X, Y, Z$), and volumetric decomposition.
+* **"Pen and Ink Drawing"** (*Alphonso Dunn*):
+  Foundational guide for stroke weight control, line density discipline, screentone / cross-hatching textures, and high-contrast monochrome ink rendering.
+* **Daromeon Interactive & Duolingo Methodology**:
+  Pioneering conceptual inspiration in interactive web perspective drills (Daromeon) combined with the proven habit-forming mechanisms of spaced micro-learning, daily streaks, and modular curriculum progression (Duolingo).
+
+### Resolving the "Pain of Paper" (*El Dolor del Folio*)
+* **The Friction of Physical Paper:** Setting up blank sheets, rulers, and erasers creates cognitive inertia. Paper waste, lack of portability, and zero tracking of historical improvement slow down learning.
+* **The Era of the Active Stylus:** Today's students carry iPads, Samsung Galaxy Tabs with S-Pens, and graphics tablets (Wacom, Huion). These provide pressure sensitivity, natural stroke ergonomics, and frictionless iteration.
+* **The Living Differentiator — Real-Time Evaluation:** On paper, an aspiring designer never knows *why* a box feels distorted. Paplitz calculates invisible projective rays in real time and highlights the exact angular or proportional discrepancy.
+
+---
+
+## 03. Project Objectives
+
+### General Research & Development Objective
+> *Develop, validate, and implement an open-source digital interactive training ecosystem for accelerated spatial muscle memory acquisition and geometric perspective correction in technical sketching, accessible to any student without economic or hardware barriers.*
+
+### Core Project Pillars
+1. **Decoupled Analytical Engine (Offline Speed):**
+   A pure analytical 3D projection and evaluation engine executing entirely client-side on the user's device. Operates with sub-1.5 millisecond validation latency, zero cloud AI API costs, and total data sovereignty.
+2. **Cognitive Scaffolding (Structured Curriculum):**
+   Deconstruct spatial complexity into an incremental curriculum of 8 thematic units and over 32 structured lessons: from single assisted edges to rotated volumes and cast shadows.
+3. **Emotional Engagement & Gamification:**
+   Implement positive psychological reinforcement mechanisms (reactive Sensei Cubo mascot, daily streak counters, XP mastery tiers, arcade speed drills) that eliminate the fear of failure and nurture deliberate daily practice.
+4. **Open Educational Ecosystem (Classrooms & Community):**
+   Foster collaboration in design studios and university classrooms through student groups, shareable practice codes, and an unencumbered MIT license allowing educators and researchers to audit, customize, and expand the syllabus.
+
+---
+
+## 04. Didactic Methodology: "The Path" & The Practice Loop
+
+### The 4 Principles of Cognitive Scaffolding
+1. **Granular Milestone Decomposition:** Beginners are not asked to draw a sports car or an electric power drill. Challenges isolate the atomic building block of all spatial design: **the orthogonal cube and its cardinal vanishing rays**.
+2. **Gradual Scaffolding:**
+   * *Assisted Phase:* Explicit projection of $X, Y, Z$ director axes and dotted construction guidelines.
+   * *Intermediate Phase:* Progressive fading of assistive lines; intuitive eye-level convergence estimation.
+   * *Expert Phase:* Blind sketching, dynamic rotations, and projected shadow boundaries with directional light sources.
+3. **Immediate Dopaminergic Reinforcement Loop:** Instead of waiting days for critiques, finishing a stroke triggers an instant percentage score, volumetric validation, and XP progression.
+4. **Placement Tests & Adaptive Progression:** Students with prior drafting experience can take leveling evaluations to automatically unlock advanced units matching their skill level.
+
+---
+
+### The Practice Loop: Challenge, Sketch & Evaluation
+
+Paplitz structures every drill into an intuitive, high-tempo interactive cycle:
 
 | 1. Geometric Challenge | 2. Freehand Sketching | 3. Analytical Evaluation |
 | :---: | :---: | :---: |
 | ![Step 1 - Challenge](docs/assets/step1-challenge.png) | ![Step 2 - Sketching](docs/assets/step2-sketching.png) | ![Step 3 - Evaluation](docs/assets/step3-evaluation.png) |
-| **Step 1: The Setup**<br>The engine procedurally presents incomplete 3D forms with projective $X, Y, Z$ axes and vanishing guides. | **Step 2: Drawing**<br>Complete missing edges freehand using a drawing tablet, stylus, or mouse. Supports pressure sensitivity and stroke undo. | **Step 3: Instant Scoring**<br>The offline geometry engine calculates vanishing convergence, angle tolerance, and volume closure with instant feedback. |
+| **Step 1: Procedural Generation**<br>The mathematical engine projects an incomplete orthogonal form with seed-based $X, Y, Z$ perspective axes. | **Step 2: Freehand Sketching**<br>The student completes missing edges on a digital canvas with pressure sensitivity, stroke stabilization, and instant undo. | **Step 3: Quantitative Diagnostic**<br>In $<2\text{ ms}$, the engine computes angular convergence to vanishing points, volume closure, and score ($\ge 80\%$ to pass). |
 
 ---
 
-## 🌟 Key Features
+## 05. Technical Engine: Analytical Geometric Evaluation Without Dependencies
 
-* 🖤 **Pure Black & White Ink Aesthetic:** Designed with inspiration from industrial design manuals, technical fanzines, and screentone / halftone manga aesthetics.
-* ☁️ **Cloud Sync & Rescue Saves (Supabase):** Sync your progress, level, XP, streak, and unlocked lessons across all devices with private user recovery codes or offline JSON save backup files.
-* 👥 **Classrooms & Student Groups:** Perfect for design schools, universities, and drawing workshops. Teachers can create groups with join codes to track student practice and progress.
-* 📱 **Mobile Responsive & Landscape APK:** Dedicated mobile experience with an *Ink Drawer* navigation menu, and native Android APK locked to horizontal mode (`sensorLandscape`) for maximum drawing area.
-* 🗺️ **Learning Path ("The Path" - Duolingo-Style):** Progressive thematic units, stroke warm-ups, time-attack challenges, placement exams, and integrated theoretical guides.
-* 🧮 **Offline 3D Mathematical Engine:** Zero external AI dependencies, zero API costs, and 100% private. Conic and cylindrical perspective calculations are validated purely through analytical geometry in sub-milliseconds.
-* ✏️ **Dual Input Support:**
-  * **Digital Canvas:** Highly responsive drawing canvas optimized for drawing tablets & styluses (Wacom, Apple Pencil, S-Pen, Huion) with pressure sensitivity and tilt (`PointerEvents`).
-  * **Analog Worksheets (A4):** Printable vector PDF generator with 12 encoded challenge slots and an integrated camera scanner to validate real-world pencil drawings on paper.
-* 🧊 **Interactive 3D Avatar ("Sensei Cubito"):** Draggable mascot that reacts in real-time to your strokes, accuracy, mistakes, and combos.
-* 🕹️ **Arcade & Minigame Modes:** *Fever*, *Blitz*, *Survival*, and *Speed Sprint* modes for fast-paced muscle memory drills.
-* ⚡ **Gamification & Daily Streaks:** Streak tracking, XP progression, level titles, and milestone achievements.
+Unlike opaque machine learning models that require heavy GPU servers, hallucinate arbitrary scores, and depend on costly APIs, Paplitz operates on **pure vector analytical geometry**.
+
+```mermaid
+flowchart LR
+    A["Raw Pointer Events\n(Stylus / Mouse)"] --> B["Stroke Normalization\n& Resampling"]
+    B --> C["Corner Splitting\n(Deflection θ > 42°)"]
+    C --> D["Segment Pool\n[s₁, s₂, ... sₙ]"]
+    D --> E["Bipartite Matching\n(Greedy Assignment)"]
+    E --> F["Multifactorial Scoring\n45% Topology | 45% Angle | 10% Cleanliness"]
+    F --> G["Instant Score (0-100%)\n& Visual Diagnostic Overlay"]
+```
+
+### The Real-World Sketching Problem: *Corner Splitting*
+In authentic sketching, designers rarely lift the stylus at every single vertex; they trace continuous **"L"** or **"U"** shaped lines around corners. A naive evaluator expecting one discrete stroke per edge would penalize skilled designers with failing scores ($<15\%$).
+
+Paplitz solves this through an anatomical corner-splitting algorithm (`src/lib/validation.ts`):
+1. Samples discrete coordinate points along the raw stroke.
+2. Computes normalized tangent vectors: $\vec{u}_k = \frac{P_{k+1} - P_k}{\|P_{k+1} - P_k\|}$.
+3. Calculates local deflection angle: $\theta = \arccos(\vec{u}_k \cdot \vec{u}_{k+1})$.
+4. When $\theta > 42^\circ$, a **corner inflection vertex** is detected.
+5. The stroke is automatically split into constituent linear segments: $[A \to B] + [B \to C]$.
+6. Dispatched into an **optimal bipartite greedy assignment** matching user segments with target 3D edges.
+
+### Multifactorial Scoring Function (0% – 100%)
+$$\text{Score} = 0.45 \cdot S_{\text{edges}} + 0.45 \cdot S_{\text{convergence}} + 0.10 \cdot S_{\text{cleanliness}}$$
+
+* **Edge Completeness ($45\%$):** Topological volume verification. If an essential bounding edge is missing, the volume does not exist in projective space.
+* **Geometric Vanishing Accuracy ($45\%$):** Dot product alignment between user segments and exact target vanishing rays, factoring in relative length and conic foreshortening.
+* **Cleanliness & Stability ($10\%$):** Penalizes parasitic hand tremor and disconnected ghost strokes.
+* **The Fundamental Rule:** An incomplete cube receives $0\%$. In technical drawing, missing boundary topology breaks the solid. Passing threshold is set to $\ge 80\%$.
 
 ---
 
-## 📚 Technical Documentation for Developers
+## 06. Ecosystem Innovations: Hybrid A4 Worksheets & Sensei Cubo
 
-For deep architectural insights, mathematical formulations, or platform porting guides, explore the [`docs/`](./docs/README.md) directory:
+### 1. The Analog-Digital Bridge: Vector A4 Worksheets with QR Calibration
+For design studios, high schools, and students who cherish the tactile drag of physical graphite on paper, Paplitz includes a hybrid bridge:
+* **Pure Vector PDF Generator (`jsPDF`):** Generates high-resolution printable A4 practice sheets with millimetric alignment grids and 12 procedurally generated perspective challenges.
+* **High-Density QR Embedding:** Every challenge slot prints its own unique QR code containing seed parameters and vanishing coordinates.
+* **Optical Camera Scanner:** Students point their smartphone or webcam at the completed paper worksheet; the computer vision scanner (`jsQR`) decodes the exercise, extracts drawn graphite marks, and scores them automatically.
 
-* 📖 **[Documentation Index](./docs/README.md)**
+### 2. Affective Mentorship: "Sensei Cubito" 3D Avatar
+Learning perspective is mentally taxing. To transform frustration into empathy and motivation, Paplitz features an expressive 3D companion mascot powered by `@bible-strong/avatar-react`:
+* **Working Focus:** Detects when the stylus touches the canvas; eyes concentrate and follow the drawing tip in real time.
+* **Celebration:** Exceeding an $80\%$ score triggers joyful star eyes, jumping physics, and celebratory ink particles.
+* **Empathy on Mistakes:** Rather than loud game-over sounds, Cubito shows sympathetic spirals and invites immediate re-trying.
+* **60 FPS Physics & Evasion:** Fully draggable anywhere on the screen with dynamic boundary repulsion to avoid obstructing active drawing areas.
+
+### 3. High-Tempo Arcade Minigames
+Beyond the structured curriculum, Paplitz features dedicated speed and endurance drills:
+* 🔥 **Fever:** Maintain dynamic perspective combos without breaking accuracy streaks.
+* ⚡ **Blitz:** Rapid 60-second muscle memory drills against a ticking clock.
+* 🛡️ **Survival:** Increasing difficulty where a single unclosed volume ends the run.
+* ⏱️ **Speed Sprint:** Measure precise completion time across 5 consecutive cubes.
+
+---
+
+## 07. Open-Source Philosophy, Community & Future Roadmap
+
+### The Universal Right to Master Sketching
+* **Educational Democratization:** Professional CAD and design licenses often carry prohibitive costs. Paplitz is **100% free and open-source under the MIT License**.
+* **Technological Sovereignty & Client-Side Privacy:** All geometric computation runs locally in the client browser. No personal data, drawings, or usage metrics are sold or transmitted to third-party servers.
+* **☁️ Cloud Sync & Rescue Saves (Supabase):** Seamlessly synchronize progress, unlocked units, streak, and XP across multiple devices with private recovery codes or offline JSON save backup files—no mandatory email registration required.
+* **👥 Classrooms & Teacher Hubs:** Instructors can group students via simple classroom codes to monitor which perspective concepts create bottlenecks across the cohort.
+* **📱 True Multiplatform Freedom:** Web application hosted on Vercel, standalone Windows `.exe` desktop application with Electron, and Android `.apk` optimized for horizontal tablet sketching with active pens via Capacitor.
+
+### Community Invitation & Future Roadmap
+Paplitz is architected as a living platform. Faculties of industrial design, architecture, and fine arts are invited to integrate the tool into syllabi and contribute to its roadmap:
+* 🔄 **Cylinders & Ellipses Module:** Geometric extension to evaluate ellipse degree opening (eccentricity) and cylindrical axes in perspective.
+* 🌿 **Complex Organic Forms:** Progression from orthogonal primitives toward continuous-radius fillets and double-curved volumes.
+* 🛠️ **Visual Lesson Designer for Teachers:** Drag-and-drop web editor enabling instructors to configure custom geometric challenges and assign them to classes.
+
+---
+
+## 08. Conclusions & Summary
+
+1. **Scientific Pedagogy:** Replaces trial-and-error frustration with a measurable, objective, and adaptive learning curve inspired by the best instructional references.
+2. **Technological Independence:** Pure TypeScript 3D analytical engine operating locally at zero server cost, zero latency, and zero dependency on black-box AI models.
+3. **Community Impact:** An open-source project conceived by and for the industrial design community, available to test worldwide today.
+
+---
+
+## 💻 Developer Quickstart & Multiplatform Builds
+
+### Prerequisites
+* [Node.js](https://nodejs.org/) (version 18 or higher)
+* `npm` (included with Node.js)
+
+### 1. Local Development
+```bash
+# Clone the repository
+git clone https://github.com/lazaro-guerrero-losada/paplitz.git
+cd paplitz
+
+# Install dependencies
+npm install
+
+# Start development server (Hot Module Replacement at http://localhost:5173/)
+npm run dev
+```
+
+### 2. Compile for Production (Web)
+```bash
+npm run build
+```
+Outputs optimized static assets to `/dist`, ready for instant deployment on **Vercel**, **Netlify**, or **Cloudflare Pages**.
+
+### 3. Build Windows Standalone Executable (`.exe`)
+```bash
+# Builds portable and installer binaries into /dist_electron
+npm run electron:build
+```
+
+### 4. Build Android Native App (`.apk`)
+```bash
+# Syncs web build with Capacitor and opens Android Studio
+npm run build:android
+npm run cap:open
+```
+
+---
+
+## 📚 Technical Documentation Directory
+
+For in-depth architectural specifications and formulas, refer to the [`docs/`](./docs/README.md) directory:
+
+* 📖 **[Central Documentation Index](./docs/README.md)**
 * 🏗️ **[Architecture & Component Tree](./docs/ARCHITECTURE.md)**
 * 📐 **[3D Geometry & Perspective Engine](./docs/GEOMETRY_AND_PERSPECTIVE.md)**
 * 🎯 **[Stroke Evaluation & Scoring Algorithms](./docs/STROKE_EVALUATION_AND_SCORING.md)**
@@ -65,72 +257,17 @@ For deep architectural insights, mathematical formulations, or platform porting 
 
 ---
 
-## 🚀 Getting Started
+## 👤 Authorship, Academic Affiliation & Contact
 
-### Prerequisites
-* [Node.js](https://nodejs.org/) (version 18 or higher)
-* `npm` (comes with Node.js)
-
-### Local Development
-
-```bash
-# 1. Clone the repository
-git clone https://github.com/lazaro-guerrero-losada/paplitz.git
-cd paplitz
-
-# 2. Install dependencies
-npm install
-
-# 3. Start development server
-npm run dev
-```
-
-Open [http://localhost:5173](http://localhost:5173) in your browser.
-
----
-
-## 📦 Building for Production & Multiplatform
-
-### Web (Production Bundle)
-```bash
-npm run build
-```
-Generates optimized static assets in the `dist/` directory, ready to deploy instantly on **Vercel**, **Netlify**, or **GitHub Pages**.
-
-### Windows Executable (`.exe`)
-```bash
-npm run electron:build
-```
-Produces an installer (`.exe`) inside `dist_electron/`.
-
-### Android (`.apk`)
-```bash
-npm run build:android
-npm run cap:open
-```
-Syncs the web build with Android Studio to compile the native `.apk`.
-
----
-
-## 🛠️ Tech Stack
-
-* **Frontend:** React 19, TypeScript, Vite, Tailwind CSS v4
-* **Canvas & Input:** HTML5 Canvas, Pointer Events API (Pressure & Tilt)
-* **Geometry Engine:** Pure Analytical Geometry & Vector Math (0 dependencies)
-* **Document & Scanner:** jsPDF (Vector A4 sheets), jsQR & pdfjs-dist (Camera & PDF validation)
-* **Desktop & Mobile:** Electron & Capacitor
-
----
-
-## 💡 Acknowledgments & References
-
-Paplitz was born as a passion project inspired by pioneer works in perspective learning and visual education:
-
-* **[Daromeon](https://daromeon.com/)**: Special acknowledgment for the early conceptual inspiration on perspective practice tools. Paplitz builds upon this idea with a unique architecture: a custom offline 3D geometric engine in TypeScript, Duolingo-style gamification, analog A4 worksheet printing with QR camera scanning, and full cross-platform support.
-* **"Sketching: The Basics"** (*Koos Eissen & Roselien Steur*): Primary pedagogical reference for theoretical foundations in industrial sketching, vanishing points, ellipse construction, and spatial projection. *(Note: Copyrighted book materials are not included in this repository).*
+* **Author:** **Lázaro Guerrero Losada**
+* **Academic Background:** Degree in Industrial Design Engineering and Product Development (*Universidad de Málaga — UMA*) | M.Sc. in Industrial Engineering (*UMA*).
+* **Academic Scope:** International Conference on Educational Innovation and Design Education.
+* **Email:** `lazaroguerrerolosada@uma.es`
+* **Live Web App:** [https://paplitz.vercel.app/](https://paplitz.vercel.app/)
+* **Source Code Repository:** [https://github.com/lazaro-guerrero-losada/paplitz](https://github.com/lazaro-guerrero-losada/paplitz)
 
 ---
 
 ## 📄 License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [MIT License](LICENSE) — free to use, modify, study, and distribute for educational, commercial, or research purposes.
