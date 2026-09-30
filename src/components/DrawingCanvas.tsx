@@ -1039,117 +1039,153 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
         )}
       </div>
 
-      {/* BARRA DE HERRAMIENTAS Y ACCIONES INMEDIATA (TODO AL ALCANCE EN 1 SOLA LÍNEA) */}
-      <div className="w-full mt-2 flex items-center justify-between gap-1.5 sm:gap-2 border-2 border-black bg-white p-2 shadow-[3px_3px_0px_#000000] flex-wrap sm:flex-nowrap min-w-0">
-        {/* Lado Izquierdo: Herramientas de dibujo (o toggle de capas si está comprobado) */}
+      {/* BARRA DE HERRAMIENTAS Y ACCIONES (TODO DENTRO DEL MARCO DEL LIENZO) */}
+      <div className="w-full mt-2 border-2 border-black bg-white p-2 shadow-[3px_3px_0px_#000000] min-w-0">
         {!feedback ? (
-          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-            <button
-              onClick={undoLastStroke}
-              disabled={strokes.length === 0 || showSolution}
-              className="btn-ink-outline px-2 py-1 text-xs font-mono disabled:opacity-30 cursor-pointer flex items-center gap-1 shrink-0 shadow-[1px_1px_0px_#000000]"
-              title="Deshacer último trazo (Ctrl+Z)"
-            >
-              <Undo2 className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">Deshacer</span>
-            </button>
-            <button
-              onClick={clearStrokes}
-              disabled={strokes.length === 0 || showSolution}
-              className="btn-ink-outline px-2 py-1 text-xs font-mono disabled:opacity-30 cursor-pointer flex items-center gap-1 shrink-0 shadow-[1px_1px_0px_#000000]"
-              title="Borrar todos los trazos"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">Borrar</span>
-            </button>
-            <span className="text-[11px] font-mono text-neutral-600 pl-0.5 font-bold shrink-0">
-              {countDetectedAristas(strokes)}/{challenge.targetEdges.length}
-              <span className="hidden lg:inline font-normal"> {challenge.isShadowLevel ? 'sombras' : 'aristas'}</span>
-            </span>
+          <div className="flex items-center justify-between gap-1.5 sm:gap-2 w-full">
+            {/* Lado Izquierdo: Herramientas de dibujo */}
+            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+              <button
+                onClick={undoLastStroke}
+                disabled={strokes.length === 0 || showSolution}
+                className="btn-ink-outline px-2 py-1 text-xs font-mono disabled:opacity-30 cursor-pointer flex items-center gap-1 shrink-0 shadow-[1px_1px_0px_#000000]"
+                title="Deshacer último trazo (Ctrl+Z)"
+              >
+                <Undo2 className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">Deshacer</span>
+              </button>
+              <button
+                onClick={clearStrokes}
+                disabled={strokes.length === 0 || showSolution}
+                className="btn-ink-outline px-2 py-1 text-xs font-mono disabled:opacity-30 cursor-pointer flex items-center gap-1 shrink-0 shadow-[1px_1px_0px_#000000]"
+                title="Borrar todos los trazos"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">Borrar</span>
+              </button>
+              <span className="text-[11px] font-mono text-neutral-600 pl-0.5 font-bold shrink-0">
+                {countDetectedAristas(strokes)}/{challenge.targetEdges.length}
+                <span className="hidden lg:inline font-normal"> {challenge.isShadowLevel ? 'sombras' : 'aristas'}</span>
+              </span>
+            </div>
+
+            {/* Lado Derecho: Reporte y Comprobar */}
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              <button
+                onClick={handleOpenReportModal}
+                className="btn-ink-outline p-1.5 text-xs font-mono font-bold flex items-center gap-1 cursor-pointer transition-transform active:scale-95 shadow-[1px_1px_0px_#000000] shrink-0"
+                title="Escribir nota y descargar reporte (JSON / Copiar)"
+              >
+                <AlertTriangle className="w-3.5 h-3.5 text-black stroke-[2.5]" />
+              </button>
+
+              <button
+                onClick={handleValidateClick}
+                disabled={countDetectedAristas(strokes) === 0}
+                className="btn-ink px-2.5 sm:px-3.5 py-1.5 text-xs font-mono uppercase font-bold disabled:opacity-25 disabled:pointer-events-none disabled:cursor-not-allowed cursor-pointer shadow-[2px_2px_0px_#000000] flex items-center gap-1 shrink-0"
+                title={
+                  countDetectedAristas(strokes) === 0
+                    ? "Dibuja al menos una arista antes de comprobar"
+                    : challenge.isShadowLevel
+                    ? "Comprobar proyección de sombra (Enter)"
+                    : "Comprobar perspectiva (Enter)"
+                }
+              >
+                <span>Comprobar</span>
+                <Check className="w-3.5 h-3.5 stroke-[3]" />
+              </button>
+            </div>
           </div>
         ) : (
-          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 flex-wrap">
-            <span className="text-[11px] font-mono font-bold text-neutral-700 bg-neutral-100 px-1.5 sm:px-2 py-1 border border-black shadow-[1px_1px_0px_#000000]">
-              {countDetectedAristas(strokes)}/{challenge.targetEdges.length}
-              <span className="hidden md:inline"> {challenge.isShadowLevel ? 'aristas sombra' : 'aristas'}</span>
-            </span>
-
-            {/* Botón Ver/Ocultar Mi Dibujo */}
-            <button
-              type="button"
-              onClick={() => setShowUserDrawing((prev) => !prev)}
-              className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 cursor-pointer transition-all shadow-[1px_1px_0px_#000000] border border-black ${
-                showUserDrawing
-                  ? 'bg-black text-white hover:bg-neutral-800'
-                  : 'bg-neutral-100 text-neutral-500 border-neutral-400 hover:bg-neutral-200'
-              }`}
-              title={showUserDrawing ? 'Ocultar mi dibujo (D)' : 'Mostrar mi dibujo (D)'}
-            >
-              {showUserDrawing ? (
-                <Eye className="w-3.5 h-3.5 stroke-[2.5]" />
-              ) : (
-                <EyeOff className="w-3.5 h-3.5 stroke-[2]" />
-              )}
-              <span className={showUserDrawing ? '' : 'line-through opacity-75'}>
-                <span className="hidden sm:inline">Mi dibujo</span>
-                <span className="sm:hidden">Dibujo</span>
+          /* DOS FILAS ESTRUCTURADAS AL RESOLVER: NUNCA SE SALE DEL CUADRO DE DIBUJO */
+          <div className="flex flex-col gap-1.5 w-full">
+            {/* Fila 1: Contador de aristas y Botones para Mostrar/Ocultar Dibujo y Solución */}
+            <div className="flex items-center justify-between gap-1.5 pb-1.5 border-b border-neutral-200 w-full">
+              <span className="text-[11px] font-mono font-bold text-neutral-700 bg-neutral-100 px-1.5 sm:px-2 py-0.5 border border-black shadow-[1px_1px_0px_#000000] shrink-0">
+                {countDetectedAristas(strokes)}/{challenge.targetEdges.length}
+                <span className="hidden sm:inline"> {challenge.isShadowLevel ? 'aristas sombra' : 'aristas'}</span>
               </span>
-            </button>
 
-            {/* Botón Ver/Ocultar Solución Paramétrica */}
-            <button
-              type="button"
-              onClick={() => setShowParametricSolution((prev) => !prev)}
-              className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 cursor-pointer transition-all shadow-[1px_1px_0px_#000000] border border-black ${
-                showParametricSolution
-                  ? 'bg-black text-white hover:bg-neutral-800'
-                  : 'bg-neutral-100 text-neutral-500 border-neutral-400 hover:bg-neutral-200'
-              }`}
-              title={showParametricSolution ? 'Ocultar solución paramétrica (S)' : 'Mostrar solución paramétrica (S)'}
-            >
-              {showParametricSolution ? (
-                <Eye className="w-3.5 h-3.5 stroke-[2.5]" />
-              ) : (
-                <EyeOff className="w-3.5 h-3.5 stroke-[2]" />
-              )}
-              <span className={showParametricSolution ? '' : 'line-through opacity-75'}>
-                <span className="hidden sm:inline">Solución</span>
-                <span className="sm:hidden">Solución</span>
-              </span>
-            </button>
-          </div>
-        )}
-
-        {/* Lado Derecho: Acciones (Comprobar o Siguiente) + Botón Report */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {/* Botón de Reporte (pequeño con icono de triángulo para exportar / depurar) */}
-          <button
-            onClick={handleOpenReportModal}
-            className="btn-ink-outline p-1.5 text-xs font-mono font-bold flex items-center gap-1 cursor-pointer transition-transform active:scale-95 shadow-[1px_1px_0px_#000000] shrink-0"
-            title="Escribir nota y descargar reporte (JSON / Copiar)"
-          >
-            <AlertTriangle className="w-3.5 h-3.5 text-black stroke-[2.5]" />
-          </button>
-
-          {feedback ? (
-            <div className="flex items-center gap-1.5 shrink-0">
-              <div className="flex items-center gap-1 border-2 border-black bg-neutral-100 px-2 py-1 font-mono text-xs font-bold shadow-[1px_1px_0px_#000000] shrink-0">
-                {feedback.passed ? (
-                  <CheckCircle className="w-3.5 h-3.5 text-black stroke-[2.5]" />
-                ) : (
-                  <AlertTriangle className="w-3.5 h-3.5 text-black stroke-[2.5]" />
-                )}
-                <span>{feedback.totalScore ?? feedback.score}%</span>
-                {feedback.passed && (feedback.speedBonus ?? 0) > 0 && (
-                  <span
-                    className="text-[10px] bg-black text-white px-1 ml-0.5 flex items-center gap-0.5"
-                    title={`Base: ${feedback.score}% + Bonus velocidad: +${feedback.speedBonus}%`}
-                  >
-                    <Zap className="w-2.5 h-2.5 fill-white text-white shrink-0" />
-                    <span>+{feedback.speedBonus}%</span>
+              <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+                {/* Botón Ver/Ocultar Mi Dibujo */}
+                <button
+                  type="button"
+                  onClick={() => setShowUserDrawing((prev) => !prev)}
+                  className={`px-2 py-0.5 text-xs font-mono font-bold flex items-center gap-1 cursor-pointer transition-all shadow-[1px_1px_0px_#000000] border border-black ${
+                    showUserDrawing
+                      ? 'bg-black text-white hover:bg-neutral-800'
+                      : 'bg-neutral-100 text-neutral-500 border-neutral-400 hover:bg-neutral-200'
+                  }`}
+                  title={showUserDrawing ? 'Ocultar mi dibujo (D)' : 'Mostrar mi dibujo (D)'}
+                >
+                  {showUserDrawing ? (
+                    <Eye className="w-3.5 h-3.5 stroke-[2.5]" />
+                  ) : (
+                    <EyeOff className="w-3.5 h-3.5 stroke-[2]" />
+                  )}
+                  <span className={showUserDrawing ? '' : 'line-through opacity-75'}>
+                    <span className="hidden sm:inline">Mi dibujo</span>
+                    <span className="sm:hidden">Dibujo</span>
                   </span>
-                )}
+                </button>
+
+                {/* Botón Ver/Ocultar Solución Paramétrica */}
+                <button
+                  type="button"
+                  onClick={() => setShowParametricSolution((prev) => !prev)}
+                  className={`px-2 py-0.5 text-xs font-mono font-bold flex items-center gap-1 cursor-pointer transition-all shadow-[1px_1px_0px_#000000] border border-black ${
+                    showParametricSolution
+                      ? 'bg-black text-white hover:bg-neutral-800'
+                      : 'bg-neutral-100 text-neutral-500 border-neutral-400 hover:bg-neutral-200'
+                  }`}
+                  title={showParametricSolution ? 'Ocultar solución paramétrica (S)' : 'Mostrar solución paramétrica (S)'}
+                >
+                  {showParametricSolution ? (
+                    <Eye className="w-3.5 h-3.5 stroke-[2.5]" />
+                  ) : (
+                    <EyeOff className="w-3.5 h-3.5 stroke-[2]" />
+                  )}
+                  <span className={showParametricSolution ? '' : 'line-through opacity-75'}>
+                    <span className="hidden sm:inline">Solución</span>
+                    <span className="sm:hidden">Solución</span>
+                  </span>
+                </button>
               </div>
+            </div>
+
+            {/* Fila 2: Diagnóstico/Reporte a la izquierda y Botón Siguiente a la derecha */}
+            <div className="flex items-center justify-between gap-1.5 pt-0.5 w-full">
+              <div className="flex items-center gap-1.5 shrink-0">
+                {/* Botón de Reporte */}
+                <button
+                  onClick={handleOpenReportModal}
+                  className="btn-ink-outline p-1.5 text-xs font-mono font-bold flex items-center gap-1 cursor-pointer transition-transform active:scale-95 shadow-[1px_1px_0px_#000000] shrink-0"
+                  title="Escribir nota y descargar reporte (JSON / Copiar)"
+                >
+                  <AlertTriangle className="w-3.5 h-3.5 text-black stroke-[2.5]" />
+                </button>
+
+                {/* Badge de puntuación */}
+                <div className="flex items-center gap-1 border-2 border-black bg-neutral-100 px-2 py-1 font-mono text-xs font-bold shadow-[1px_1px_0px_#000000] shrink-0">
+                  {feedback.passed ? (
+                    <CheckCircle className="w-3.5 h-3.5 text-black stroke-[2.5]" />
+                  ) : (
+                    <AlertTriangle className="w-3.5 h-3.5 text-black stroke-[2.5]" />
+                  )}
+                  <span>{feedback.totalScore ?? feedback.score}%</span>
+                  {feedback.passed && (feedback.speedBonus ?? 0) > 0 && (
+                    <span
+                      className="text-[10px] bg-black text-white px-1 ml-0.5 flex items-center gap-0.5"
+                      title={`Base: ${feedback.score}% + Bonus velocidad: +${feedback.speedBonus}%`}
+                    >
+                      <Zap className="w-2.5 h-2.5 fill-white text-white shrink-0" />
+                      <span>+{feedback.speedBonus}%</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Botón Siguiente alineado a la derecha sin desbordar el cuadro */}
               <button
                 onClick={onNextCube}
                 className="btn-ink px-3 sm:px-4 py-1.5 text-xs font-mono uppercase font-bold flex items-center gap-1 cursor-pointer shadow-[2px_2px_0px_#000000] shrink-0"
@@ -1159,24 +1195,8 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
-          ) : (
-            <button
-              onClick={handleValidateClick}
-              disabled={countDetectedAristas(strokes) === 0}
-              className="btn-ink px-2.5 sm:px-3.5 py-1.5 text-xs font-mono uppercase font-bold disabled:opacity-25 disabled:pointer-events-none disabled:cursor-not-allowed cursor-pointer shadow-[2px_2px_0px_#000000] flex items-center gap-1 shrink-0"
-              title={
-                countDetectedAristas(strokes) === 0
-                  ? "Dibuja al menos una arista antes de comprobar"
-                  : challenge.isShadowLevel
-                  ? "Comprobar proyección de sombra (Enter)"
-                  : "Comprobar perspectiva (Enter)"
-              }
-            >
-              <span>Comprobar</span>
-              <Check className="w-3.5 h-3.5 stroke-[3]" />
-            </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Feedback técnico si se ha comprobado */}
