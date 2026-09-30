@@ -1016,13 +1016,25 @@ export function App() {
 
         {/* PESTAÑA 1: HOME / PRÁCTICA RÁPIDA (TODO AL ALCANCE, SIN SCROLL) */}
         {activeTab === 'practice' && (
-          <div className="flex-1 w-full practice-grid px-4 py-2 sm:py-3">
-            {/* Columna izquierda espaciadora para centrar matemáticamente el lienzo en el centro de la pantalla */}
-            <div className="hidden lg:block w-full min-w-0" aria-hidden="true" />
+          <div className="flex-1 w-full practice-grid px-3 sm:px-4 py-2 sm:py-3 gap-3 lg:gap-4">
+            {/* Columna 1: Reto Diario en el lateral izquierdo en Desktop (arriba del todo); en móvil abajo del lienzo pero encima de Cubito */}
+            <div
+              data-no-cubito="true"
+              className="w-full min-w-0 flex flex-col items-center lg:items-end justify-start shrink-0 pt-1 lg:pt-2 max-w-sm w-full mx-auto lg:mx-0 lg:justify-self-end order-2 lg:order-1"
+            >
+              <DailyChallengePanel
+                unlockedNodes={unlockedNodes}
+                activeSession={dailySetSession}
+                onStartChallenge={handleStartDailyChallenge}
+                onCancelChallenge={handleCancelDailyChallenge}
+                history={dailySetHistory}
+                onClearHistory={handleClearDailyHistory}
+              />
+            </div>
 
             {/* Columna central: Lienzo 100% centrado con la pantalla */}
             <div
-              className="w-full min-w-0 flex flex-col items-center shrink-0 justify-self-center"
+              className="w-full min-w-0 flex flex-col items-center shrink-0 justify-self-center order-1 lg:order-2"
               style={{
                 width: 'min(100%, 600px, max(280px, calc((100vh - 330px) * 600 / 540)))',
               }}
@@ -1197,26 +1209,16 @@ export function App() {
               />
             </div>
 
-            {/* Columna Lateral Derecha (Desktop) / Abajo bajo el lienzo (Móvil vertical) */}
-            <div className="w-full min-w-0 flex flex-col items-center justify-start shrink-0 pt-4 sm:pt-6 lg:pt-8 max-w-sm mx-auto space-y-4">
+            {/* Columna 3: Sensei Cubo en el lateral derecho en Desktop (más abajo que el reto); en móvil al final del todo */}
+            <div className="w-full min-w-0 flex flex-col items-center lg:items-start justify-start shrink-0 pt-3 sm:pt-4 lg:pt-14 max-w-sm w-full mx-auto lg:mx-0 lg:justify-self-start order-3 lg:order-3">
               <SenseiCubo
                 mood={avatarMood}
                 isDrawing={isUserDrawing}
-                size={windowWidth < 640 ? 125 : 160}
+                size={windowWidth < 640 ? 120 : 155}
                 onPoke={() => {
                   setAvatarMood('poked');
                   setTimeout(() => setAvatarMood('neutral'), 1800);
                 }}
-              />
-
-              {/* Panel Desplegable de Reto Diario / Daily Challenge (en el lateral en desktop, abajo bajo la caja de dibujo en móvil) */}
-              <DailyChallengePanel
-                unlockedNodes={unlockedNodes}
-                activeSession={dailySetSession}
-                onStartChallenge={handleStartDailyChallenge}
-                onCancelChallenge={handleCancelDailyChallenge}
-                history={dailySetHistory}
-                onClearHistory={handleClearDailyHistory}
               />
             </div>
           </div>
