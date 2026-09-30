@@ -10,7 +10,7 @@ import { ProfileView } from './components/ProfileView';
 import { MinigamesView } from './components/MinigamesView';
 import { LevelGuideModal } from './components/LevelGuideModal';
 import { PlacementModal } from './components/PlacementModal';
-import { LevelUnlockedModal } from './components/LevelUnlockedModal';
+import { TinyToast, ToastData } from './components/TinyToast';
 import { StreakModal } from './components/StreakModal';
 import { DailyChallengePanel } from './components/DailyChallengePanel';
 import { DailySetCompletedModal } from './components/DailySetCompletedModal';
@@ -57,25 +57,45 @@ export function App() {
   // Estado del Currículum / Camino (fusionando progreso guardado con la estructura actual)
   const [units, setUnits] = useState<Unit[]>(() => {
     const saved = localStorage.getItem('paplitz_units');
-    if (!saved) return MODULE_PARALLELEPIPEDS.units;
-    try {
-      const parsed: Unit[] = JSON.parse(saved);
-      return MODULE_PARALLELEPIPEDS.units.map((defaultUnit) => {
-        const savedUnit = parsed.find((u) => u.id === defaultUnit.id);
-        if (!savedUnit) return defaultUnit;
-        return {
-          ...defaultUnit,
-          nodes: defaultUnit.nodes.map((defaultNode) => {
-            const savedNode = savedUnit.nodes.find((n) => n.id === defaultNode.id);
-            return savedNode
-              ? { ...defaultNode, status: savedNode.status, score: savedNode.score }
-              : defaultNode;
-          }),
-        };
-      });
-    } catch {
-      return MODULE_PARALLELEPIPEDS.units;
+    let loadedUnits = MODULE_PARALLELEPIPEDS.units;
+    if (saved) {
+      try {
+        const parsed: Unit[] = JSON.parse(saved);
+        loadedUnits = MODULE_PARALLELEPIPEDS.units.map((defaultUnit) => {
+          const savedUnit = parsed.find((u) => u.id === defaultUnit.id);
+          if (!savedUnit) return defaultUnit;
+          return {
+            ...defaultUnit,
+            nodes: defaultUnit.nodes.map((defaultNode) => {
+              const savedNode = savedUnit.nodes.find((n) => n.id === defaultNode.id);
+              return savedNode
+                ? { ...defaultNode, status: savedNode.status, score: savedNode.score }
+                : defaultNode;
+            }),
+          };
+        });
+      } catch {
+        loadedUnits = MODULE_PARALLELEPIPEDS.units;
+      }
     }
+
+    // Auto-sanitizar para garantizar una progresión estrictamente secuencial:
+    // Los nodos completados se preservan. El primer nodo no completado es 'current'.
+    // Los nodos posteriores no completados permanecen 'locked' (evitando saltos indebidos de nivel).
+    let foundFirstUncompleted = false;
+    return loadedUnits.map((u) => ({
+      ...u,
+      nodes: u.nodes.map((n) => {
+        if (n.status === 'completed') {
+          return n;
+        }
+        if (!foundFirstUncompleted) {
+          foundFirstUncompleted = true;
+          return { ...n, status: 'current' as const };
+        }
+        return { ...n, status: 'locked' as const };
+      }),
+    }));
   });
 
   // Lista aplanada de todos los nodos del camino
@@ -122,10 +142,39 @@ export function App() {
   const [showLevelGuide, setShowLevelGuide] = useState<boolean>(false);
   const [isPlacementModalOpen, setIsPlacementModalOpen] = useState<boolean>(false);
   const [placementTestNode, setPlacementTestNode] = useState<LessonNode | null>(null);
-  const [unlockedLevelNotification, setUnlockedLevelNotification] = useState<{
-    node: LessonNode;
-    unitTitle?: string;
-  } | null>(null);
+  // Sistema de Notificaciones Ligeras (Tiny Toast no intrusivo)
+  const [toast, setToast] = useState<ToastData | null>(null);
+  const showToast = (
+    icon: string,
+    title: string,
+    message: string,
+    actionLabel?: string,
+    onAction?: () => void,
+    type?: 'success' | 'info' | 'warning'
+  ) => {
+    setToast({
+      id: Date.now(),
+      icon,
+      title,
+      message,
+      actionLabel,
+      onAction,
+      type,
+    });
+  };
+
+  // Racha de maestría por nivel (se requieren al menos 3 cubos seguidos con nota ≥90% para superar el nivel actual)
+  const [masteryStreaks, setMasteryStreaks] = useState<Record<string, number>>(() => {
+    const saved = localStorage.getItem('paplitz_mastery_streaks');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  useEffect(() => {
+    localStorage.setItem('paplitz_mastery_streaks', JSON.stringify(masteryStreaks));
+  }, [masteryStreaks]);
+
+  const currentMasteryStreak = activeNode ? (masteryStreaks[activeNode.id] || 0) : 0;
+
   const [streakModalState, setStreakModalState] = useState<{
     isOpen: boolean;
     isNewDayAward: boolean;
@@ -412,11 +461,11 @@ export function App() {
 
       setXp((prev) => prev + totalXp);
 
-      // Actualizar racha diaria y comprobar si se alcanza un nuevo día consecutivo
+      // Actualizar racha diaria
       const streakResult = recordDailyPractice(streak);
       setStreak(streakResult.newStreak);
       if (streakResult.isNewDay) {
-        setStreakModalState({ isOpen: true, isNewDayAward: true });
+        showToast('🔥', `¡Racha Diaria: ${streakResult.newStreak} días!`, 'Has registrado tu práctica de hoy. Haz clic en la llama del menú superior para ver tu historial.');
       }
 
       setScoresHistory((prev) => [...prev, recordedScore]);
@@ -429,50 +478,123 @@ export function App() {
         setXp((prev) => prev + placementBonusXp);
         setPlacementTestNode(null);
         setActiveNode((prev) => (prev ? { ...prev, status: 'current' } : prev));
+        showToast('⚡', '¡Examen Convalidado!', `Has saltado hasta el nivel ${placementTestNode.code} (+50 XP).`);
         return;
       }
 
-      // Desbloquear siguiente nodo en el camino si el actual estaba en curso
+      // GESTIÓN DE NIVELES Y PROGRESIÓN SECUENCIAL
       if (activeNode) {
-        let newlyUnlocked: LessonNode | null = null;
-        let unlockedUnitTitle = '';
-        let foundCurrent = false;
+        // CASO A: Nivel inferior ya superado ('completed')
+        // Regla estricta: Practicar un nivel inferior NUNCA desbloquea niveles futuros. Solo actualiza su récord.
+        if (activeNode.status === 'completed') {
+          if (recordedScore > (activeNode.score || 0)) {
+            setUnits((prevUnits) =>
+              prevUnits.map((unit) => ({
+                ...unit,
+                nodes: unit.nodes.map((n) =>
+                  n.id === activeNode.id
+                    ? { ...n, score: Math.max(n.score || 0, recordedScore) }
+                    : n
+                ),
+              }))
+            );
+            setActiveNode((prev) => (prev ? { ...prev, score: Math.max(prev.score || 0, recordedScore) } : prev));
+          }
+          return;
+        }
 
-        const nextUnits = units.map((unit) => ({
-          ...unit,
-          nodes: unit.nodes.map((n) => {
-            if (n.id === activeNode.id) {
-              foundCurrent = true;
-              return { ...n, status: 'completed' as const, score: Math.max(n.score || 0, recordedScore) };
+        // CASO B: Nivel activo actual ('current')
+        // Regla pedagógica: Se requieren AL MENOS 3 CUBOS SEGUIDOS CON NOTA ≥90% para superar el nivel
+        if (activeNode.status === 'current') {
+          if (recordedScore >= 90) {
+            const currentStreak = masteryStreaks[activeNode.id] || 0;
+            const newStreak = currentStreak + 1;
+            setMasteryStreaks((prev) => ({ ...prev, [activeNode.id]: newStreak }));
+
+            if (newStreak < 3) {
+              // Aún no ha alcanzado los 3 cubos seguidos
+              showToast(
+                '🎯',
+                `Racha de Maestría: ${newStreak}/3 (≥90%)`,
+                newStreak === 1
+                  ? `¡Gran cubo con ${recordedScore}%! Necesitas 2 cubos más seguidos ≥90% para superar ${activeNode.code}.`
+                  : `¡Excelente precisión (${recordedScore}%)! Solo te falta 1 cubo más para superar ${activeNode.code}.`
+              );
+            } else {
+              // ¡HA COMPLETADO 3 CUBOS SEGUIDOS CON ≥90%! Supera el nivel
+              setMasteryStreaks((prev) => ({ ...prev, [activeNode.id]: 0 }));
+
+              // Buscar estrictamente el SIGUIENTE nodo inmediato en la lista secuencial
+              const currentIndexInAll = allNodes.findIndex((n) => n.id === activeNode.id);
+              const immediateNextNode =
+                currentIndexInAll >= 0 && currentIndexInAll < allNodes.length - 1
+                  ? allNodes[currentIndexInAll + 1]
+                  : null;
+
+              const nextUnits = units.map((unit) => ({
+                ...unit,
+                nodes: unit.nodes.map((n) => {
+                  if (n.id === activeNode.id) {
+                    return { ...n, status: 'completed' as const, score: Math.max(n.score || 0, recordedScore) };
+                  }
+                  // Solo se desbloquea el nodo inmediatamente siguiente si estaba bloqueado
+                  if (immediateNextNode && n.id === immediateNextNode.id && n.status === 'locked') {
+                    return { ...n, status: 'current' as const };
+                  }
+                  return n;
+                }),
+              }));
+
+              setUnits(nextUnits);
+              setActiveNode((prev) => (prev ? { ...prev, status: 'completed', score: Math.max(prev.score || 0, recordedScore) } : prev));
+
+              if (immediateNextNode && immediateNextNode.status === 'locked') {
+                showToast(
+                  '✨',
+                  `¡Nivel ${activeNode.code} Superado! (3/3)`,
+                  `Has dominado ${activeNode.code}. Nuevo nivel desbloqueado: ${immediateNextNode.code} ${immediateNextNode.title}`,
+                  `Ir a ${immediateNextNode.code}`,
+                  () => handleSelectNode(immediateNextNode)
+                );
+              } else {
+                showToast(
+                  '✨',
+                  `¡Nivel ${activeNode.code} Superado! (3/3)`,
+                  `¡Maestría demostrada con 3 cubos seguidos ≥90%!`
+                );
+              }
             }
-            if (foundCurrent && n.status === 'locked') {
-              foundCurrent = false;
-              const unlocked = { ...n, status: 'current' as const };
-              newlyUnlocked = unlocked;
-              unlockedUnitTitle = unit.title;
-              return unlocked;
+          } else {
+            // La nota fue < 90%: la racha consecutiva se rompe y reinicia a 0
+            const prevStreak = masteryStreaks[activeNode.id] || 0;
+            setMasteryStreaks((prev) => ({ ...prev, [activeNode.id]: 0 }));
+            if (prevStreak > 0) {
+              showToast(
+                '⚠️',
+                `Racha reiniciada (${recordedScore}%)`,
+                `Para superar ${activeNode.code} necesitas 3 cubos consecutivos con nota ≥90%. ¡Sigue practicando!`
+              );
             }
-            return n;
-          }),
-        }));
-
-        setUnits(nextUnits);
-
-        // Actualizar el estado de la lección activa
-        setActiveNode((prev) => (prev ? { ...prev, status: 'completed', score: Math.max(prev.score || 0, recordedScore) } : prev));
-
-        // Si se acaba de desbloquear un nuevo nivel, mostrar animación/pop-up
-        if (newlyUnlocked) {
-          setUnlockedLevelNotification({
-            node: newlyUnlocked,
-            unitTitle: unlockedUnitTitle,
-          });
+          }
         }
       }
     } else {
       // Suspenso: avatar con espirales y sudor
       setAvatarMood('fail-spiral');
       setTimeout(() => setAvatarMood('neutral'), 3500);
+
+      // Si estaba en el nivel actual, romper la racha de maestría
+      if (activeNode && activeNode.status === 'current') {
+        const prevStreak = masteryStreaks[activeNode.id] || 0;
+        setMasteryStreaks((prev) => ({ ...prev, [activeNode.id]: 0 }));
+        if (prevStreak > 0) {
+          showToast(
+            '⚠️',
+            `Racha reiniciada`,
+            `Para superar ${activeNode.code} necesitas 3 cubos seguidos con nota ≥90%.`
+          );
+        }
+      }
     }
   };
 
@@ -483,6 +605,7 @@ export function App() {
     setStreak(0);
     setXp(0);
     setScoresHistory([]);
+    setMasteryStreaks({});
     const firstNode = MODULE_PARALLELEPIPEDS.units[0].nodes[0];
     setActiveNode(firstNode);
     handleNewPracticeCube(firstNode);
@@ -924,16 +1047,34 @@ export function App() {
 
                 <div className="flex items-center gap-1.5 shrink-0">
                   {activeNode && (
-                    <span
-                      className={`text-[10px] font-mono px-1.5 py-0.5 font-bold border shrink-0 ${
-                        activeNode.status === 'completed'
-                          ? 'bg-black text-white border-black'
-                          : 'bg-white text-black border-black'
-                      }`}
-                    >
-                      <span className="hidden xs:inline">{activeNode.status === 'completed' ? 'Superado ✓' : 'En curso ★'}</span>
-                      <span className="xs:hidden">{activeNode.status === 'completed' ? '✓' : '★'}</span>
-                    </span>
+                    activeNode.status === 'completed' ? (
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 font-bold border border-black bg-black text-white shrink-0">
+                        <span className="hidden xs:inline">Superado ✓</span>
+                        <span className="xs:hidden">✓</span>
+                      </span>
+                    ) : (
+                      <div
+                        className="flex items-center gap-1 border border-black bg-white px-1.5 py-0.5 text-[10px] font-mono font-bold shadow-[1px_1px_0px_#000000] shrink-0"
+                        title={`Racha de maestría: ${currentMasteryStreak}/3 cubos seguidos con nota ≥90% para superar el nivel`}
+                      >
+                        <span className="hidden xs:inline">Maestría:</span>
+                        <div className="flex items-center gap-0.5">
+                          {[0, 1, 2].map((i) => (
+                            <span
+                              key={i}
+                              className={`w-2.5 h-2.5 border border-black inline-flex items-center justify-center text-[8px] font-bold ${
+                                i < currentMasteryStreak
+                                  ? 'bg-black text-white'
+                                  : 'bg-neutral-100 text-transparent'
+                              }`}
+                            >
+                              ✓
+                            </span>
+                          ))}
+                        </div>
+                        <span className="tabular-nums">{currentMasteryStreak}/3</span>
+                      </div>
+                    )
                   )}
                   <button
                     onClick={() => handleNewPracticeCube()}
@@ -1009,23 +1150,34 @@ export function App() {
                       — {activeNode.subtitle}
                     </span>
                   </div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {activeNode.status === 'current' ? (
+                      <span className="text-[10px] font-mono bg-white text-black border border-black px-1.5 py-0.5 font-bold shrink-0 flex items-center gap-1 shadow-[1px_1px_0px_#000000]">
+                        <span className="hidden sm:inline text-neutral-500">Objetivo:</span>
+                        <span>3 seguidos ≥90%</span>
+                        <span className="bg-black text-white px-1 text-[9px]">{currentMasteryStreak}/3</span>
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-mono bg-white text-black border border-black px-1.5 py-0.5 font-bold shrink-0 shadow-[1px_1px_0px_#000000]">
+                        Superado ✓
+                      </span>
+                    )}
                     {activeNode.axesMode === 'xyz' && (
                       <span className="text-[10px] font-mono bg-white text-black border border-black px-2 py-0.5 font-bold shrink-0 flex items-center gap-1 shadow-[1px_1px_0px_#000000]">
                         <Compass className="w-3 h-3 stroke-[2.5]" />
-                        <span>Ejes X, Y, Z</span>
+                        <span className="hidden sm:inline">Ejes X, Y, Z</span>
                       </span>
                     )}
                     {activeNode.axesMode === 'base_axes' && (
                       <span className="text-[10px] font-mono bg-white text-black border border-black px-2 py-0.5 font-bold shrink-0 flex items-center gap-1 shadow-[1px_1px_0px_#000000]">
                         <Compass className="w-3 h-3 stroke-[2.5]" />
-                        <span>Ejes X e Y</span>
+                        <span className="hidden sm:inline">Ejes X e Y</span>
                       </span>
                     )}
                     {activeNode.axesMode === 'none' && (
                       <span className="text-[10px] font-mono bg-white text-black border border-black px-2 py-0.5 font-bold shrink-0 flex items-center gap-1 shadow-[1px_1px_0px_#000000]">
                         <PenTool className="w-3 h-3 stroke-[2.5]" />
-                        <span>Reto Libre</span>
+                        <span className="hidden sm:inline">Reto Libre</span>
                       </span>
                     )}
                   </div>
@@ -1164,21 +1316,7 @@ export function App() {
           }}
         />
       )}
-      {unlockedLevelNotification && (
-        <LevelUnlockedModal
-          unlockedNode={unlockedLevelNotification.node}
-          unitTitle={unlockedLevelNotification.unitTitle}
-          onClose={() => setUnlockedLevelNotification(null)}
-          onStartLevel={(node) => {
-            setUnlockedLevelNotification(null);
-            handleSelectNode(node);
-          }}
-          onViewPath={() => {
-            setUnlockedLevelNotification(null);
-            setActiveTab('path');
-          }}
-        />
-      )}
+      <TinyToast toast={toast} onClose={() => setToast(null)} />
       <StreakModal
         streak={streak}
         isOpen={streakModalState.isOpen}
