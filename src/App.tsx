@@ -12,12 +12,23 @@ import { LevelGuideModal } from './components/LevelGuideModal';
 import { PlacementModal } from './components/PlacementModal';
 import { LevelUnlockedModal } from './components/LevelUnlockedModal';
 import { StreakModal } from './components/StreakModal';
+import { DailyChallengePanel } from './components/DailyChallengePanel';
+import { DailySetCompletedModal } from './components/DailySetCompletedModal';
 import { calculatePlayerLevel } from './lib/levelSystem';
 import { SenseiCubo } from './components/avatar/SenseiCubo';
 import { AvatarMood } from './lib/avatarTypes';
-import { Flame, Printer, Compass, Map, User, RefreshCw, Filter, PenTool, Gamepad2, BookOpen, Zap, Menu, X, ChevronRight } from 'lucide-react';
+import { Flame, Printer, Compass, Map, User, RefreshCw, Filter, PenTool, Gamepad2, BookOpen, Zap, Menu, X, ChevronRight, Target } from 'lucide-react';
 import { PaplitzSaveData, applySaveDataToLocalStorage, fastForwardCurriculum } from './lib/saveSystem';
 import { recordDailyPractice } from './lib/streakSystem';
+import {
+  DailySetSession,
+  DailySetHistoryItem,
+  createDailyChallenge,
+  loadActiveDailySet,
+  saveActiveDailySet,
+  loadDailyChallengeHistory,
+  recordCompletedDailySet,
+} from './lib/dailyChallenge';
 
 function GithubIcon({ className = 'w-3.5 h-3.5' }: { className?: string }) {
   return (
@@ -121,6 +132,15 @@ export function App() {
   }>({ isOpen: false, isNewDayAward: false });
   const playerLevel = calculatePlayerLevel(xp);
 
+  // Reto Diario / Lote de ejercicios (hábito diario de 12 ejercicios)
+  const [dailySetSession, setDailySetSession] = useState<DailySetSession | null>(() => {
+    return loadActiveDailySet(allNodes);
+  });
+  const [dailySetHistory, setDailySetHistory] = useState<DailySetHistoryItem[]>(() => {
+    return loadDailyChallengeHistory();
+  });
+  const [completedDailySetForModal, setCompletedDailySetForModal] = useState<DailySetHistoryItem | null>(null);
+
   // Guardar en LocalStorage
   useEffect(() => {
     localStorage.setItem('paplitz_units', JSON.stringify(units));
@@ -128,6 +148,11 @@ export function App() {
     localStorage.setItem('paplitz_xp', xp.toString());
     localStorage.setItem('paplitz_scores', JSON.stringify(scoresHistory));
   }, [units, streak, xp, scoresHistory]);
+
+  // Persistir estado de reto diario activo
+  useEffect(() => {
+    saveActiveDailySet(dailySetSession);
+  }, [dailySetSession]);
 
   // Detección de tamaño de pantalla y orientación para móvil
   useEffect(() => {
@@ -162,6 +187,20 @@ export function App() {
   const handleNewPracticeCube = (nodeToUse?: LessonNode) => {
     const targetNode = nodeToUse || activeNode || allNodes[0];
     const newSeed = Math.floor(Math.random() * 100000);
+
+    // Si hay un reto diario activo, actualizar la semilla del ejercicio actual
+    if (dailySetSession && !dailySetSession.isCompleted) {
+      const updatedProblems = [...dailySetSession.problems];
+      updatedProblems[dailySetSession.currentIndex] = {
+        ...updatedProblems[dailySetSession.currentIndex],
+        seed: newSeed,
+      };
+      setDailySetSession({
+        ...dailySetSession,
+        problems: updatedProblems,
+      });
+    }
+
     setChallenge(
       generateCubeChallenge(newSeed, 600, 540, {
         mode: targetNode.perspectiveMode,
@@ -175,6 +214,78 @@ export function App() {
     setShowSolution(false);
     setStrokes([]);
     setAvatarMood('neutral');
+  };
+
+  // Pasar al siguiente problema del lote diario o nuevo cubo de práctica libre
+  const handleNextCubeOrProblem = () => {
+    if (dailySetSession && !dailySetSession.isCompleted) {
+      const nextIndex = dailySetSession.currentIndex + 1;
+      if (nextIndex < dailySetSession.totalCount) {
+        const nextProblem = dailySetSession.problems[nextIndex];
+        setDailySetSession({
+          ...dailySetSession,
+          currentIndex: nextIndex,
+        });
+        setActiveNode(nextProblem.node);
+        setChallenge(
+          generateCubeChallenge(nextProblem.seed, 600, 540, {
+            mode: nextProblem.node.perspectiveMode,
+            axesMode: nextProblem.node.axesMode,
+            forceSide: nextProblem.node.forceSide,
+            isShadowLevel: nextProblem.node.isShadowLevel,
+            hasGroundGrid: nextProblem.node.hasGroundGrid,
+          })
+        );
+        setFeedback(null);
+        setShowSolution(false);
+        setStrokes([]);
+        setAvatarMood('neutral');
+        return;
+      }
+    }
+    handleNewPracticeCube();
+  };
+
+  // Iniciar un nuevo reto diario de N ejercicios
+  const handleStartDailyChallenge = (
+    count: number,
+    levelMode: 'random' | 'specific',
+    selectedNodeIds: string[]
+  ) => {
+    const newSession = createDailyChallenge(count, levelMode, selectedNodeIds, unlockedNodes);
+    setDailySetSession(newSession);
+
+    const firstProblem = newSession.problems[0];
+    if (firstProblem) {
+      setActiveNode(firstProblem.node);
+      setChallenge(
+        generateCubeChallenge(firstProblem.seed, 600, 540, {
+          mode: firstProblem.node.perspectiveMode,
+          axesMode: firstProblem.node.axesMode,
+          forceSide: firstProblem.node.forceSide,
+          isShadowLevel: firstProblem.node.isShadowLevel,
+          hasGroundGrid: firstProblem.node.hasGroundGrid,
+        })
+      );
+      setFeedback(null);
+      setShowSolution(false);
+      setStrokes([]);
+      setAvatarMood('speed-lightning');
+      setTimeout(() => setAvatarMood('neutral'), 2200);
+    }
+    setActiveTab('practice');
+  };
+
+  // Cancelar reto diario en curso
+  const handleCancelDailyChallenge = () => {
+    setDailySetSession(null);
+    saveActiveDailySet(null);
+  };
+
+  // Limpiar el historial de retos diarios completados
+  const handleClearDailyHistory = () => {
+    setDailySetHistory([]);
+    localStorage.removeItem('paplitz_daily_challenge_history');
   };
 
   // Convalidación directa de niveles (Fast-Forward)
@@ -247,6 +358,39 @@ export function App() {
     const res = validateCubeDrawing(challenge, strokes, timeRemainingSeconds);
     setFeedback(res);
     setShowSolution(true);
+
+    const currentScore = res.totalScore ?? res.score;
+
+    // Registrar puntuación en el reto diario activo si existe
+    if (dailySetSession && !dailySetSession.isCompleted) {
+      const updatedProblems = [...dailySetSession.problems];
+      updatedProblems[dailySetSession.currentIndex] = {
+        ...updatedProblems[dailySetSession.currentIndex],
+        score: currentScore,
+        passed: res.passed,
+      };
+
+      const isLastProblem = dailySetSession.currentIndex >= dailySetSession.totalCount - 1;
+      if (isLastProblem) {
+        const completedSession: DailySetSession = {
+          ...dailySetSession,
+          problems: updatedProblems,
+          isCompleted: true,
+          completedAt: new Date().toISOString(),
+        };
+        const historyItem = recordCompletedDailySet(completedSession);
+        setDailySetHistory((prev) => [historyItem, ...prev]);
+        setDailySetSession(null);
+        // Bonus de Hábito Diario por completar el lote de ejercicios (+50 XP)
+        setXp((prev) => prev + 50);
+        setCompletedDailySetForModal(historyItem);
+      } else {
+        setDailySetSession({
+          ...dailySetSession,
+          problems: updatedProblems,
+        });
+      }
+    }
 
     if (res.passed) {
       // Reacción del Avatar: Éxito con ojos de estrella o bonus de rayo
@@ -822,6 +966,35 @@ export function App() {
                 </div>
               )}
 
+              {/* Banner de Reto Diario Activo */}
+              {dailySetSession && !dailySetSession.isCompleted && (
+                <div className="w-full mb-2 px-3 py-1.5 border-2 border-black bg-white shadow-[2px_2px_0px_#000000] flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="bg-black text-white px-1.5 py-0.2 font-mono font-bold text-[10px] flex items-center gap-1 shrink-0">
+                      <Target className="w-3 h-3" /> RETO DIARIO
+                    </span>
+                    <span className="font-mono font-bold text-xs truncate">
+                      Ejercicio {dailySetSession.currentIndex + 1} de {dailySetSession.totalCount}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="w-16 sm:w-24 h-2 border border-black bg-neutral-100 overflow-hidden">
+                      <div
+                        className="h-full bg-black transition-all duration-300"
+                        style={{
+                          width: `${Math.round(
+                            ((dailySetSession.currentIndex + (feedback ? 1 : 0)) / dailySetSession.totalCount) * 100
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                    <span className="text-[10px] font-mono font-bold">
+                      {Math.round(((dailySetSession.currentIndex + (feedback ? 1 : 0)) / dailySetSession.totalCount) * 100)}%
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {/* Banner de Guía Activa compacto */}
               {activeNode && (
                 <div className="w-full mb-2 px-3 py-1.5 border border-black bg-neutral-50 flex items-center justify-between text-xs">
@@ -866,22 +1039,32 @@ export function App() {
                 onStrokesChange={setStrokes}
                 showSolution={showSolution}
                 onValidate={handleValidate}
-                onNextCube={() => handleNewPracticeCube()}
+                onNextCube={handleNextCubeOrProblem}
                 onDrawingStateChange={setIsUserDrawing}
                 activeLesson={activeNode}
               />
             </div>
 
-            {/* Columna Lateral Derecha: Cubito (en el lateral derecho sin empujar el centro del lienzo) */}
-            <div className="w-full min-w-0 flex flex-col items-center justify-center shrink-0 pt-4 sm:pt-6 lg:pt-20">
+            {/* Columna Lateral Derecha (Desktop) / Abajo bajo el lienzo (Móvil vertical) */}
+            <div className="w-full min-w-0 flex flex-col items-center justify-start shrink-0 pt-4 sm:pt-6 lg:pt-8 max-w-sm mx-auto space-y-4">
               <SenseiCubo
                 mood={avatarMood}
                 isDrawing={isUserDrawing}
-                size={windowWidth < 640 ? 140 : 185}
+                size={windowWidth < 640 ? 125 : 160}
                 onPoke={() => {
                   setAvatarMood('poked');
                   setTimeout(() => setAvatarMood('neutral'), 1800);
                 }}
+              />
+
+              {/* Panel Desplegable de Reto Diario / Daily Challenge (en el lateral en desktop, abajo bajo la caja de dibujo en móvil) */}
+              <DailyChallengePanel
+                unlockedNodes={unlockedNodes}
+                activeSession={dailySetSession}
+                onStartChallenge={handleStartDailyChallenge}
+                onCancelChallenge={handleCancelDailyChallenge}
+                history={dailySetHistory}
+                onClearHistory={handleClearDailyHistory}
               />
             </div>
           </div>
@@ -1002,6 +1185,12 @@ export function App() {
         isNewDayAward={streakModalState.isNewDayAward}
         onClose={() => setStreakModalState({ isOpen: false, isNewDayAward: false })}
       />
+      {completedDailySetForModal && (
+        <DailySetCompletedModal
+          completedSet={completedDailySetForModal}
+          onClose={() => setCompletedDailySetForModal(null)}
+        />
+      )}
     </div>
   );
 }
