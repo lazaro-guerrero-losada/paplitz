@@ -68,6 +68,7 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
   const [showGuides, setShowGuides] = useState<boolean>(true);
   const [evaluation, setEvaluation] = useState<StrokeEvaluation | null>(null);
   const [showBookModal, setShowBookModal] = useState<boolean>(false);
+  const [imgError, setImgError] = useState<boolean>(false);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -94,6 +95,7 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
     const idx = ALL_42_EXERCISES.findIndex((e) => e.page === exercise.page);
     if (idx !== -1) {
       setCurrentExerciseIndex(idx);
+      setImgError(false);
       const newSeed = Math.floor(Math.random() * 90000 + 10000);
       setChallengeSeed(newSeed);
       const newChallenge = generateStrokeChallenge(exercise, newSeed, 600, 540);
@@ -102,6 +104,17 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
       currentStrokeRef.current = [];
       setIsDrawing(false);
       setEvaluation(null);
+    }
+  };
+
+  // Manejar cambio de bloque asegurando que el ejercicio activo sea coherente
+  const handleBlockChange = (newBlock: string) => {
+    setSelectedBlock(newBlock);
+    if (newBlock !== 'Todos los Bloques (42 Páginas)') {
+      const firstInBlock = ALL_42_EXERCISES.find((e) => e.block === newBlock);
+      if (firstInBlock && currentExercise.block !== newBlock) {
+        handleSelectExercise(firstInBlock);
+      }
     }
   };
 
@@ -481,7 +494,7 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
               </label>
               <select
                 value={selectedBlock}
-                onChange={(e) => setSelectedBlock(e.target.value)}
+                onChange={(e) => handleBlockChange(e.target.value)}
                 className="w-full border-2 border-black px-2 py-1 text-xs font-mono font-bold bg-white shadow-[2px_2px_0px_#000000] cursor-pointer"
               >
                 {BLOCKS_LIST.map((b) => (
@@ -825,11 +838,48 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
             </div>
 
             <div className="flex-1 overflow-auto border-2 border-black bg-neutral-100 p-2 flex items-center justify-center">
-              <img
-                src={`/extracted_pages/page_${String(currentExercise.page).padStart(2, '0')}.jpg`}
-                alt={`Página ${currentExercise.page}`}
-                className="max-h-[65vh] object-contain border border-neutral-300 bg-white"
-              />
+              {!imgError ? (
+                <img
+                  src={`/extracted_pages/page_${String(currentExercise.page).padStart(2, '0')}.jpg`}
+                  alt={`Página ${currentExercise.page}`}
+                  onError={() => setImgError(true)}
+                  className="max-h-[65vh] object-contain border border-neutral-300 bg-white shadow-sm"
+                />
+              ) : (
+                <div className="max-w-md w-full bg-white border-2 border-black p-4 shadow-[4px_4px_0px_#000000] text-left">
+                  <div className="flex items-center gap-2 mb-2 pb-2 border-b-2 border-black">
+                    <span className="font-mono font-bold bg-black text-white px-2 py-0.5 text-xs">
+                      P.{currentExercise.page}
+                    </span>
+                    <span className="font-mono font-bold text-xs uppercase text-neutral-600 truncate">
+                      {currentExercise.block}
+                    </span>
+                  </div>
+                  <h4 className="font-display font-bold text-base text-black mb-1">
+                    {currentExercise.code} · {currentExercise.title}
+                  </h4>
+                  <p className="text-xs text-neutral-700 font-sans leading-relaxed mb-3">
+                    {currentExercise.desc}
+                  </p>
+                  <div className="bg-neutral-50 border border-black p-2.5 font-mono text-[11px] space-y-1.5">
+                    <div>
+                      <strong className="text-black uppercase">Instrucción:</strong>{' '}
+                      <span className="text-neutral-800">{currentExercise.instruction}</span>
+                    </div>
+                    <div>
+                      <strong className="text-black uppercase">Métricas evaluadas:</strong>{' '}
+                      <span className="text-neutral-800">{currentExercise.metrics}</span>
+                    </div>
+                    <div>
+                      <strong className="text-black uppercase">Dificultad:</strong>{' '}
+                      <span className="text-neutral-800">{currentExercise.difficulty}</span>
+                    </div>
+                  </div>
+                  <p className="text-[10px] font-mono text-neutral-500 mt-2.5 italic">
+                    * Lámina gráfica reservada para entorno local. El ejercicio interactivo completo está activo en el canvas.
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="pt-3 text-xs font-mono flex justify-between items-center">
