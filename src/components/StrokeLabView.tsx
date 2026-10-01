@@ -37,9 +37,11 @@ interface StrokeLabViewProps {
   onAvatarMoodChange?: (mood: any) => void;
 }
 
-// Agrupación de los 122 ejercicios: 80 Calistenias Dinámicas + 42 Páginas del Cuaderno
+// Agrupación dinámica de todos los ejercicios del catálogo
+const ALL_CHALLENGES_LABEL = `Todos los Retos (${ALL_LAB_EXERCISES.length} Ejercicios)`;
+
 const BLOCKS_LIST = [
-  'Todos los Retos (122 Ejercicios)',
+  ALL_CHALLENGES_LABEL,
   '⚡ Calistenia: D1 (↗ Abajo-Arriba / Izq-Der)',
   '⚡ Calistenia: D2 (↙ Arriba-Abajo / Der-Izq)',
   '⚡ Calistenia: D3 (↘ Arriba-Abajo / Izq-Der)',
@@ -57,7 +59,7 @@ const BLOCKS_LIST = [
 
 export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
   // Filtro de bloque y ejercicio seleccionado
-  const [selectedBlock, setSelectedBlock] = useState<string>('Todos los Retos (122 Ejercicios)');
+  const [selectedBlock, setSelectedBlock] = useState<string>(ALL_CHALLENGES_LABEL);
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState<number>(0);
   const currentExercise: LabExerciseDef =
     ALL_LAB_EXERCISES[currentExerciseIndex] || ALL_LAB_EXERCISES[0];
@@ -95,7 +97,7 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
 
   // Filtrado de ejercicios por bloque
   const filteredExercises =
-    selectedBlock === 'Todos los Retos (122 Ejercicios)'
+    selectedBlock === ALL_CHALLENGES_LABEL
       ? ALL_LAB_EXERCISES
       : ALL_LAB_EXERCISES.filter((e) => e.block === selectedBlock);
 
@@ -166,7 +168,7 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
   // Manejar cambio de bloque asegurando que el ejercicio activo sea coherente
   const handleBlockChange = (newBlock: string) => {
     setSelectedBlock(newBlock);
-    if (newBlock !== 'Todos los Retos (122 Ejercicios)') {
+    if (newBlock !== ALL_CHALLENGES_LABEL) {
       const firstInBlock = ALL_LAB_EXERCISES.find((e) => e.block === newBlock);
       if (firstInBlock && currentExercise.block !== newBlock) {
         handleSelectExercise(firstInBlock);
@@ -493,34 +495,43 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
     }
 
     // 5. SUPERPOSICIÓN DE SOLUCIÓN TRAS CORRECCIÓN (Línea discontinua estrictamente monocromática negra)
-    if (evaluation && evaluation.solutionOverlay && evaluation.solutionOverlay.points.length > 1) {
-      const sPts = evaluation.solutionOverlay.points;
-      ctx.save();
-      ctx.strokeStyle = '#000000'; // Estricto blanco y negro
-      ctx.lineWidth = 2.4;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.setLineDash([5, 4]);
+    if (evaluation && evaluation.solutionOverlay) {
+      const linesToDraw: { x: number; y: number }[][] =
+        evaluation.solutionOverlay.multiLines && evaluation.solutionOverlay.multiLines.length > 0
+          ? evaluation.solutionOverlay.multiLines.map((l) => l.points)
+          : evaluation.solutionOverlay.points.length > 1
+          ? [evaluation.solutionOverlay.points]
+          : [];
 
-      ctx.beginPath();
-      ctx.moveTo(sPts[0].x, sPts[0].y);
-      for (let i = 1; i < sPts.length; i++) {
-        ctx.lineTo(sPts[i].x, sPts[i].y);
+      for (const sPts of linesToDraw) {
+        if (sPts.length < 2) continue;
+        ctx.save();
+        ctx.strokeStyle = '#000000'; // Estricto blanco y negro
+        ctx.lineWidth = 2.4;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.setLineDash([5, 4]);
+
+        ctx.beginPath();
+        ctx.moveTo(sPts[0].x, sPts[0].y);
+        for (let i = 1; i < sPts.length; i++) {
+          ctx.lineTo(sPts[i].x, sPts[i].y);
+        }
+        ctx.stroke();
+
+        // Flecha de solución en el extremo de llegada
+        const lastP = sPts[sPts.length - 1];
+        const prevP = sPts[Math.max(0, sPts.length - 4)];
+        const theta = Math.atan2(lastP.y - prevP.y, lastP.x - prevP.x);
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.moveTo(lastP.x, lastP.y);
+        ctx.lineTo(lastP.x - 12 * Math.cos(theta - 0.4), lastP.y - 12 * Math.sin(theta - 0.4));
+        ctx.lineTo(lastP.x - 12 * Math.cos(theta + 0.4), lastP.y - 12 * Math.sin(theta + 0.4));
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
       }
-      ctx.stroke();
-
-      // Flecha de solución en el extremo de llegada
-      const lastP = sPts[sPts.length - 1];
-      const prevP = sPts[Math.max(0, sPts.length - 4)];
-      const theta = Math.atan2(lastP.y - prevP.y, lastP.x - prevP.x);
-      ctx.fillStyle = '#000000';
-      ctx.beginPath();
-      ctx.moveTo(lastP.x, lastP.y);
-      ctx.lineTo(lastP.x - 12 * Math.cos(theta - 0.4), lastP.y - 12 * Math.sin(theta - 0.4));
-      ctx.lineTo(lastP.x - 12 * Math.cos(theta + 0.4), lastP.y - 12 * Math.sin(theta + 0.4));
-      ctx.closePath();
-      ctx.fill();
-      ctx.restore();
     }
 
     ctx.restore();
@@ -596,19 +607,22 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
       const newStrokes = [...strokes, { points: [...currentStrokeRef.current] }];
       setStrokes(newStrokes);
 
-      // AUTO-EVALUACIÓN INSTANTÁNEA PARA CALISTENIA DE TRAZO ÚNICO (Sin temporizador automático)
+      // AUTO-EVALUACIÓN INSTANTÁNEA PARA CALISTENIA (Al alcanzar los trazos requeridos)
       if (challenge.isSingleStrokeAutoEval) {
-        currentStrokeRef.current = [];
-        const result = evaluateStrokeSubmission(newStrokes, challenge);
-        setEvaluation(result);
-        if (result.passed) {
-          setStreak((prev) => prev + 1);
-          if (onAwardXP) onAwardXP(15);
-        } else {
-          setStreak(0);
+        const requiredStrokes = challenge.minRequiredStrokes || 1;
+        if (newStrokes.length >= requiredStrokes) {
+          currentStrokeRef.current = [];
+          const result = evaluateStrokeSubmission(newStrokes, challenge);
+          setEvaluation(result);
+          if (result.passed) {
+            setStreak((prev) => prev + 1);
+            if (onAwardXP) onAwardXP(15 * requiredStrokes);
+          } else {
+            setStreak(0);
+          }
+          renderCanvas();
+          return;
         }
-        renderCanvas();
-        return;
       }
     }
     currentStrokeRef.current = [];
@@ -998,6 +1012,11 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
                 </button>
                 <span className="text-[11px] font-mono text-neutral-600 pl-0.5 font-bold shrink-0">
                   {strokes.length}/{challenge.minRequiredStrokes} trazos
+                  {challenge.minRequiredStrokes > 1 && strokes.length < challenge.minRequiredStrokes && (
+                    <span className="text-neutral-500 font-normal ml-1 hidden xs:inline">
+                      (falta {challenge.minRequiredStrokes - strokes.length})
+                    </span>
+                  )}
                 </span>
               </div>
 

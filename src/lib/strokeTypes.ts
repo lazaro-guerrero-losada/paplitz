@@ -39,13 +39,26 @@ export interface KeyPoint {
   type?: 'start' | 'mid' | 'end';
 }
 
+export interface TargetLineDef {
+  id: string;
+  start: { x: number; y: number };
+  end: { x: number; y: number };
+  idealPath: { x: number; y: number }[];
+  angleDeg: number;
+  lengthPx: number;
+  order: number;
+  startKeyPointOrder: number;
+  endKeyPointOrder: number;
+}
+
 export interface SingleStrokeConfig {
   direction: StrokeDirection;
-  variationType: 'fixed' | 'length' | 'rotation' | 'rotation_length' | 'position' | 'position_length' | 'total_random';
+  variationType: 'fixed' | 'length' | 'rotation' | 'rotation_length' | 'position' | 'position_length' | 'total_random' | 'multi_line';
   guideType: 'gray_line' | 'points_only';
   curvature?: 'subtle' | 'medium' | 'pronounced';
   baseAngleDeg?: number;
   baseLengthPx?: number;
+  multiLineCount?: 2 | 3;
 }
 
 export interface LabExerciseDef {
@@ -104,8 +117,10 @@ export interface ProceduralStrokeChallenge {
   targetLengthPx: number;
   minRequiredStrokes: number;
 
-  // Trazo Único Dinámico, Fases y Solución Fantasma
+  // Trazo Único y Multi-Líneas Dinámicas, Fases y Solución Fantasma
   isSingleStrokeAutoEval?: boolean;
+  multiLineCount?: number;
+  targetLines?: TargetLineDef[];
   directionKey?: StrokeDirection;
   activePhase?: 1 | 2 | 3;
   guideMode?: 'gray_line' | 'points_only';
@@ -171,7 +186,12 @@ export interface StrokeEvaluation {
   isSingleStroke?: boolean;
   streak?: number;
   directionWarning?: string;
-  solutionOverlay?: { points: { x: number; y: number }[]; color: string; label: string };
+  solutionOverlay?: {
+    points: { x: number; y: number }[];
+    multiLines?: { points: { x: number; y: number }[] }[];
+    color: string;
+    label: string;
+  };
   avatarMood?: import('./avatarTypes').AvatarMood;
   kinematics?: import('./strokeKinematics').StrokeKinematicsResult;
   currentPhase?: 1 | 2 | 3;
@@ -190,7 +210,8 @@ function buildSingleStrokeLevel(
   desc: string,
   instruction: string,
   curvature?: 'subtle' | 'medium' | 'pronounced',
-  baseAngleDeg?: number
+  baseAngleDeg?: number,
+  multiLineCount?: 2 | 3
 ): LabExerciseDef {
   return {
     id,
@@ -200,7 +221,11 @@ function buildSingleStrokeLevel(
     block,
     category: direction === 'curve_c' || direction === 'curve_s' ? 'single_stroke_curve' : 'single_stroke_line',
     difficulty,
-    metrics: guideType === 'gray_line' ? 'Seguimiento de guía, rectitud y dirección' : 'Puntería en dianas ① y ②, rectitud y dirección',
+    metrics: multiLineCount
+      ? `Coordinación multi-trazo (${multiLineCount} líneas), precisión en dianas y rectitud`
+      : guideType === 'gray_line'
+      ? 'Seguimiento de guía, rectitud y dirección'
+      : 'Puntería en dianas ① y ②, rectitud y dirección',
     desc,
     instruction,
     isSingleStroke: true,
@@ -210,6 +235,7 @@ function buildSingleStrokeLevel(
       guideType,
       curvature,
       baseAngleDeg,
+      multiLineCount,
     },
   };
 }
@@ -234,6 +260,8 @@ export const ALL_SINGLE_STROKE_EXERCISES: LabExerciseDef[] = [
   buildSingleStrokeLevel('d1_13', 'C1.13', 'Puntos Clave — Posición & Longitud (↗)', '⚡ Calistenia: D1 (↗ Abajo-Arriba / Izq-Der)', 'bottom_up_left_right', 'position_length', 'points_only', 'Difícil', 'Solo puntos con salto de posición y escala variable.', 'Acomoda el codo como pivote en cada nuevo punto.', undefined, 60),
   buildSingleStrokeLevel('d1_14', 'C1.14', 'Puntos Clave — Variación Total (↗)', '⚡ Calistenia: D1 (↗ Abajo-Arriba / Izq-Der)', 'bottom_up_left_right', 'total_random', 'points_only', 'Difícil', 'Desafío ciego completo: ángulo, posición y longitud aleatorios.', 'Conecta los dos puntos con precisión milimétrica.', undefined, 60),
   buildSingleStrokeLevel('d1_15', 'C1.15', 'Maestría D1 — Racha Rápida (↗)', '⚡ Calistenia: D1 (↗ Abajo-Arriba / Izq-Der)', 'bottom_up_left_right', 'total_random', 'points_only', 'Experto', 'Evaluación continua instantánea: mantén una racha de más de 80% de precisión.', 'Traza rápido y sin dudar para sostener la racha de fuego.', undefined, 60),
+  buildSingleStrokeLevel('d1_16', 'C1.16', '2 Líneas Dispersas (↗)', '⚡ Calistenia: D1 (↗ Abajo-Arriba / Izq-Der)', 'bottom_up_left_right', 'multi_line', 'points_only', 'Difícil', 'Dos líneas en posiciones separadas con longitudes y ángulos distintos. Calibra el salto de dianas sin perder la orientación ↗.', 'Traza las 2 líneas en cualquier orden: de ① a ② y de ③ a ④.', undefined, 60, 2),
+  buildSingleStrokeLevel('d1_17', 'C1.17', '3 Líneas Dispersas (↗)', '⚡ Calistenia: D1 (↗ Abajo-Arriba / Izq-Der)', 'bottom_up_left_right', 'multi_line', 'points_only', 'Experto', 'Tres líneas distribuidas por el lienzo con distintas ubicaciones, escalas e inclinaciones.', 'Traza las 3 líneas en cualquier orden: de ① a ②, de ③ a ④ y de ⑤ a ⑥.', undefined, 60, 3),
 
   // DIRECCIÓN 2: Arriba a Abajo, Derecha a Izquierda (↙)
   buildSingleStrokeLevel('d2_01', 'C2.01', 'Línea Fija (↙ Guía Gris)', '⚡ Calistenia: D2 (↙ Arriba-Abajo / Der-Izq)', 'top_down_right_left', 'fixed', 'gray_line', 'Fácil', 'Flexión controlada hacia el cuerpo. Posición central fija.', 'Traza desde ① arriba-derecha hacia ② abajo-izquierda.', undefined, 240),
@@ -251,6 +279,8 @@ export const ALL_SINGLE_STROKE_EXERCISES: LabExerciseDef[] = [
   buildSingleStrokeLevel('d2_13', 'C2.13', 'Puntos Clave — Posición & Longitud (↙)', '⚡ Calistenia: D2 (↙ Arriba-Abajo / Der-Izq)', 'top_down_right_left', 'position_length', 'points_only', 'Difícil', 'Salto continuo de escala y posición.', 'Sincroniza la postura antes de cada línea.', undefined, 240),
   buildSingleStrokeLevel('d2_14', 'C2.14', 'Puntos Clave — Variación Total (↙)', '⚡ Calistenia: D2 (↙ Arriba-Abajo / Der-Izq)', 'top_down_right_left', 'total_random', 'points_only', 'Difícil', 'Reto dinámico completo de recogida hacia el cuerpo.', 'Precisión absoluta en diana de entrada y salida.', undefined, 240),
   buildSingleStrokeLevel('d2_15', 'C2.15', 'Maestría D2 — Racha Rápida (↙)', '⚡ Calistenia: D2 (↙ Arriba-Abajo / Der-Izq)', 'top_down_right_left', 'total_random', 'points_only', 'Experto', 'Modo infinito rápido: acumula la mayor racha de aciertos en D2.', 'Traza sin vacilar al primer contacto.', undefined, 240),
+  buildSingleStrokeLevel('d2_16', 'C2.16', '2 Líneas Dispersas (↙)', '⚡ Calistenia: D2 (↙ Arriba-Abajo / Der-Izq)', 'top_down_right_left', 'multi_line', 'points_only', 'Difícil', 'Dos líneas de flexión hacia el cuerpo en sectores distintos con longitudes e inclinaciones independientes.', 'Traza las 2 líneas en cualquier orden: de ① a ② y de ③ a ④.', undefined, 240, 2),
+  buildSingleStrokeLevel('d2_17', 'C2.17', '3 Líneas Dispersas (↙)', '⚡ Calistenia: D2 (↙ Arriba-Abajo / Der-Izq)', 'top_down_right_left', 'multi_line', 'points_only', 'Experto', 'Tres líneas en flexión hacia el pecho en ubicaciones separadas con rotaciones y escalas variadas.', 'Traza las 3 líneas en cualquier orden: de ① a ②, de ③ a ④ y de ⑤ a ⑥.', undefined, 240, 3),
 
   // DIRECCIÓN 3: Arriba a Abajo, Izquierda a Derecha (↘)
   buildSingleStrokeLevel('d3_01', 'C3.01', 'Línea Fija (↘ Guía Gris)', '⚡ Calistenia: D3 (↘ Arriba-Abajo / Izq-Der)', 'top_down_left_right', 'fixed', 'gray_line', 'Fácil', 'Trazo descendente diagonal hacia afuera. Posición central.', 'Traza desde ① arriba-izquierda hacia ② abajo-derecha.', undefined, 315),
@@ -268,6 +298,8 @@ export const ALL_SINGLE_STROKE_EXERCISES: LabExerciseDef[] = [
   buildSingleStrokeLevel('d3_13', 'C3.13', 'Puntos Clave — Posición & Longitud (↘)', '⚡ Calistenia: D3 (↘ Arriba-Abajo / Izq-Der)', 'top_down_left_right', 'position_length', 'points_only', 'Difícil', 'Desplazamiento y escala libre.', 'No titubees a mitad del recorrido.', undefined, 315),
   buildSingleStrokeLevel('d3_14', 'C3.14', 'Puntos Clave — Variación Total (↘)', '⚡ Calistenia: D3 (↘ Arriba-Abajo / Izq-Der)', 'top_down_left_right', 'total_random', 'points_only', 'Difícil', 'Reto ciego de precisión en diagonal descendente.', 'Clava ambos extremos con precisión.', undefined, 315),
   buildSingleStrokeLevel('d3_15', 'C3.15', 'Maestría D3 — Racha Rápida (↘)', '⚡ Calistenia: D3 (↘ Arriba-Abajo / Izq-Der)', 'top_down_left_right', 'total_random', 'points_only', 'Experto', 'Racha continua de alta velocidad en D3.', 'Mantén el fuego activo sin fallar ninguna diana.', undefined, 315),
+  buildSingleStrokeLevel('d3_16', 'C3.16', '2 Líneas Dispersas (↘)', '⚡ Calistenia: D3 (↘ Arriba-Abajo / Izq-Der)', 'top_down_left_right', 'multi_line', 'points_only', 'Difícil', 'Dos líneas en diagonal descendente hacia afuera en posiciones distintas con longitud y pendiente cambiantes.', 'Traza las 2 líneas en cualquier orden: de ① a ② y de ③ a ④.', undefined, 315, 2),
+  buildSingleStrokeLevel('d3_17', 'C3.17', '3 Líneas Dispersas (↘)', '⚡ Calistenia: D3 (↘ Arriba-Abajo / Izq-Der)', 'top_down_left_right', 'multi_line', 'points_only', 'Experto', 'Tres líneas descendentes en cuadrantes distintos con diferentes escalas y grados de inclinación.', 'Traza las 3 líneas en cualquier orden: de ① a ②, de ③ a ④ y de ⑤ a ⑥.', undefined, 315, 3),
 
   // DIRECCIÓN 4: Abajo a Arriba, Derecha a Izquierda (↖)
   buildSingleStrokeLevel('d4_01', 'C4.01', 'Línea Fija (↖ Guía Gris)', '⚡ Calistenia: D4 (↖ Abajo-Arriba / Der-Izq)', 'bottom_up_right_left', 'fixed', 'gray_line', 'Fácil', 'Empuje ascendente hacia la izquierda. Posición central.', 'Traza desde ① abajo-derecha hacia ② arriba-izquierda.', undefined, 135),
@@ -285,6 +317,8 @@ export const ALL_SINGLE_STROKE_EXERCISES: LabExerciseDef[] = [
   buildSingleStrokeLevel('d4_13', 'C4.13', 'Puntos Clave — Posición & Longitud (↖)', '⚡ Calistenia: D4 (↖ Abajo-Arriba / Der-Izq)', 'bottom_up_right_left', 'position_length', 'points_only', 'Difícil', 'Salto continuo de escala y posición.', 'Conserva la misma velocidad de trazo.', undefined, 135),
   buildSingleStrokeLevel('d4_14', 'C4.14', 'Puntos Clave — Variación Total (↖)', '⚡ Calistenia: D4 (↖ Abajo-Arriba / Der-Izq)', 'bottom_up_right_left', 'total_random', 'points_only', 'Difícil', 'Reto ciego completo en la dirección 4.', 'Máxima precisión sin apoyos visuales.', undefined, 135),
   buildSingleStrokeLevel('d4_15', 'C4.15', 'Maestría D4 — Racha Rápida (↖)', '⚡ Calistenia: D4 (↖ Abajo-Arriba / Der-Izq)', 'bottom_up_right_left', 'total_random', 'points_only', 'Experto', 'Racha de fuego continuo en la cuarta dirección motora.', 'Acumula aciertos consecutivos a alta velocidad.', undefined, 135),
+  buildSingleStrokeLevel('d4_16', 'C4.16', '2 Líneas Dispersas (↖)', '⚡ Calistenia: D4 (↖ Abajo-Arriba / Der-Izq)', 'bottom_up_right_left', 'multi_line', 'points_only', 'Difícil', 'Dos líneas en empuje diagonal ascendente hacia la izquierda con saltos de posición y escala.', 'Traza las 2 líneas en cualquier orden: de ① a ② y de ③ a ④.', undefined, 135, 2),
+  buildSingleStrokeLevel('d4_17', 'C4.17', '3 Líneas Dispersas (↖)', '⚡ Calistenia: D4 (↖ Abajo-Arriba / Der-Izq)', 'bottom_up_right_left', 'multi_line', 'points_only', 'Experto', 'Tres líneas en empuje ↖ distribuidas por la pantalla con diferentes distancias e inclinaciones.', 'Traza las 3 líneas en cualquier orden: de ① a ②, de ③ a ④ y de ⑤ a ⑥.', undefined, 135, 3),
 
   // CURVAS Y ARCOS (C & S)
   buildSingleStrokeLevel('cc_01', 'CC.01', 'Arco en C Fijo (Guía Gris)', '⚡ Calistenia: Trazos Curvos & Arcos (C & S)', 'curve_c', 'fixed', 'gray_line', 'Fácil', 'Curva suave en arco de parábola con guía gris visible.', 'Sigue la trayectoria curvada desde ① hasta ②.', 'subtle'),
@@ -359,7 +393,7 @@ export const ALL_42_EXERCISES: WorkbookExerciseDef[] = [
 ];
 
 /**
- * Catálogo Maestro Completo: 80 Calistenias de Trazo Único + 42 Páginas del Cuaderno (122 Ejercicios)
+ * Catálogo Maestro Completo: 88 Calistenias Dinámicas + 42 Páginas del Cuaderno (130 Ejercicios)
  */
 export const ALL_LAB_EXERCISES: LabExerciseDef[] = [
   ...ALL_SINGLE_STROKE_EXERCISES,

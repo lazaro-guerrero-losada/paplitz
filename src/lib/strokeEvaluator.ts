@@ -529,6 +529,354 @@ export function evaluateSingleStrokeSubmission(
 }
 
 /**
+ * Evaluación de Calistenia Multi-Línea (2 o 3 líneas independientes dispersas)
+ * Permite al usuario trazar las líneas en cualquier orden.
+ */
+export function evaluateMultiLineSubmission(
+  strokes: RawStroke[],
+  challenge: ProceduralStrokeChallenge
+): StrokeEvaluation {
+  const targetLines = challenge.targetLines || [];
+  const requiredCount = challenge.minRequiredStrokes || targetLines.length || 2;
+
+  if (strokes.length === 0 || strokes.every((s) => s.points.length === 0)) {
+    return {
+      overallScore: 0,
+      passed: false,
+      isSingleStroke: true,
+      metrics: {
+        parallelismScore: 0,
+        spacingScore: 0,
+        straightnessScore: 0,
+        tonalDensityScore: 0,
+        boundaryScore: 0,
+      },
+      detectedStats: {
+        strokeCount: 0,
+        measuredAvgSpacingPx: 0,
+        spacingVariance: 0,
+        measuredAvgAngleDeg: 0,
+        measuredOpticalDensityPct: 0,
+      },
+      feedbackTitle: 'Sin trazos detectados',
+      feedbackMessage: `Dibuja las ${requiredCount} líneas requeridas para evaluar.`,
+      tipMessage: 'Traza cada línea desde el punto de menor número al de mayor número.',
+    };
+  }
+
+  // 1. Emparejamiento óptimo (Matching Bipartito) entre trazos del usuario y líneas diana
+  const numTargets = targetLines.length;
+  const numUserStrokes = strokes.length;
+
+  const permutations: number[][] = [];
+  if (numTargets === 2) {
+    permutations.push([0, 1], [1, 0]);
+  } else {
+    permutations.push(
+      [0, 1, 2], [0, 2, 1],
+      [1, 0, 2], [1, 2, 0],
+      [2, 0, 1], [2, 1, 0]
+    );
+  }
+
+  function strokeDistanceCost(uStroke: RawStroke, target: typeof targetLines[0]): number {
+    const pts = uStroke.points;
+    if (pts.length < 2) return 9999;
+    const uStart = pts[0];
+    const uEnd = pts[pts.length - 1];
+    const tStart = target.start;
+    const tEnd = target.end;
+
+    const dFwd = Math.hypot(uStart.x - tStart.x, uStart.y - tStart.y) + Math.hypot(uEnd.x - tEnd.x, uEnd.y - tEnd.y);
+    const dRev = Math.hypot(uStart.x - tEnd.x, uStart.y - tEnd.y) + Math.hypot(uEnd.x - tStart.x, uEnd.y - tStart.y);
+    return Math.min(dFwd, dRev);
+  }
+
+  let bestPermutation = permutations[0] || [0];
+  let minTotalCost = Infinity;
+
+  for (const perm of permutations) {
+    let currentCost = 0;
+    for (let uIdx = 0; uIdx < Math.min(numUserStrokes, numTargets); uIdx++) {
+      const tIdx = perm[uIdx];
+      currentCost += strokeDistanceCost(strokes[uIdx], targetLines[tIdx]);
+    }
+    if (currentCost < minTotalCost) {
+      minTotalCost = currentCost;
+      bestPermutation = perm;
+    }
+  }
+
+  // 2. Evaluar cada par (trazo usuario -> línea objetivo asignada)
+  interface LineResult {
+    targetIndex: number;
+    userStrokeIndex: number;
+    boundaryScore: number;
+    straightnessScore: number;
+    angleScore: number;
+    overallLineScore: number;
+    isReversed: boolean;
+    startErr: number;
+    endErr: number;
+    angleDiff: number;
+    stroke: RawStroke;
+    target: typeof targetLines[0];
+  }
+
+  const lineResults: LineResult[] = [];
+  const directionWarnings: string[] = [];
+
+  for (let uIdx = 0; uIdx < Math.min(numUserStrokes, numTargets); uIdx++) {
+    const tIdx = bestPermutation[uIdx];
+    const target = targetLines[tIdx];
+    const uStroke = strokes[uIdx];
+    const pts = uStroke.points;
+    const uStart = pts[0];
+    const uEnd = pts[pts.length - 1];
+    const tStart = target.start;
+    const tEnd = target.end;
+
+    const tDx = tEnd.x - tStart.x;
+    const tDy = tEnd.y - tStart.y;
+    let targetAngle = (Math.atan2(tDy, tDx) * 180) / Math.PI;
+    if (targetAngle < 0) targetAngle += 360;
+
+    const uDx = uEnd.x - uStart.x;
+    const uDy = uEnd.y - uStart.y;
+    let userAngle = (Math.atan2(uDy, uDx) * 180) / Math.PI;
+    if (userAngle < 0) userAngle += 360;
+
+    let angleDiff = Math.abs(userAngle - targetAngle);
+    if (angleDiff > 180) angleDiff = 360 - angleDiff;
+    const angleScore = Math.round(Math.max(0, 100 - angleDiff * 3.2));
+
+    const distStartToStart = Math.hypot(uStart.x - tStart.x, uStart.y - tStart.y);
+    const distStartToEnd = Math.hypot(uStart.x - tEnd.x, uStart.y - tEnd.y);
+    const distEndToEnd = Math.hypot(uEnd.x - tEnd.x, uEnd.y - tEnd.y);
+    const distEndToStart = Math.hypot(uEnd.x - tStart.x, uEnd.y - tStart.y);
+
+    let isReversed = false;
+    if ((distStartToEnd < distStartToStart && distEndToStart < distEndToEnd) || angleDiff > 90) {
+      isReversed = true;
+    }
+
+    const startErr = isReversed ? distStartToEnd : distStartToStart;
+    const endErr = isReversed ? distEndToStart : distEndToEnd;
+    const avgErr = (startErr + endErr) / 2;
+    const boundaryScore = Math.round(Math.max(0, 100 - Math.max(0, avgErr - 6) * 2.4));
+
+    let maxDev = 0;
+    let sumDev = 0;
+    for (let i = 1; i < pts.length - 1; i++) {
+      const d = distPointToSegment(pts[i].x, pts[i].y, tStart.x, tStart.y, tEnd.x, tEnd.y);
+      if (d > maxDev) maxDev = d;
+      sumDev += d;
+    }
+    const avgDev = pts.length > 2 ? sumDev / (pts.length - 2) : 0;
+    const straightnessScore = Math.round(Math.max(0, 100 - avgDev * 5 - maxDev * 2.8));
+
+    let overallLine = Math.round(boundaryScore * 0.40 + straightnessScore * 0.35 + angleScore * 0.25);
+    if (isReversed) {
+      overallLine = Math.min(overallLine, 35);
+      directionWarnings.push(
+        `L${target.order} (pts ${target.startKeyPointOrder}→${target.endKeyPointOrder}) fue trazada en sentido inverso.`
+      );
+    }
+
+    lineResults.push({
+      targetIndex: tIdx,
+      userStrokeIndex: uIdx,
+      boundaryScore,
+      straightnessScore,
+      angleScore,
+      overallLineScore: overallLine,
+      isReversed,
+      startErr,
+      endErr,
+      angleDiff,
+      stroke: uStroke,
+      target,
+    });
+  }
+
+  // Si faltan trazos para completar el reto
+  if (lineResults.length < numTargets) {
+    const missing = numTargets - lineResults.length;
+    return {
+      overallScore: Math.round(lineResults.reduce((a, b) => a + b.overallLineScore, 0) / numTargets),
+      passed: false,
+      isSingleStroke: true,
+      metrics: {
+        parallelismScore: Math.round(lineResults.reduce((a, b) => a + b.angleScore, 0) / numTargets),
+        spacingScore: 100,
+        straightnessScore: Math.round(lineResults.reduce((a, b) => a + b.straightnessScore, 0) / numTargets),
+        tonalDensityScore: 100,
+        boundaryScore: Math.round(lineResults.reduce((a, b) => a + b.boundaryScore, 0) / numTargets),
+      },
+      detectedStats: {
+        strokeCount: numUserStrokes,
+        measuredAvgSpacingPx: 0,
+        spacingVariance: 0,
+        measuredAvgAngleDeg: 0,
+        measuredOpticalDensityPct: 0,
+      },
+      feedbackTitle: `Falta${missing > 1 ? 'n' : ''} ${missing} línea${missing > 1 ? 's' : ''}`,
+      feedbackMessage: `Has dibujado ${lineResults.length} de ${numTargets} líneas. Dibuja las restantes.`,
+      tipMessage: 'Dibuja todas las líneas marcadas con sus puntos antes de evaluar.',
+    };
+  }
+
+  // 3. Puntuación agregada
+  const avgBoundary = Math.round(lineResults.reduce((a, b) => a + b.boundaryScore, 0) / lineResults.length);
+  const avgStraightness = Math.round(lineResults.reduce((a, b) => a + b.straightnessScore, 0) / lineResults.length);
+  const avgAngle = Math.round(lineResults.reduce((a, b) => a + b.angleScore, 0) / lineResults.length);
+  let overallScore = Math.round(lineResults.reduce((a, b) => a + b.overallLineScore, 0) / lineResults.length);
+
+  const hasAnyReversed = lineResults.some((r) => r.isReversed);
+  if (hasAnyReversed) {
+    overallScore = Math.min(overallScore, 40);
+  }
+
+  // Criterios estrictos de aprobación
+  let passed = overallScore >= 70 && !hasAnyReversed;
+  for (const r of lineResults) {
+    if (r.startErr > 40 || r.endErr > 46 || r.angleDiff > 22 || r.straightnessScore < 55) {
+      passed = false;
+      break;
+    }
+  }
+
+  // 4. Cinemática de cada trazo y agregación
+  const activePhase = challenge.activePhase || 1;
+  const directionKey = challenge.directionKey || 'general';
+
+  const kinematicResults = lineResults.map((r) =>
+    analyzeStrokeKinematics(r.stroke, directionKey, activePhase, r.target.lengthPx)
+  );
+
+  for (let i = 0; i < lineResults.length; i++) {
+    if (!lineResults[i].isReversed && lineResults[i].boundaryScore >= 60) {
+      recordStrokeSpeed(directionKey, kinematicResults[i].avgSpeedPxPerSec);
+    }
+  }
+
+  const avgSpeed = Math.round(
+    kinematicResults.reduce((a, b) => a + b.avgSpeedPxPerSec, 0) / kinematicResults.length
+  );
+  const peakSpeed = Math.max(...kinematicResults.map((k) => k.peakSpeedPxPerSec));
+  const avgFluency = Math.round(
+    kinematicResults.reduce((a, b) => a + b.fluencyScore, 0) / kinematicResults.length
+  );
+  const totalMicroStops = kinematicResults.reduce((a, b) => a + b.microStopCount, 0);
+  const totalDuration = kinematicResults.reduce((a, b) => a + b.durationMs, 0);
+  const userBaseline = kinematicResults[0]?.userBaselineSpeedPxPerSec || 450;
+  const speedRatio = Math.round((avgSpeed / userBaseline) * 100) / 100;
+
+  const allPhasesPassed = kinematicResults.every((k) => k.phasePassed);
+  const phasePassed = passed && allPhasesPassed;
+
+  let speedDiagnosis = 'Ritmo constante en todas las líneas';
+  if (avgSpeed < userBaseline * 0.5) speedDiagnosis = 'Ritmo calmado de calibración';
+  else if (avgSpeed > userBaseline * 1.3) speedDiagnosis = 'Trazo veloz y decidido';
+
+  const aggregatedKinematics: import('./strokeKinematics').StrokeKinematicsResult = {
+    durationMs: totalDuration,
+    lengthPx: targetLines.reduce((a, b) => a + b.lengthPx, 0),
+    avgSpeedPxPerSec: avgSpeed,
+    peakSpeedPxPerSec: peakSpeed,
+    fluencyScore: avgFluency,
+    microStopCount: totalMicroStops,
+    userBaselineSpeedPxPerSec: userBaseline,
+    speedRatioVsBaseline: speedRatio,
+    phasePassed: allPhasesPassed,
+    phaseRequirementText: kinematicResults[0]?.phaseRequirementText || 'Ritmo uniforme',
+    speedDiagnosisLabel: speedDiagnosis,
+  };
+
+  const sortedResults = [...lineResults].sort((a, b) => a.target.order - b.target.order);
+  const linesDetail = sortedResults
+    .map(
+      (r) =>
+        `L${r.target.order} (pts ${r.target.startKeyPointOrder}→${r.target.endKeyPointOrder}): ${r.overallLineScore}%`
+    )
+    .join(' · ');
+
+  let feedbackTitle = '¡Multi-Trazo Completado!';
+  let feedbackMessage = `${linesDetail}. Puntería: ${avgBoundary}%, Rectitud: ${avgStraightness}%.`;
+  let tipMessage = 'Mantén la misma velocidad y soltura al pasar de una línea a la siguiente.';
+  let avatarMood: AvatarMood = 'wink';
+
+  let directionWarning: string | undefined;
+  if (hasAnyReversed) {
+    feedbackTitle = 'Dirección Invertida 🔄';
+    directionWarning = `⚠️ ${directionWarnings.join(' ')}`;
+    feedbackMessage = directionWarning;
+    tipMessage = 'Recuerda: inicia siempre en el punto de menor número y termina en el de mayor número.';
+    avatarMood = 'fail-spiral';
+  } else if (!passed) {
+    if (overallScore >= 50) {
+      feedbackTitle = 'Cerca del Objetivo 🏹';
+      feedbackMessage = `${linesDetail}. Ajusta la puntería en los extremos de cada línea.`;
+      tipMessage = 'Haz una pasada rápida en el aire (ghosting) antes de apoyar el lápiz en cada línea.';
+      avatarMood = 'curious';
+    } else {
+      feedbackTitle = 'Desviación en las Líneas 💨';
+      feedbackMessage = `${linesDetail}. Desviación angular o error de longitud en los trazos.`;
+      tipMessage = 'Fija la mirada en el punto de llegada antes de disparar cada trazo.';
+      avatarMood = 'fail-spiral';
+    }
+  } else if (!allPhasesPassed) {
+    feedbackTitle = 'Buena Geometría pero Falta Fluidez/Velocidad ⚡';
+    feedbackMessage = `${linesDetail}. Velocidad media: ${avgSpeed} px/s. Fluidez: ${avgFluency}%.`;
+    tipMessage = 'Realiza cada una de las líneas con un movimiento decidido sin dudar.';
+    avatarMood = 'curious';
+  } else {
+    feedbackTitle = `¡Reto de ${numTargets} Líneas Superado! 🎯`;
+    feedbackMessage = `${linesDetail}. Excelente coordinación espacial y consistencia motora.`;
+    tipMessage = '¡Consistencia perfecta en múltiples sectores!';
+    avatarMood = 'success-stars';
+  }
+
+  const solutionMultiLines = targetLines.map((t) => ({ points: t.idealPath }));
+
+  return {
+    overallScore,
+    passed,
+    isSingleStroke: true,
+    directionWarning,
+    currentPhase: activePhase,
+    phasePassed,
+    kinematics: aggregatedKinematics,
+    solutionOverlay: {
+      points: targetLines[0]?.idealPath || [],
+      multiLines: solutionMultiLines,
+      color: '#000000',
+      label: `Solución (${numTargets} Líneas)`,
+    },
+    metrics: {
+      parallelismScore: avgAngle,
+      spacingScore: 100,
+      straightnessScore: avgStraightness,
+      tonalDensityScore: 100,
+      boundaryScore: avgBoundary,
+    },
+    detectedStats: {
+      strokeCount: numUserStrokes,
+      measuredAvgSpacingPx: 0,
+      spacingVariance: 0,
+      measuredAvgAngleDeg: Math.round(
+        lineResults.reduce((a, b) => a + b.target.angleDeg, 0) / lineResults.length
+      ),
+      measuredOpticalDensityPct: 0,
+    },
+    feedbackTitle,
+    feedbackMessage,
+    tipMessage,
+    avatarMood,
+  };
+}
+
+/**
  * Genera un informe detallado en texto / markdown de la evaluación para depuración y revisión
  */
 export function buildStrokeDebugReport(
@@ -536,6 +884,58 @@ export function buildStrokeDebugReport(
   strokes: RawStroke[],
   evaluation: StrokeEvaluation
 ): string {
+  const isMulti = challenge.targetLines && challenge.targetLines.length > 1;
+
+  if (isMulti) {
+    const targets = challenge.targetLines || [];
+    const targetLinesDesc = targets
+      .map(
+        (t) =>
+          `  - Línea ${t.order} (pts ${t.startKeyPointOrder}→${t.endKeyPointOrder}): Start (${Math.round(t.start.x)}, ${Math.round(t.start.y)}) -> End (${Math.round(t.end.x)}, ${Math.round(t.end.y)}), L: ${Math.round(t.lengthPx)}px, θ: ${t.angleDeg}°`
+      )
+      .join('\n');
+
+    return [
+      `=== REPORTE DE DEPURACIÓN MULTI-TRAZO (PAPLITZ LAB) ===`,
+      `Fecha: ${new Date().toISOString()}`,
+      `Reto: [${challenge.code}] ${challenge.title} (Semilla: #${challenge.seed})`,
+      `Subtítulo: ${challenge.subtitle}`,
+      ``,
+      `--- OBJETIVO MULTI-LÍNEA (${targets.length} LÍNEAS) ---`,
+      targetLinesDesc,
+      ``,
+      `--- TRAZOS DEL USUARIO ---`,
+      `Trazos recibidos: ${strokes.length} (requeridos: ${challenge.minRequiredStrokes})`,
+      ...strokes.map((s, i) => {
+        const p0 = s.points[0] || { x: 0, y: 0 };
+        const pN = s.points[s.points.length - 1] || { x: 0, y: 0 };
+        return `  - Trazo ${i + 1}: ${s.points.length} puntos. Start (${Math.round(p0.x)}, ${Math.round(p0.y)}) -> End (${Math.round(pN.x)}, ${Math.round(pN.y)}), L: ${Math.round(Math.hypot(pN.x - p0.x, pN.y - p0.y))}px`;
+      }),
+      ``,
+      `--- RESULTADO DE EVALUACIÓN ---`,
+      `Nota Global: ${evaluation.overallScore}% (Superado: ${evaluation.passed ? 'SÍ' : 'NO'})`,
+      evaluation.currentPhase ? `Fase Activa: Fase ${evaluation.currentPhase} (Fase Superada: ${evaluation.phasePassed ? 'SÍ' : 'NO'})` : '',
+      `Puntería en Dianas: ${evaluation.metrics.boundaryScore}%`,
+      `Rectitud Media: ${evaluation.metrics.straightnessScore}%`,
+      `Paralelismo / Vector: ${evaluation.metrics.parallelismScore}%`,
+      ``,
+      evaluation.kinematics
+        ? [
+            `--- CINEMÁTICA Y BIOMECÁNICA ---`,
+            `Duración acumulada: ${evaluation.kinematics.durationMs}ms`,
+            `Velocidad Media: ${evaluation.kinematics.avgSpeedPxPerSec} px/s (Pico: ${evaluation.kinematics.peakSpeedPxPerSec} px/s)`,
+            `Media Adaptativa del Usuario: ${evaluation.kinematics.userBaselineSpeedPxPerSec} px/s`,
+            `Índice de Fluidez: ${evaluation.kinematics.fluencyScore}% (Micro-frenazos: ${evaluation.kinematics.microStopCount})`,
+            `Diagnóstico Velocidad: ${evaluation.kinematics.speedDiagnosisLabel}`,
+          ].join('\n')
+        : '',
+      ``,
+      evaluation.directionWarning ? `Aviso Dirección: ${evaluation.directionWarning}` : `Dirección: Correcta`,
+      `Diagnóstico: ${evaluation.feedbackTitle} - ${evaluation.feedbackMessage}`,
+      `================================================`,
+    ].filter(Boolean).join('\n');
+  }
+
   const s0 = strokes[0];
   const pts = s0?.points || [];
   const uStart = pts[0] || { x: 0, y: 0 };
@@ -599,6 +999,14 @@ export function evaluateStrokeSubmission(
   strokes: RawStroke[],
   challenge: ProceduralStrokeChallenge
 ): StrokeEvaluation {
+  // Si es un reto multi-línea (2 o 3 líneas dispersas)
+  if (
+    (challenge.multiLineCount && challenge.multiLineCount > 1) ||
+    (challenge.targetLines && challenge.targetLines.length > 1)
+  ) {
+    return evaluateMultiLineSubmission(strokes, challenge);
+  }
+
   // Si es un reto de trazo único, usar el evaluador de calistenia instantánea
   if (
     challenge.isSingleStrokeAutoEval ||

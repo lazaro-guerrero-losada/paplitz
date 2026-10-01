@@ -5,6 +5,7 @@ import {
   ALL_LAB_EXERCISES,
   PolyFace,
   KeyPoint,
+  TargetLineDef,
 } from './strokeTypes';
 
 /**
@@ -34,6 +35,236 @@ export class SeededRNG {
   }
 }
 
+function shuffleWithRNG<T>(array: T[], rng: SeededRNG): T[] {
+  const result = [...array];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = rng.rangeInt(0, i);
+    const temp = result[i];
+    result[i] = result[j];
+    result[j] = temp;
+  }
+  return result;
+}
+
+/**
+ * Genera un reto de Calistenia Multi-Línea (2 o 3 líneas independientes dispersas)
+ */
+export function generateMultiLineChallenge(
+  exercise: LabExerciseDef,
+  seed: number,
+  canvasWidth = 600,
+  canvasHeight = 540,
+  lineCount: 2 | 3 = 2
+): ProceduralStrokeChallenge {
+  const rng = new SeededRNG(seed);
+  const cfg = exercise.singleStrokeConfig || {
+    direction: 'bottom_up_left_right',
+    variationType: 'multi_line',
+    guideType: 'points_only',
+  };
+
+  let dirArrow = '↗';
+  let dirLabel = 'Abajo a Arriba, Izquierda a Derecha (↗)';
+  if (cfg.direction === 'top_down_right_left') {
+    dirArrow = '↙';
+    dirLabel = 'Arriba a Abajo, Derecha a Izquierda (↙)';
+  } else if (cfg.direction === 'top_down_left_right') {
+    dirArrow = '↘';
+    dirLabel = 'Arriba a Abajo, Izquierda a Derecha (↘)';
+  } else if (cfg.direction === 'bottom_up_right_left') {
+    dirArrow = '↖';
+    dirLabel = 'Abajo a Arriba, Derecha a Izquierda (↖)';
+  }
+
+  // 1. Asignación de Centros no solapados en distintos cuadrantes
+  let centers: { cx: number; cy: number }[] = [];
+  if (lineCount === 2) {
+    const flip = rng.nextFloat() > 0.5;
+    const c1 = {
+      cx: rng.range(160, 310),
+      cy: rng.range(130, 230),
+    };
+    const c2 = {
+      cx: rng.range(320, 460),
+      cy: rng.range(290, 410),
+    };
+    centers = flip ? [c2, c1] : [c1, c2];
+  } else {
+    // 3 Líneas en 3 sectores
+    const z0 = {
+      cx: rng.range(150, 300),
+      cy: rng.range(120, 195),
+    };
+    const z1 = {
+      cx: rng.range(330, 460),
+      cy: rng.range(210, 330),
+    };
+    const z2 = {
+      cx: rng.range(150, 310),
+      cy: rng.range(340, 420),
+    };
+    centers = shuffleWithRNG([z0, z1, z2], rng);
+  }
+
+  // 2. Longitudes diferentes para cada línea
+  let lengths: number[] = [];
+  if (lineCount === 2) {
+    const l1 = Math.round(rng.range(135, 185));
+    const l2 = Math.round(rng.range(225, 290));
+    lengths = rng.nextFloat() > 0.5 ? [l1, l2] : [l2, l1];
+  } else {
+    const lShort = Math.round(rng.range(130, 165));
+    const lMed = Math.round(rng.range(185, 225));
+    const lLong = Math.round(rng.range(250, 295));
+    lengths = shuffleWithRNG([lShort, lMed, lLong], rng);
+  }
+
+  // 3. Ángulos de rotación diferenciados dentro del sector motor
+  let angles: number[] = [];
+  const isD1orD2 = cfg.direction === 'bottom_up_left_right' || cfg.direction === 'top_down_right_left';
+  if (lineCount === 2) {
+    if (isD1orD2) {
+      const a1 = Math.round(rng.range(36, 50));
+      const a2 = Math.round(rng.range(60, 74));
+      angles = rng.nextFloat() > 0.5 ? [a1, a2] : [a2, a1];
+    } else {
+      const a1 = Math.round(rng.range(26, 40));
+      const a2 = Math.round(rng.range(50, 64));
+      angles = rng.nextFloat() > 0.5 ? [a1, a2] : [a2, a1];
+    }
+  } else {
+    if (isD1orD2) {
+      const a1 = Math.round(rng.range(35, 46));
+      const a2 = Math.round(rng.range(50, 60));
+      const a3 = Math.round(rng.range(64, 75));
+      angles = shuffleWithRNG([a1, a2, a3], rng);
+    } else {
+      const a1 = Math.round(rng.range(25, 36));
+      const a2 = Math.round(rng.range(40, 50));
+      const a3 = Math.round(rng.range(54, 65));
+      angles = shuffleWithRNG([a1, a2, a3], rng);
+    }
+  }
+
+  // 4. Construcción de coordenadas para cada línea
+  const keyPoints: KeyPoint[] = [];
+  const targetLines: TargetLineDef[] = [];
+  const ghostSolutionStrokes: { points: { x: number; y: number }[] }[] = [];
+  const guideLines: { x1: number; y1: number; x2: number; y2: number; dashed?: boolean }[] = [];
+
+  for (let k = 0; k < lineCount; k++) {
+    const { cx, cy } = centers[k];
+    const L = lengths[k];
+    const halfL = L / 2;
+    const angleDeg = angles[k];
+    const thetaRad = (angleDeg * Math.PI) / 180;
+    const dx = halfL * Math.cos(thetaRad);
+    const dy = halfL * Math.sin(thetaRad);
+
+    let pStart = { x: cx, y: cy };
+    let pEnd = { x: cx, y: cy };
+
+    if (cfg.direction === 'bottom_up_left_right') {
+      // ↗ D1: Abajo-Izquierda -> Arriba-Derecha
+      pStart = { x: cx - dx, y: cy + dy };
+      pEnd = { x: cx + dx, y: cy - dy };
+    } else if (cfg.direction === 'top_down_right_left') {
+      // ↙ D2: Arriba-Derecha -> Abajo-Izquierda
+      pStart = { x: cx + dx, y: cy - dy };
+      pEnd = { x: cx - dx, y: cy + dy };
+    } else if (cfg.direction === 'top_down_left_right') {
+      // ↘ D3: Arriba-Izquierda -> Abajo-Derecha
+      pStart = { x: cx - dx, y: cy - dy };
+      pEnd = { x: cx + dx, y: cy + dy };
+    } else if (cfg.direction === 'bottom_up_right_left') {
+      // ↖ D4: Abajo-Derecha -> Arriba-Izquierda
+      pStart = { x: cx + dx, y: cy + dy };
+      pEnd = { x: cx - dx, y: cy - dy };
+    }
+
+    // Margen seguro respecto a los bordes del canvas (45px)
+    const minX = Math.min(pStart.x, pEnd.x);
+    const maxX = Math.max(pStart.x, pEnd.x);
+    const minY = Math.min(pStart.y, pEnd.y);
+    const maxY = Math.max(pStart.y, pEnd.y);
+    let shiftX = 0;
+    let shiftY = 0;
+    if (minX < 45) shiftX = 45 - minX;
+    else if (maxX > canvasWidth - 45) shiftX = canvasWidth - 45 - maxX;
+    if (minY < 45) shiftY = 45 - minY;
+    else if (maxY > canvasHeight - 45) shiftY = canvasHeight - 45 - maxY;
+
+    pStart.x = Math.round(pStart.x + shiftX);
+    pStart.y = Math.round(pStart.y + shiftY);
+    pEnd.x = Math.round(pEnd.x + shiftX);
+    pEnd.y = Math.round(pEnd.y + shiftY);
+
+    // Puntos diana numerados: Línea 1 -> 1 y 2; Línea 2 -> 3 y 4; Línea 3 -> 5 y 6
+    const startOrder = 2 * k + 1;
+    const endOrder = 2 * k + 2;
+    keyPoints.push({ x: pStart.x, y: pStart.y, order: startOrder, label: String(startOrder), type: 'start' });
+    keyPoints.push({ x: pEnd.x, y: pEnd.y, order: endOrder, label: String(endOrder), type: 'end' });
+
+    // Trayectoria ideal interpolada
+    const STEPS = 30;
+    const idealPath: { x: number; y: number }[] = [];
+    for (let s = 0; s <= STEPS; s++) {
+      const t = s / STEPS;
+      idealPath.push({
+        x: pStart.x + (pEnd.x - pStart.x) * t,
+        y: pStart.y + (pEnd.y - pStart.y) * t,
+      });
+    }
+
+    targetLines.push({
+      id: `line-${k + 1}`,
+      start: pStart,
+      end: pEnd,
+      idealPath,
+      angleDeg,
+      lengthPx: L,
+      order: k + 1,
+      startKeyPointOrder: startOrder,
+      endKeyPointOrder: endOrder,
+    });
+
+    ghostSolutionStrokes.push({ points: idealPath });
+
+    if (cfg.guideType === 'gray_line') {
+      guideLines.push({ x1: pStart.x, y1: pStart.y, x2: pEnd.x, y2: pEnd.y, dashed: false });
+    }
+  }
+
+  const avgLength = Math.round(lengths.reduce((a, b) => a + b, 0) / lengths.length);
+
+  return {
+    id: `multi-${exercise.code}-${seed}`,
+    pageNumber: exercise.page || 0,
+    code: exercise.code,
+    category: exercise.category,
+    title: exercise.title,
+    subtitle: `${dirArrow} ${lineCount} Líneas (${dirLabel}) · L: ${lengths.join('/')}px · θ: ${angles.map((a) => `${a}°`).join('/')}`,
+    blockTitle: exercise.block,
+    seed,
+    instruction: exercise.instruction,
+    targetMetricsText: exercise.metrics,
+    targetAngleDeg: angles[0],
+    targetSpacingPx: 0,
+    targetLengthPx: avgLength,
+    minRequiredStrokes: lineCount,
+    multiLineCount: lineCount,
+    targetLines,
+    isSingleStrokeAutoEval: true,
+    directionKey: cfg.direction,
+    guideMode: cfg.guideType,
+    keyPoints,
+    ghostSolutionStrokes,
+    idealPath: targetLines[0]?.idealPath || [],
+    expectedDirectionAngleDeg: angles[0],
+    guideLines,
+  };
+}
+
 /**
  * Genera un reto de Calistenia Dinámica de Trazo Único (Línea o Curva)
  */
@@ -43,13 +274,18 @@ export function generateSingleStrokeChallenge(
   canvasWidth = 600,
   canvasHeight = 540
 ): ProceduralStrokeChallenge {
-  const rng = new SeededRNG(seed);
   const cfg = exercise.singleStrokeConfig || {
     direction: 'bottom_up_left_right',
     variationType: 'fixed',
     guideType: 'gray_line',
   };
 
+  // Si el ejercicio está configurado para multi-líneas (2 o 3 líneas dispersas)
+  if (cfg.multiLineCount && cfg.multiLineCount > 1) {
+    return generateMultiLineChallenge(exercise, seed, canvasWidth, canvasHeight, cfg.multiLineCount);
+  }
+
+  const rng = new SeededRNG(seed);
   const isCurve = cfg.direction === 'curve_c' || cfg.direction === 'curve_s';
 
   // 1. Centro (cx, cy)
