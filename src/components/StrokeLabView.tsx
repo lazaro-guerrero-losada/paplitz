@@ -701,7 +701,7 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
   };
 
   return (
-    <div className="w-full flex-1 flex flex-col md:flex-row items-center md:items-start justify-center gap-3 sm:gap-4 bg-neutral-50 px-2 sm:px-4 py-2 sm:py-3 min-h-[calc(100vh-64px)] select-none">
+    <div className="w-full flex-1 flex flex-col md:flex-row items-center md:items-start justify-center gap-3 sm:gap-4 bg-neutral-50 px-2 sm:px-4 pt-2 sm:pt-3 pb-6 sm:pb-8 min-h-[calc(100vh-64px)] select-none">
       {/* Drawer Colapsable de Selección de Ejercicios */}
       {drawerOpen && (
         <div className="fixed inset-0 z-50 flex">
@@ -1124,11 +1124,11 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
       {/* ========================================================
           ZONA DE LIENZO EXPANSIVA (SIN NINGÚN BOTÓN QUE ESTORBE)
          ======================================================== */}
-      <main className="flex-1 w-full flex items-center justify-center select-none min-w-0 order-1 md:order-2">
+      <main className="flex-1 w-full flex items-center justify-center select-none min-w-0 order-1 md:order-2 pb-3 sm:pb-5">
         <div
-          className="w-full flex items-center justify-center"
+          className="w-full flex items-center justify-center mb-2 sm:mb-4"
           style={{
-            maxWidth: 'min(100%, calc((100vh - 84px) * 600 / 540), 960px)',
+            maxWidth: 'min(100%, calc((100vh - 120px) * 600 / 540), 960px)',
             aspectRatio: '600 / 540',
           }}
         >
