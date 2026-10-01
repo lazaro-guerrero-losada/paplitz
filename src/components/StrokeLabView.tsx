@@ -31,6 +31,7 @@ import {
   Menu,
   Copy,
   Download,
+  Info,
 } from 'lucide-react';
 
 interface StrokeLabViewProps {
@@ -84,8 +85,11 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
   const activePointerIdRef = useRef<number | null>(null);
 
-  // Visibilidad de guías, evaluación y modal
-  const [showGuides, setShowGuides] = useState<boolean>(true);
+  // Visibilidad de trazos, solución/guías, evaluación y modales de información
+  const [showUserStrokes, setShowUserStrokes] = useState<boolean>(true);
+  const [showSolution, setShowSolution] = useState<boolean>(true);
+  const [showKinematicsInfoModal, setShowKinematicsInfoModal] = useState<boolean>(false);
+  const [showChallengeInfoModal, setShowChallengeInfoModal] = useState<boolean>(false);
   const [evaluation, setEvaluation] = useState<StrokeEvaluation | null>(null);
   const [showBookModal, setShowBookModal] = useState<boolean>(false);
   const [showDebugModal, setShowDebugModal] = useState<boolean>(false);
@@ -318,7 +322,7 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
       ctx.fill();
       ctx.stroke();
 
-      if (showGuides) {
+      if (showSolution) {
         const ax = challenge.blobShape.axisLine;
         ctx.strokeStyle = '#777777';
         ctx.lineWidth = 1.6;
@@ -373,7 +377,7 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
         ctx.fill();
         ctx.stroke();
 
-        if (showGuides) {
+        if (showSolution) {
           let fcx = 0;
           let fcy = 0;
           for (const v of f.vertices) {
@@ -407,7 +411,7 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
         ctx.fill();
         ctx.stroke();
 
-        if (showGuides) {
+        if (showSolution) {
           let rcx = 0;
           let rcy = 0;
           for (const v of rf.vertices) {
@@ -427,7 +431,7 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
     }
 
     // E. Curva S generatriz
-    if (challenge.waveParams && showGuides) {
+    if (challenge.waveParams && showSolution) {
       const wp = challenge.waveParams;
       ctx.strokeStyle = '#888888';
       ctx.lineWidth = 1.8;
@@ -446,7 +450,7 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
     }
 
     // F. Líneas de cota y carriles guía
-    if (showGuides && challenge.guideLines) {
+    if (showSolution && challenge.guideLines) {
       for (const line of challenge.guideLines) {
         ctx.strokeStyle = line.dashed ? '#888888' : '#000000';
         ctx.lineWidth = 1.5;
@@ -461,9 +465,9 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
       }
     }
 
-    // G. SOLUCIÓN FANTASMA EN GRIS CON OPACIDAD (Visible antes de empezar a dibujar)
-    // Desaparece en cuanto el usuario toca el lienzo o tiene trazos
-    if (strokes.length === 0 && !isDrawing && showGuides && challenge.ghostSolutionStrokes) {
+    // G. SOLUCIÓN FANTASMA EN GRIS CON OPACIDAD (Visible antes de empezar a dibujar si showSolution está activo)
+    // Desaparece en cuanto el usuario toca el lienzo o tiene trazos, o si se desactiva Solución
+    if (showSolution && strokes.length === 0 && !isDrawing && challenge.ghostSolutionStrokes) {
       ctx.save();
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.22)';
       ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
@@ -507,8 +511,8 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
     // 4. Dibujar los trazos entintados del usuario con suavizado Bézier
     const allStrokes =
       isDrawing && currentStrokeRef.current.length > 0
-        ? [...strokes, { points: currentStrokeRef.current }]
-        : strokes;
+        ? (showUserStrokes ? [...strokes, { points: currentStrokeRef.current }] : [{ points: currentStrokeRef.current }])
+        : (showUserStrokes ? strokes : []);
 
     ctx.strokeStyle = '#000000';
     ctx.lineCap = 'round';
@@ -542,7 +546,7 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
     }
 
     // 5. SUPERPOSICIÓN DE SOLUCIÓN TRAS CORRECCIÓN (Línea discontinua estrictamente monocromática negra)
-    if (evaluation && evaluation.solutionOverlay) {
+    if (showSolution && evaluation && evaluation.solutionOverlay) {
       const linesToDraw: { x: number; y: number }[][] =
         evaluation.solutionOverlay.multiLines && evaluation.solutionOverlay.multiLines.length > 0
           ? evaluation.solutionOverlay.multiLines.map((l) => l.points)
@@ -582,7 +586,7 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
     }
 
     ctx.restore();
-  }, [challenge, strokes, isDrawing, showGuides, evaluation]);
+  }, [challenge, strokes, isDrawing, evaluation, showUserStrokes, showSolution]);
 
   useEffect(() => {
     renderCanvas();
@@ -842,9 +846,18 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
           {/* 1. Selección y Navegación de Reto */}
           <div>
             <div className="flex items-center justify-between gap-1 mb-1">
-              <span className="text-[10px] font-mono uppercase font-black text-neutral-500 tracking-wider">
-                Reto Activo
-              </span>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-mono uppercase font-black text-neutral-500 tracking-wider">
+                  Reto Activo
+                </span>
+                <button
+                  onClick={() => setShowChallengeInfoModal(true)}
+                  className="text-neutral-400 hover:text-black p-0.5 cursor-pointer transition-colors"
+                  title="Información detallada del nivel"
+                >
+                  <Info className="w-3.5 h-3.5" />
+                </button>
+              </div>
               <div className="flex items-center gap-1">
                 {challenge.isSingleStrokeAutoEval && streak > 0 && (
                   <div className="flex items-center gap-0.5 bg-black text-white px-1.5 py-0.2 text-[10px] font-mono font-black">
@@ -898,12 +911,26 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
             </div>
           </div>
 
-          {/* 2. Fases Didácticas en 1 sola fila horizontal */}
+          {/* 2. Fases Didácticas en 1 sola fila horizontal con botón de información */}
           {challenge.isSingleStrokeAutoEval && (
             <div className="border-t border-black pt-2">
-              <span className="text-[10px] font-mono uppercase font-black text-neutral-500 block mb-1 tracking-wider">
-                Fase Cinemática
-              </span>
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] font-mono uppercase font-black text-neutral-500 tracking-wider">
+                    Fase Cinemática
+                  </span>
+                  <button
+                    onClick={() => setShowKinematicsInfoModal(true)}
+                    className="text-neutral-400 hover:text-black p-0.5 cursor-pointer transition-colors"
+                    title="Información sobre las fases cinemáticas"
+                  >
+                    <Info className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <span className="text-[10px] font-mono text-neutral-600 font-bold">
+                  {currentPhase === 1 ? 'Precisión' : currentPhase === 2 ? 'Fluidez' : 'Velocidad'}
+                </span>
+              </div>
               <div className="grid grid-cols-3 gap-1">
                 <button
                   onClick={() => handlePhaseSelect(1)}
@@ -936,7 +963,7 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
             </div>
           )}
 
-          {/* 3. Herramientas del Lienzo en 1 fila horizontal */}
+          {/* 3. Herramientas del Lienzo: Deshacer/Borrar y Visibilidad de Mi Trazo y Solución */}
           <div className="border-t border-black pt-2">
             <div className="flex items-center justify-between mb-1">
               <span className="text-[10px] font-mono uppercase font-black text-neutral-500 tracking-wider">
@@ -947,11 +974,12 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
               </span>
             </div>
 
-            <div className="grid grid-cols-3 gap-1">
+            {/* Fila 1: Deshacer y Borrar */}
+            <div className="grid grid-cols-2 gap-1 mb-1">
               <button
                 onClick={handleUndo}
                 disabled={strokes.length === 0}
-                className="btn-ink-outline py-1 text-[11px] font-mono disabled:opacity-30 cursor-pointer flex items-center justify-center gap-0.5 shadow-[1px_1px_0px_#000000]"
+                className="btn-ink-outline py-1 text-[11px] font-mono disabled:opacity-30 cursor-pointer flex items-center justify-center gap-1 shadow-[1px_1px_0px_#000000]"
                 title="Deshacer último trazo (Ctrl+Z)"
               >
                 <Undo2 className="w-3 h-3" />
@@ -960,21 +988,35 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
               <button
                 onClick={handleClear}
                 disabled={strokes.length === 0}
-                className="btn-ink-outline py-1 text-[11px] font-mono disabled:opacity-30 cursor-pointer flex items-center justify-center gap-0.5 shadow-[1px_1px_0px_#000000]"
+                className="btn-ink-outline py-1 text-[11px] font-mono disabled:opacity-30 cursor-pointer flex items-center justify-center gap-1 shadow-[1px_1px_0px_#000000]"
                 title="Borrar lienzo"
               >
                 <Trash2 className="w-3 h-3" />
                 <span>Borrar</span>
               </button>
+            </div>
+
+            {/* Fila 2: Ver/Ocultar Mi Trazo y Ver/Ocultar Solución */}
+            <div className="grid grid-cols-2 gap-1">
               <button
-                onClick={() => setShowGuides(!showGuides)}
-                className={`btn-ink-outline py-1 text-[11px] font-mono cursor-pointer flex items-center justify-center gap-0.5 shadow-[1px_1px_0px_#000000] ${
-                  showGuides ? 'bg-neutral-100' : ''
+                onClick={() => setShowUserStrokes((prev) => !prev)}
+                className={`btn-ink-outline py-1 text-[11px] font-mono cursor-pointer flex items-center justify-center gap-1 shadow-[1px_1px_0px_#000000] ${
+                  showUserStrokes ? 'bg-neutral-100 font-bold text-black' : 'text-neutral-400 line-through'
                 }`}
-                title="Alternar Guías Fantasma"
+                title={showUserStrokes ? 'Ocultar mi trazo dibujado' : 'Mostrar mi trazo dibujado'}
               >
-                {showGuides ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                <span>Guías</span>
+                {showUserStrokes ? <Eye className="w-3 h-3 text-black" /> : <EyeOff className="w-3 h-3 text-neutral-400" />}
+                <span>Mi Trazo</span>
+              </button>
+              <button
+                onClick={() => setShowSolution((prev) => !prev)}
+                className={`btn-ink-outline py-1 text-[11px] font-mono cursor-pointer flex items-center justify-center gap-1 shadow-[1px_1px_0px_#000000] ${
+                  showSolution ? 'bg-neutral-100 font-bold text-black' : 'text-neutral-400 line-through'
+                }`}
+                title={showSolution ? 'Ocultar solución y guías' : 'Mostrar solución y guías'}
+              >
+                {showSolution ? <Eye className="w-3 h-3 text-black" /> : <EyeOff className="w-3 h-3 text-neutral-400" />}
+                <span>Solución</span>
               </button>
             </div>
           </div>
@@ -984,22 +1026,27 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
             {/* Si hay evaluación activa */}
             {evaluation ? (
               <div className="flex flex-col gap-1.5">
-                {/* Veredicto, Nota y Telemetría en 1 sola línea */}
-                <div className="flex items-center justify-between bg-neutral-100 border border-black px-2 py-1 font-mono text-xs">
-                  <div className="flex items-center gap-1.5">
+                {/* Nota destacada en grande con veredicto y telemetría */}
+                <div className="bg-neutral-100 border-2 border-black p-2 flex items-center justify-between shadow-[2px_2px_0px_#000000]">
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-mono font-black text-2xl sm:text-3xl text-black leading-none">
+                      {evaluation.overallScore}%
+                    </span>
                     <span
-                      className={`text-[10px] font-mono px-1 py-0.2 font-black uppercase ${
-                        evaluation.phasePassed ? 'bg-black text-white' : 'bg-white text-black border border-black'
+                      className={`text-[10px] font-mono px-1.5 py-0.5 font-black uppercase tracking-wider ${
+                        evaluation.phasePassed
+                          ? 'bg-black text-white'
+                          : 'bg-white text-black border border-black'
                       }`}
                     >
                       {evaluation.phasePassed ? 'Superado ✓' : 'Ajustar'}
                     </span>
-                    <span className="font-mono font-black text-xs">{evaluation.overallScore}%</span>
                   </div>
                   {evaluation.kinematics && (
-                    <span className="text-[10px] font-mono text-neutral-600 font-bold">
-                      {(evaluation.kinematics.durationMs / 1000).toFixed(2)}s · {evaluation.kinematics.avgSpeedPxPerSec}px/s
-                    </span>
+                    <div className="text-right font-mono text-[10px] text-neutral-600 font-bold leading-tight">
+                      <div>{(evaluation.kinematics.durationMs / 1000).toFixed(2)}s</div>
+                      <div className="text-neutral-500">{evaluation.kinematics.avgSpeedPxPerSec} px/s</div>
+                    </div>
                   )}
                 </div>
 
@@ -1269,6 +1316,168 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
                 className="px-3 py-1.5 text-xs font-mono text-neutral-600 hover:text-black border border-neutral-300 hover:border-black cursor-pointer ml-auto"
               >
                 Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal: Información del Reto Activo */}
+      {showChallengeInfoModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-fade-in">
+          <div className="bg-white border-3 border-black p-4 sm:p-5 max-w-md w-full shadow-[6px_6px_0px_#000000] flex flex-col gap-3 font-sans max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b-2 border-black pb-2">
+              <div className="flex items-center gap-2">
+                <Info className="w-5 h-5 text-black stroke-[2.5]" />
+                <h3 className="font-display font-bold text-sm sm:text-base uppercase tracking-tight">
+                  Información del Reto
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowChallengeInfoModal(false)}
+                className="p-1 hover:bg-neutral-100 border border-black cursor-pointer text-black"
+                title="Cerrar modal"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between gap-2 bg-neutral-50 p-2.5 border border-black font-mono text-xs">
+              <span className="font-black bg-black text-white px-2 py-0.5 text-xs">
+                {currentExercise.code}
+              </span>
+              <span className="font-bold border border-black px-1.5 py-0.5 bg-white uppercase text-[10px]">
+                Dificultad: {currentExercise.difficulty}
+              </span>
+            </div>
+
+            <div>
+              <h4 className="font-display font-black text-base text-black mb-1">
+                {currentExercise.title}
+              </h4>
+              <p className="text-xs text-neutral-700 font-sans leading-relaxed">
+                {currentExercise.desc}
+              </p>
+            </div>
+
+            <div className="bg-neutral-50 border border-black p-2.5 font-mono text-[11px] space-y-2">
+              <div>
+                <strong className="block text-black uppercase text-[10px] tracking-wider mb-0.5">
+                  Instrucción didáctica:
+                </strong>
+                <span className="text-neutral-800">{currentExercise.instruction}</span>
+              </div>
+              <div>
+                <strong className="block text-black uppercase text-[10px] tracking-wider mb-0.5">
+                  Qué se mide:
+                </strong>
+                <span className="text-neutral-800">{currentExercise.metrics}</span>
+              </div>
+              <div className="pt-1.5 border-t border-neutral-300 grid grid-cols-2 gap-2 text-[10px]">
+                <div>
+                  <span className="text-neutral-500">Bloque:</span>{' '}
+                  <strong className="text-neutral-800">{currentExercise.block.split(':')[0]}</strong>
+                </div>
+                <div>
+                  <span className="text-neutral-500">Evaluación:</span>{' '}
+                  <strong className="text-neutral-800">
+                    {challenge.isSingleStrokeAutoEval ? 'Instantánea (auto)' : 'Manual'}
+                  </strong>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-neutral-200 flex justify-end">
+              <button
+                onClick={() => setShowChallengeInfoModal(false)}
+                className="btn-ink px-4 py-1.5 text-xs font-mono font-bold uppercase cursor-pointer"
+              >
+                Entendido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Información de Fases Cinemáticas */}
+      {showKinematicsInfoModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-fade-in">
+          <div className="bg-white border-3 border-black p-4 sm:p-5 max-w-lg w-full shadow-[6px_6px_0px_#000000] flex flex-col gap-3 font-sans max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b-2 border-black pb-2">
+              <div className="flex items-center gap-2">
+                <Info className="w-5 h-5 text-black stroke-[2.5]" />
+                <h3 className="font-display font-bold text-sm sm:text-base uppercase tracking-tight">
+                  Fases Cinemáticas del Trazo
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowKinematicsInfoModal(false)}
+                className="p-1 hover:bg-neutral-100 border border-black cursor-pointer text-black"
+                title="Cerrar modal"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-neutral-700 font-sans leading-relaxed">
+              El dibujo profesional exige desacoplar primero y coordinar después la <strong>precisión espacial</strong> y la <strong>velocidad balística</strong>. Entrenar en 3 fases evita el vicio de dibujar con titubeos o frenadas:
+            </p>
+
+            <div className="space-y-2.5 font-mono text-xs">
+              {/* Fase 1 */}
+              <div className="border border-black p-2.5 bg-neutral-50">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-black bg-black text-white px-1.5 py-0.5 text-[11px] uppercase">
+                    1. Precisión
+                  </span>
+                  <span className="text-[10px] text-neutral-600 font-bold uppercase">Ritmo Libre</span>
+                </div>
+                <p className="font-sans text-[11px] text-neutral-700 mb-1">
+                  <strong>Sentido:</strong> Calibrar el control motriz fino conectando inicio y meta con fidelidad a la trayectoria geométrica.
+                </p>
+                <div className="text-[10px] text-neutral-600 bg-white border border-neutral-300 p-1.5">
+                  • <em>Valores & Criterio:</em> No hay penalización por lentitud. La nota prioriza que no te desvíes del eje ni te pases de los puntos.
+                </div>
+              </div>
+
+              {/* Fase 2 */}
+              <div className="border border-black p-2.5 bg-neutral-50">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-black bg-black text-white px-1.5 py-0.5 text-[11px] uppercase">
+                    2. Fluidez
+                  </span>
+                  <span className="text-[10px] text-neutral-600 font-bold uppercase">Ritmo Continuo</span>
+                </div>
+                <p className="font-sans text-[11px] text-neutral-700 mb-1">
+                  <strong>Sentido:</strong> Automatizar la continuidad del trazo, erradicando micro-paradas, titubeos o dudas en el lápiz.
+                </p>
+                <div className="text-[10px] text-neutral-600 bg-white border border-neutral-300 p-1.5">
+                  • <em>Valores & Criterio:</em> Velocidad constante y sostenida. Penaliza frenazos antes de tocar la diana final.
+                </div>
+              </div>
+
+              {/* Fase 3 */}
+              <div className="border border-black p-2.5 bg-neutral-50">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-black bg-black text-white px-1.5 py-0.5 text-[11px] uppercase">
+                    3. Velocidad
+                  </span>
+                  <span className="text-[10px] text-neutral-600 font-bold uppercase">Disparo Rápido</span>
+                </div>
+                <p className="font-sans text-[11px] text-neutral-700 mb-1">
+                  <strong>Sentido:</strong> Gesto balístico rápido desde el hombro / codo (técnica de "ghosting") con total confianza.
+                </p>
+                <div className="text-[10px] text-neutral-600 bg-white border border-neutral-300 p-1.5">
+                  • <em>Valores & Criterio:</em> Exige alta velocidad media (&gt; 400-600 px/s) manteniendo la puntería hacia el punto diana.
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-neutral-200 flex justify-end">
+              <button
+                onClick={() => setShowKinematicsInfoModal(false)}
+                className="btn-ink px-4 py-1.5 text-xs font-mono font-bold uppercase cursor-pointer"
+              >
+                Entendido
               </button>
             </div>
           </div>
