@@ -17,7 +17,6 @@ import {
   Undo2,
   Trash2,
   CheckCircle2,
-  BookOpen,
   X,
   ChevronLeft,
   ChevronRight,
@@ -90,8 +89,8 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
   const [showSolution, setShowSolution] = useState<boolean>(true);
   const [showKinematicsInfoModal, setShowKinematicsInfoModal] = useState<boolean>(false);
   const [showChallengeInfoModal, setShowChallengeInfoModal] = useState<boolean>(false);
+  const [challengeModalTab, setChallengeModalTab] = useState<'info' | 'book'>('info');
   const [evaluation, setEvaluation] = useState<StrokeEvaluation | null>(null);
-  const [showBookModal, setShowBookModal] = useState<boolean>(false);
   const [showDebugModal, setShowDebugModal] = useState<boolean>(false);
   const [debugComment, setDebugComment] = useState<string>('');
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
@@ -120,6 +119,8 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
     currentStrokeRef.current = [];
     setIsDrawing(false);
     setEvaluation(null);
+    setShowUserStrokes(true);
+    setShowSolution(true);
     setShowDebugModal(false);
     setDebugComment('');
   }, [currentExercise, currentPhase]);
@@ -132,6 +133,8 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
     currentStrokeRef.current = [];
     setIsDrawing(false);
     setEvaluation(null);
+    setShowUserStrokes(true);
+    setShowSolution(true);
     setShowDebugModal(false);
     setDebugComment('');
   }, []);
@@ -142,6 +145,8 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
     currentStrokeRef.current = [];
     setIsDrawing(false);
     setEvaluation(null);
+    setShowUserStrokes(true);
+    setShowSolution(true);
     setShowDebugModal(false);
     setDebugComment('');
   }, []);
@@ -797,19 +802,20 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
               </button>
             </div>
 
-            {/* 4. Ver Lámina Original / Guía */}
+            {/* 4. Ver Lámina Original / Información del Reto */}
             <button
               onClick={() => {
-                setShowBookModal(true);
+                setChallengeModalTab(currentExercise.page ? 'book' : 'info');
+                setShowChallengeInfoModal(true);
                 setDrawerOpen(false);
               }}
               className="btn-ink-outline w-full py-2 text-xs font-mono font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] mb-4"
             >
-              <BookOpen className="w-4 h-4 text-black" />
+              <Info className="w-4 h-4 text-black" />
               <span>
                 {currentExercise.page
-                  ? `Ver Lámina Original (P.${currentExercise.page})`
-                  : `Guía Biomecánica (${currentExercise.code})`}
+                  ? `Ver Lámina & Ficha (P.${currentExercise.page})`
+                  : `Ficha Didáctica (${currentExercise.code})`}
               </span>
             </button>
 
@@ -851,7 +857,10 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
                   Reto Activo
                 </span>
                 <button
-                  onClick={() => setShowChallengeInfoModal(true)}
+                  onClick={() => {
+                    setChallengeModalTab('info');
+                    setShowChallengeInfoModal(true);
+                  }}
                   className="text-neutral-400 hover:text-black p-0.5 cursor-pointer transition-colors"
                   title="Información detallada del nivel"
                 >
@@ -996,24 +1005,34 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
               </button>
             </div>
 
-            {/* Fila 2: Ver/Ocultar Mi Trazo y Ver/Ocultar Solución */}
+            {/* Fila 2: Ver/Ocultar Mi Trazo y Ver/Ocultar Solución (Activos solo tras obtener la nota) */}
             <div className="grid grid-cols-2 gap-1">
               <button
-                onClick={() => setShowUserStrokes((prev) => !prev)}
-                className={`btn-ink-outline py-1 text-[11px] font-mono cursor-pointer flex items-center justify-center gap-1 shadow-[1px_1px_0px_#000000] ${
-                  showUserStrokes ? 'bg-neutral-100 font-bold text-black' : 'text-neutral-400 line-through'
+                onClick={() => evaluation && setShowUserStrokes((prev) => !prev)}
+                disabled={!evaluation}
+                className={`btn-ink-outline py-1 text-[11px] font-mono flex items-center justify-center gap-1 shadow-[1px_1px_0px_#000000] transition-opacity ${
+                  !evaluation
+                    ? 'opacity-30 cursor-not-allowed bg-neutral-50 text-neutral-400'
+                    : showUserStrokes
+                    ? 'bg-neutral-100 font-bold text-black cursor-pointer'
+                    : 'text-neutral-400 line-through cursor-pointer'
                 }`}
-                title={showUserStrokes ? 'Ocultar mi trazo dibujado' : 'Mostrar mi trazo dibujado'}
+                title={!evaluation ? 'Disponible tras obtener la nota' : (showUserStrokes ? 'Ocultar mi trazo dibujado' : 'Mostrar mi trazo dibujado')}
               >
                 {showUserStrokes ? <Eye className="w-3 h-3 text-black" /> : <EyeOff className="w-3 h-3 text-neutral-400" />}
                 <span>Mi Trazo</span>
               </button>
               <button
-                onClick={() => setShowSolution((prev) => !prev)}
-                className={`btn-ink-outline py-1 text-[11px] font-mono cursor-pointer flex items-center justify-center gap-1 shadow-[1px_1px_0px_#000000] ${
-                  showSolution ? 'bg-neutral-100 font-bold text-black' : 'text-neutral-400 line-through'
+                onClick={() => evaluation && setShowSolution((prev) => !prev)}
+                disabled={!evaluation}
+                className={`btn-ink-outline py-1 text-[11px] font-mono flex items-center justify-center gap-1 shadow-[1px_1px_0px_#000000] transition-opacity ${
+                  !evaluation
+                    ? 'opacity-30 cursor-not-allowed bg-neutral-50 text-neutral-400'
+                    : showSolution
+                    ? 'bg-neutral-100 font-bold text-black cursor-pointer'
+                    : 'text-neutral-400 line-through cursor-pointer'
                 }`}
-                title={showSolution ? 'Ocultar solución y guías' : 'Mostrar solución y guías'}
+                title={!evaluation ? 'Disponible tras obtener la nota' : (showSolution ? 'Ocultar solución y guías' : 'Mostrar solución y guías')}
               >
                 {showSolution ? <Eye className="w-3 h-3 text-black" /> : <EyeOff className="w-3 h-3 text-neutral-400" />}
                 <span>Solución</span>
@@ -1028,8 +1047,8 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
               <div className="flex flex-col gap-1.5">
                 {/* Nota destacada en grande con veredicto y telemetría */}
                 <div className="bg-neutral-100 border-2 border-black p-2 flex items-center justify-between shadow-[2px_2px_0px_#000000]">
-                  <div className="flex items-baseline gap-2">
-                    <span className="font-mono font-black text-2xl sm:text-3xl text-black leading-none">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-black text-3xl sm:text-4xl text-black leading-none tracking-tight">
                       {evaluation.overallScore}%
                     </span>
                     <span
@@ -1108,15 +1127,6 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
                 </button>
               )
             )}
-
-            {/* Botón Ver Lámina Original / Guía Teórica */}
-            <button
-              onClick={() => setShowBookModal(true)}
-              className="w-full btn-ink-outline py-1 text-[11px] font-mono font-bold flex items-center justify-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000000] text-neutral-700 hover:text-black"
-            >
-              <BookOpen className="w-3.5 h-3.5" />
-              <span>{currentExercise.page ? `Lámina Original (P.${currentExercise.page})` : 'Guía Teórica'}</span>
-            </button>
           </div>
         </div>
       </aside>
@@ -1150,85 +1160,7 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
         </div>
       </main>
 
-      {/* Modal: Visor de Lámina Original o Guía Biomecánica */}
-      {showBookModal ? (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-          <div className="border-4 border-black bg-white max-w-xl w-full p-4 relative shadow-[8px_8px_0px_#000000] flex flex-col max-h-[92vh]">
-            <div className="flex items-center justify-between pb-2 border-b-2 border-black mb-3">
-              <div>
-                <h3 className="font-display font-bold text-base text-black">
-                  {currentExercise.page
-                    ? `Lámina Original · Página ${currentExercise.page}`
-                    : `Guía Biomecánica · ${currentExercise.code}`}
-                </h3>
-                <p className="text-xs font-mono text-neutral-600">
-                  {currentExercise.block}
-                </p>
-              </div>
-              <button
-                onClick={() => setShowBookModal(false)}
-                className="p-1 border border-black hover:bg-neutral-100 cursor-pointer text-black"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
 
-            <div className="flex-1 overflow-auto border-2 border-black bg-neutral-100 p-2 flex items-center justify-center">
-              {currentExercise.page && !imgError ? (
-                <img
-                  src={`/extracted_pages/page_${String(currentExercise.page).padStart(2, '0')}.jpg`}
-                  alt={`Página ${currentExercise.page}`}
-                  onError={() => setImgError(true)}
-                  className="max-h-[65vh] object-contain border border-neutral-300 bg-white shadow-sm"
-                />
-              ) : (
-                <div className="max-w-md w-full bg-white border-2 border-black p-4 shadow-[4px_4px_0px_#000000] text-left">
-                  <div className="flex items-center gap-2 mb-2 pb-2 border-b-2 border-black">
-                    <span className="font-mono font-bold bg-black text-white px-2 py-0.5 text-xs">
-                      {currentExercise.code}
-                    </span>
-                    <span className="font-mono font-bold text-xs uppercase text-neutral-600 truncate">
-                      {currentExercise.block}
-                    </span>
-                  </div>
-                  <h4 className="font-display font-bold text-base text-black mb-1">
-                    {currentExercise.title}
-                  </h4>
-                  <p className="text-xs text-neutral-700 font-sans leading-relaxed mb-3">
-                    {currentExercise.desc}
-                  </p>
-                  <div className="bg-neutral-50 border border-black p-2.5 font-mono text-[11px] space-y-1.5">
-                    <div>
-                      <strong className="text-black uppercase">Instrucción:</strong>{' '}
-                      <span className="text-neutral-800">{currentExercise.instruction}</span>
-                    </div>
-                    <div>
-                      <strong className="text-black uppercase">Métricas evaluadas:</strong>{' '}
-                      <span className="text-neutral-800">{currentExercise.metrics}</span>
-                    </div>
-                    <div>
-                      <strong className="text-black uppercase">Dificultad:</strong>{' '}
-                      <span className="text-neutral-800">{currentExercise.difficulty}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="pt-3 text-xs font-mono flex justify-between items-center">
-              <span className="truncate max-w-[340px]">
-                {currentExercise.code} · {currentExercise.title}
-              </span>
-              <button
-                onClick={() => setShowBookModal(false)}
-                className="btn-ink px-4 py-1.5 text-xs font-mono uppercase font-bold cursor-pointer"
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
 
       {/* Modal de Reporte de Depuración del Trazo (Idéntico a Práctica con Comentario, Copiar y Descargar JSON) */}
       {showDebugModal && evaluation && (
@@ -1321,10 +1253,10 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
           </div>
         </div>
       )}
-      {/* Modal: Información del Reto Activo */}
+      {/* Modal: Información del Reto Activo y Lámina Original */}
       {showChallengeInfoModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-fade-in">
-          <div className="bg-white border-3 border-black p-4 sm:p-5 max-w-md w-full shadow-[6px_6px_0px_#000000] flex flex-col gap-3 font-sans max-h-[92vh] overflow-y-auto">
+          <div className="bg-white border-3 border-black p-4 sm:p-5 max-w-lg sm:max-w-xl w-full shadow-[6px_6px_0px_#000000] flex flex-col gap-3 font-sans max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b-2 border-black pb-2">
               <div className="flex items-center gap-2">
                 <Info className="w-5 h-5 text-black stroke-[2.5]" />
@@ -1341,52 +1273,102 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
               </button>
             </div>
 
-            <div className="flex items-center justify-between gap-2 bg-neutral-50 p-2.5 border border-black font-mono text-xs">
-              <span className="font-black bg-black text-white px-2 py-0.5 text-xs">
-                {currentExercise.code}
-              </span>
-              <span className="font-bold border border-black px-1.5 py-0.5 bg-white uppercase text-[10px]">
-                Dificultad: {currentExercise.difficulty}
-              </span>
-            </div>
-
-            <div>
-              <h4 className="font-display font-black text-base text-black mb-1">
-                {currentExercise.title}
-              </h4>
-              <p className="text-xs text-neutral-700 font-sans leading-relaxed">
-                {currentExercise.desc}
-              </p>
-            </div>
-
-            <div className="bg-neutral-50 border border-black p-2.5 font-mono text-[11px] space-y-2">
-              <div>
-                <strong className="block text-black uppercase text-[10px] tracking-wider mb-0.5">
-                  Instrucción didáctica:
-                </strong>
-                <span className="text-neutral-800">{currentExercise.instruction}</span>
+            {/* Pestañas si el ejercicio tiene lámina en el libro */}
+            {currentExercise.page && (
+              <div className="flex border-2 border-black bg-neutral-100 p-0.5 text-xs font-mono font-bold">
+                <button
+                  type="button"
+                  onClick={() => setChallengeModalTab('info')}
+                  className={`flex-1 py-1 text-center transition-colors cursor-pointer ${
+                    challengeModalTab === 'info'
+                      ? 'bg-black text-white shadow-xs'
+                      : 'text-neutral-700 hover:text-black'
+                  }`}
+                >
+                  Ficha Técnica & Instrucciones
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChallengeModalTab('book')}
+                  className={`flex-1 py-1 text-center transition-colors cursor-pointer ${
+                    challengeModalTab === 'book'
+                      ? 'bg-black text-white shadow-xs'
+                      : 'text-neutral-700 hover:text-black'
+                  }`}
+                >
+                  Lámina Original (P.{currentExercise.page})
+                </button>
               </div>
-              <div>
-                <strong className="block text-black uppercase text-[10px] tracking-wider mb-0.5">
-                  Qué se mide:
-                </strong>
-                <span className="text-neutral-800">{currentExercise.metrics}</span>
+            )}
+
+            {challengeModalTab === 'book' && currentExercise.page ? (
+              <div className="flex-1 overflow-auto border-2 border-black bg-neutral-100 p-2 flex items-center justify-center min-h-[300px]">
+                {!imgError ? (
+                  <img
+                    src={`/extracted_pages/page_${String(currentExercise.page).padStart(2, '0')}.jpg`}
+                    alt={`Lámina Página ${currentExercise.page}`}
+                    onError={() => setImgError(true)}
+                    className="max-h-[60vh] object-contain border border-neutral-300 bg-white shadow-sm"
+                  />
+                ) : (
+                  <div className="p-4 text-center font-mono text-xs text-neutral-600">
+                    No se pudo cargar la imagen de la lámina original (Página {currentExercise.page}).
+                  </div>
+                )}
               </div>
-              <div className="pt-1.5 border-t border-neutral-300 grid grid-cols-2 gap-2 text-[10px]">
-                <div>
-                  <span className="text-neutral-500">Bloque:</span>{' '}
-                  <strong className="text-neutral-800">{currentExercise.block.split(':')[0]}</strong>
+            ) : (
+              <>
+                <div className="flex items-center justify-between gap-2 bg-neutral-50 p-2.5 border border-black font-mono text-xs">
+                  <span className="font-black bg-black text-white px-2 py-0.5 text-xs">
+                    {currentExercise.code}
+                  </span>
+                  <span className="font-bold border border-black px-1.5 py-0.5 bg-white uppercase text-[10px]">
+                    Dificultad: {currentExercise.difficulty}
+                  </span>
                 </div>
-                <div>
-                  <span className="text-neutral-500">Evaluación:</span>{' '}
-                  <strong className="text-neutral-800">
-                    {challenge.isSingleStrokeAutoEval ? 'Instantánea (auto)' : 'Manual'}
-                  </strong>
-                </div>
-              </div>
-            </div>
 
-            <div className="pt-2 border-t border-neutral-200 flex justify-end">
+                <div>
+                  <h4 className="font-display font-black text-base text-black mb-1">
+                    {currentExercise.title}
+                  </h4>
+                  <p className="text-xs text-neutral-700 font-sans leading-relaxed">
+                    {currentExercise.desc}
+                  </p>
+                </div>
+
+                <div className="bg-neutral-50 border border-black p-2.5 font-mono text-[11px] space-y-2">
+                  <div>
+                    <strong className="block text-black uppercase text-[10px] tracking-wider mb-0.5">
+                      Instrucción didáctica:
+                    </strong>
+                    <span className="text-neutral-800">{currentExercise.instruction}</span>
+                  </div>
+                  <div>
+                    <strong className="block text-black uppercase text-[10px] tracking-wider mb-0.5">
+                      Qué se mide:
+                    </strong>
+                    <span className="text-neutral-800">{currentExercise.metrics}</span>
+                  </div>
+                  <div className="pt-1.5 border-t border-neutral-300 grid grid-cols-2 gap-2 text-[10px]">
+                    <div>
+                      <span className="text-neutral-500">Bloque:</span>{' '}
+                      <strong className="text-neutral-800">{currentExercise.block.split(':')[0]}</strong>
+                    </div>
+                    <div>
+                      <span className="text-neutral-500">Evaluación:</span>{' '}
+                      <strong className="text-neutral-800">
+                        {challenge.isSingleStrokeAutoEval ? 'Instantánea (auto)' : 'Manual'}
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            <div className="pt-2 border-t border-neutral-200 flex items-center justify-between">
+              <span className="text-[11px] font-mono text-neutral-500 truncate max-w-[280px]">
+                {currentExercise.code} · {currentExercise.title}
+              </span>
               <button
                 onClick={() => setShowChallengeInfoModal(false)}
                 className="btn-ink px-4 py-1.5 text-xs font-mono font-bold uppercase cursor-pointer"
