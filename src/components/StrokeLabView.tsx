@@ -787,105 +787,110 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
       )}
 
       {/* ========================================================
-          PANEL DE CONTROL LATERAL IZQUIERDO (TODOS LOS BOTONES)
+          PANEL DE CONTROL LATERAL IZQUIERDO (COMPACTO PARA TABLET Y PC)
          ======================================================== */}
-      <aside className="w-full sm:w-[260px] md:w-[260px] lg:w-[280px] shrink-0 flex flex-col gap-2.5 order-2 md:order-1">
-        <div className="border-2 border-black bg-white p-3 shadow-[3px_3px_0px_#000000] flex flex-col gap-3">
+      <aside className="w-full sm:w-[260px] md:w-[260px] lg:w-[270px] shrink-0 flex flex-col gap-2 order-2 md:order-1">
+        <div className="border-2 border-black bg-white p-2.5 shadow-[3px_3px_0px_#000000] flex flex-col gap-2.5">
           {/* 1. Selección y Navegación de Reto */}
           <div>
-            <div className="flex items-center justify-between gap-1 mb-1.5">
+            <div className="flex items-center justify-between gap-1 mb-1">
               <span className="text-[10px] font-mono uppercase font-black text-neutral-500 tracking-wider">
                 Reto Activo
               </span>
-              {challenge.isSingleStrokeAutoEval && streak > 0 && (
-                <div className="flex items-center gap-1 bg-black text-white px-1.5 py-0.5 text-[10px] font-mono font-black">
-                  <Flame className="w-3 h-3 text-white stroke-[2.5]" />
-                  <span>Racha: {streak}</span>
-                </div>
-              )}
+              <div className="flex items-center gap-1">
+                {challenge.isSingleStrokeAutoEval && streak > 0 && (
+                  <div className="flex items-center gap-0.5 bg-black text-white px-1.5 py-0.2 text-[10px] font-mono font-black">
+                    <Flame className="w-3 h-3 text-white stroke-[2.5]" />
+                    <span>{streak}</span>
+                  </div>
+                )}
+                <button
+                  onClick={handleNewRandomChallenge}
+                  className="p-1 border border-black hover:bg-neutral-100 cursor-pointer shadow-[1px_1px_0px_#000000]"
+                  title="Generar nueva semilla aleatoria"
+                >
+                  <Dices className="w-3 h-3 text-black" />
+                </button>
+              </div>
             </div>
 
             {/* Botón para abrir el Catálogo completo */}
             <button
               onClick={() => setDrawerOpen(true)}
-              className="w-full btn-ink px-2.5 py-1.5 text-xs font-mono flex items-center justify-between cursor-pointer shadow-[2px_2px_0px_#000000] mb-1.5"
+              className="w-full btn-ink px-2 py-1 text-xs font-mono flex items-center justify-between cursor-pointer shadow-[2px_2px_0px_#000000] mb-1.5"
               title="Abrir catálogo completo de retos"
             >
               <div className="flex items-center gap-1.5 min-w-0">
                 <Menu className="w-3.5 h-3.5 shrink-0" />
-                <span className="font-bold truncate">{currentExercise.code}</span>
+                <span className="font-bold truncate">{currentExercise.code} · {currentExercise.title}</span>
               </div>
-              <ChevronDown className="w-3.5 h-3.5 shrink-0" />
+              <ChevronDown className="w-3 h-3 shrink-0" />
             </button>
 
-            <div className="text-xs font-display font-bold text-black leading-snug line-clamp-2 mb-2">
-              {challenge.title}
-            </div>
-
             {/* Navegación rápida Anterior / Siguiente */}
-            <div className="grid grid-cols-2 gap-1.5">
+            <div className="grid grid-cols-2 gap-1">
               <button
                 onClick={handlePrevExercise}
                 disabled={currentExerciseIndex === 0}
-                className="btn-ink-outline py-1 text-xs font-mono disabled:opacity-30 cursor-pointer flex items-center justify-center gap-1 shadow-[1px_1px_0px_#000000]"
+                className="btn-ink-outline py-1 text-[11px] font-mono disabled:opacity-30 cursor-pointer flex items-center justify-center gap-1 shadow-[1px_1px_0px_#000000]"
                 title="Reto Anterior"
               >
-                <ChevronLeft className="w-3.5 h-3.5" />
+                <ChevronLeft className="w-3 h-3" />
                 <span>Anterior</span>
               </button>
               <button
                 onClick={handleNextExercise}
                 disabled={currentExerciseIndex === ALL_LAB_EXERCISES.length - 1}
-                className="btn-ink-outline py-1 text-xs font-mono disabled:opacity-30 cursor-pointer flex items-center justify-center gap-1 shadow-[1px_1px_0px_#000000]"
+                className="btn-ink-outline py-1 text-[11px] font-mono disabled:opacity-30 cursor-pointer flex items-center justify-center gap-1 shadow-[1px_1px_0px_#000000]"
                 title="Reto Siguiente"
               >
                 <span>Siguiente</span>
-                <ChevronRight className="w-3.5 h-3.5" />
+                <ChevronRight className="w-3 h-3" />
               </button>
             </div>
           </div>
 
-          {/* 2. Fases Didácticas de Calistenia (1. Precisión, 2. Fluidez, 3. Velocidad) */}
+          {/* 2. Fases Didácticas en 1 sola fila horizontal */}
           {challenge.isSingleStrokeAutoEval && (
-            <div className="border-t-2 border-black pt-2.5">
-              <span className="text-[10px] font-mono uppercase font-black text-neutral-500 block mb-1.5 tracking-wider">
+            <div className="border-t border-black pt-2">
+              <span className="text-[10px] font-mono uppercase font-black text-neutral-500 block mb-1 tracking-wider">
                 Fase Cinemática
               </span>
-              <div className="flex flex-col gap-1">
+              <div className="grid grid-cols-3 gap-1">
                 <button
                   onClick={() => handlePhaseSelect(1)}
-                  className={`w-full px-2 py-1 text-xs font-mono font-bold border border-black cursor-pointer text-left flex items-center justify-between transition-colors ${
+                  className={`py-1 text-[11px] font-mono font-bold border border-black cursor-pointer text-center transition-colors ${
                     currentPhase === 1 ? 'bg-black text-white' : 'bg-white text-black hover:bg-neutral-100'
                   }`}
+                  title="Fase 1: Precisión a ritmo libre"
                 >
-                  <span>1. Precisión</span>
-                  <span className="text-[10px] font-normal opacity-80">Libre</span>
+                  1. Prec.
                 </button>
                 <button
                   onClick={() => handlePhaseSelect(2)}
-                  className={`w-full px-2 py-1 text-xs font-mono font-bold border border-black cursor-pointer text-left flex items-center justify-between transition-colors ${
+                  className={`py-1 text-[11px] font-mono font-bold border border-black cursor-pointer text-center transition-colors ${
                     currentPhase === 2 ? 'bg-black text-white' : 'bg-white text-black hover:bg-neutral-100'
                   }`}
+                  title="Fase 2: Fluidez continua"
                 >
-                  <span>2. Fluidez</span>
-                  <span className="text-[10px] font-normal opacity-80">Ritmo</span>
+                  2. Fluid.
                 </button>
                 <button
                   onClick={() => handlePhaseSelect(3)}
-                  className={`w-full px-2 py-1 text-xs font-mono font-bold border border-black cursor-pointer text-left flex items-center justify-between transition-colors ${
+                  className={`py-1 text-[11px] font-mono font-bold border border-black cursor-pointer text-center transition-colors ${
                     currentPhase === 3 ? 'bg-black text-white' : 'bg-white text-black hover:bg-neutral-100'
                   }`}
+                  title="Fase 3: Disparo veloz"
                 >
-                  <span>3. Velocidad</span>
-                  <span className="text-[10px] font-normal opacity-80">Rápido</span>
+                  3. Vel.
                 </button>
               </div>
             </div>
           )}
 
-          {/* 3. Herramientas de Dibujo y Trazos */}
-          <div className="border-t-2 border-black pt-2.5">
-            <div className="flex items-center justify-between mb-1.5">
+          {/* 3. Herramientas del Lienzo en 1 fila horizontal */}
+          <div className="border-t border-black pt-2">
+            <div className="flex items-center justify-between mb-1">
               <span className="text-[10px] font-mono uppercase font-black text-neutral-500 tracking-wider">
                 Lienzo
               </span>
@@ -894,123 +899,108 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-1.5 mb-1.5">
+            <div className="grid grid-cols-3 gap-1">
               <button
                 onClick={handleUndo}
                 disabled={strokes.length === 0}
-                className="btn-ink-outline py-1 text-xs font-mono disabled:opacity-30 cursor-pointer flex items-center justify-center gap-1 shadow-[1px_1px_0px_#000000]"
+                className="btn-ink-outline py-1 text-[11px] font-mono disabled:opacity-30 cursor-pointer flex items-center justify-center gap-0.5 shadow-[1px_1px_0px_#000000]"
                 title="Deshacer último trazo (Ctrl+Z)"
               >
-                <Undo2 className="w-3.5 h-3.5" />
+                <Undo2 className="w-3 h-3" />
                 <span>Deshacer</span>
               </button>
               <button
                 onClick={handleClear}
                 disabled={strokes.length === 0}
-                className="btn-ink-outline py-1 text-xs font-mono disabled:opacity-30 cursor-pointer flex items-center justify-center gap-1 shadow-[1px_1px_0px_#000000]"
+                className="btn-ink-outline py-1 text-[11px] font-mono disabled:opacity-30 cursor-pointer flex items-center justify-center gap-0.5 shadow-[1px_1px_0px_#000000]"
                 title="Borrar lienzo"
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                <Trash2 className="w-3 h-3" />
                 <span>Borrar</span>
               </button>
+              <button
+                onClick={() => setShowGuides(!showGuides)}
+                className={`btn-ink-outline py-1 text-[11px] font-mono cursor-pointer flex items-center justify-center gap-0.5 shadow-[1px_1px_0px_#000000] ${
+                  showGuides ? 'bg-neutral-100' : ''
+                }`}
+                title="Alternar Guías Fantasma"
+              >
+                {showGuides ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                <span>Guías</span>
+              </button>
             </div>
-
-            <button
-              onClick={() => setShowGuides(!showGuides)}
-              className={`w-full btn-ink-outline py-1 text-xs font-mono cursor-pointer flex items-center justify-center gap-1.5 shadow-[1px_1px_0px_#000000] ${
-                showGuides ? 'bg-neutral-100' : ''
-              }`}
-              title="Alternar Guías Fantasma"
-            >
-              {showGuides ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-              <span>{showGuides ? 'Ocultar Guías' : 'Mostrar Guías'}</span>
-            </button>
           </div>
 
-          {/* 4. Acciones Principales & Evaluación */}
-          <div className="border-t-2 border-black pt-2.5 flex flex-col gap-2">
-            <button
-              onClick={handleNewRandomChallenge}
-              className="w-full btn-ink-outline py-1.5 text-xs font-mono font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-[1px_1px_0px_#000000]"
-              title="Genera un nuevo reto con diferente ángulo o longitud"
-            >
-              <Dices className="w-3.5 h-3.5" />
-              <span>Nuevo Reto (Semilla)</span>
-            </button>
-
+          {/* 4. Evaluación & Acciones compactas */}
+          <div className="border-t border-black pt-2 flex flex-col gap-1.5">
             {/* Si hay evaluación activa */}
             {evaluation ? (
-              <div className="bg-neutral-50 border-2 border-black p-2.5 flex flex-col gap-2 shadow-[2px_2px_0px_#000000]">
-                <div className="flex items-center justify-between pb-1 border-b border-black">
-                  <span
-                    className={`text-xs font-mono px-1.5 py-0.2 font-black uppercase ${
-                      evaluation.phasePassed ? 'bg-black text-white' : 'bg-white text-black border border-black'
-                    }`}
-                  >
-                    {evaluation.phasePassed ? 'Superado ✓' : 'Ajustar'}
-                  </span>
-                  <span className="text-base font-mono font-black text-black">
-                    {evaluation.overallScore}%
-                  </span>
-                </div>
-
-                <div className="text-[11px] font-sans text-neutral-800 leading-tight">
-                  <strong className="block font-display text-xs mb-0.5">{evaluation.feedbackTitle}</strong>
-                  <span className="text-neutral-600 block line-clamp-2">
-                    {evaluation.directionWarning || evaluation.feedbackMessage}
-                  </span>
-                </div>
-
-                {evaluation.kinematics && (
-                  <div className="text-[10px] font-mono text-neutral-700 bg-white border border-neutral-300 px-1.5 py-0.5 font-bold">
-                    ⚡ {evaluation.kinematics.avgSpeedPxPerSec} px/s ({(evaluation.kinematics.durationMs / 1000).toFixed(2)}s)
-                  </div>
-                )}
-
-                {challenge.isSingleStrokeAutoEval ? (
-                  evaluation.phasePassed && currentPhase < 3 ? (
-                    <button
-                      onClick={() => handlePhaseSelect((currentPhase + 1) as 1 | 2 | 3)}
-                      className="w-full btn-ink py-1.5 text-xs font-mono font-bold uppercase flex items-center justify-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
+              <div className="flex flex-col gap-1.5">
+                {/* Veredicto, Nota y Telemetría en 1 sola línea */}
+                <div className="flex items-center justify-between bg-neutral-100 border border-black px-2 py-1 font-mono text-xs">
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className={`text-[10px] font-mono px-1 py-0.2 font-black uppercase ${
+                        evaluation.phasePassed ? 'bg-black text-white' : 'bg-white text-black border border-black'
+                      }`}
                     >
-                      <span>Fase {currentPhase + 1}</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
+                      {evaluation.phasePassed ? 'Superado ✓' : 'Ajustar'}
+                    </span>
+                    <span className="font-mono font-black text-xs">{evaluation.overallScore}%</span>
+                  </div>
+                  {evaluation.kinematics && (
+                    <span className="text-[10px] font-mono text-neutral-600 font-bold">
+                      {(evaluation.kinematics.durationMs / 1000).toFixed(2)}s · {evaluation.kinematics.avgSpeedPxPerSec}px/s
+                    </span>
+                  )}
+                </div>
+
+                {/* Botones de acción post-evaluación en 1 sola fila */}
+                <div className="flex items-center gap-1">
+                  {challenge.isSingleStrokeAutoEval ? (
+                    evaluation.phasePassed && currentPhase < 3 ? (
+                      <button
+                        onClick={() => handlePhaseSelect((currentPhase + 1) as 1 | 2 | 3)}
+                        className="flex-1 btn-ink py-1 text-xs font-mono font-bold uppercase flex items-center justify-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000000]"
+                      >
+                        <span>Fase {currentPhase + 1}</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleNewRandomChallenge}
+                        className="flex-1 btn-ink py-1 text-xs font-mono font-bold uppercase flex items-center justify-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000000]"
+                      >
+                        <span>{evaluation.phasePassed && currentPhase === 3 ? '¡Dominado!' : 'Siguiente'}</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </button>
+                    )
                   ) : (
                     <button
                       onClick={handleNewRandomChallenge}
-                      className="w-full btn-ink py-1.5 text-xs font-mono font-bold uppercase flex items-center justify-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
+                      className="flex-1 btn-ink py-1 text-xs font-mono font-bold uppercase flex items-center justify-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000000]"
                     >
-                      <span>{evaluation.phasePassed && currentPhase === 3 ? '¡Dominado! Siguiente' : 'Siguiente (Espacio)'}</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
+                      <span>Siguiente</span>
+                      <ArrowRight className="w-3 h-3" />
                     </button>
-                  )
-                ) : null}
+                  )}
 
-                <div className="grid grid-cols-2 gap-1.5">
                   <button
                     onClick={handleRetryCurrent}
-                    className="btn-ink-outline py-1 text-xs font-mono font-bold flex items-center justify-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000000]"
+                    className="btn-ink-outline p-1 text-xs font-mono font-bold flex items-center justify-center cursor-pointer shadow-[1px_1px_0px_#000000]"
                     title="Reintentar este mismo reto (R)"
                   >
-                    <RotateCcw className="w-3 h-3" />
-                    <span>Reintentar</span>
+                    <RotateCcw className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={handleCopyDebugReport}
-                    className="btn-ink-outline py-1 text-xs font-mono font-bold flex items-center justify-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000000]"
-                    title="Copiar informe de depuración"
+                    className="btn-ink-outline p-1 text-xs font-mono font-bold flex items-center justify-center cursor-pointer shadow-[1px_1px_0px_#000000]"
+                    title="Copiar informe técnico"
                   >
                     {copiedDebug ? (
-                      <>
-                        <Check className="w-3 h-3 text-black stroke-[3]" />
-                        <span>Copiado</span>
-                      </>
+                      <Check className="w-3.5 h-3.5 text-black stroke-[3]" />
                     ) : (
-                      <>
-                        <AlertTriangle className="w-3 h-3 text-black stroke-[2.5]" />
-                        <span>Depurar</span>
-                      </>
+                      <AlertTriangle className="w-3.5 h-3.5 text-black stroke-[2.5]" />
                     )}
                   </button>
                 </div>
@@ -1020,21 +1010,21 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
                 <button
                   onClick={handleEvaluate}
                   disabled={strokes.length === 0}
-                  className="w-full btn-ink py-2 text-xs font-mono font-bold uppercase disabled:opacity-30 cursor-pointer flex items-center justify-center gap-1.5 shadow-[2px_2px_0px_#000000]"
+                  className="w-full btn-ink py-1.5 text-xs font-mono font-bold uppercase disabled:opacity-30 cursor-pointer flex items-center justify-center gap-1 shadow-[2px_2px_0px_#000000]"
                 >
-                  <CheckCircle2 className="w-4 h-4" />
+                  <CheckCircle2 className="w-3.5 h-3.5" />
                   <span>Evaluar Trazos</span>
                 </button>
               )
             )}
 
-            {/* Botón Ver Lámina Original */}
+            {/* Botón Ver Lámina Original / Guía Teórica */}
             <button
               onClick={() => setShowBookModal(true)}
-              className="w-full btn-ink-outline py-1 text-[11px] font-mono font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-[1px_1px_0px_#000000] text-neutral-700 hover:text-black mt-1"
+              className="w-full btn-ink-outline py-1 text-[11px] font-mono font-bold flex items-center justify-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000000] text-neutral-700 hover:text-black"
             >
               <BookOpen className="w-3.5 h-3.5" />
-              <span>{currentExercise.page ? `Lámina P.${currentExercise.page}` : 'Ver Guía Teórica'}</span>
+              <span>{currentExercise.page ? `Lámina Original (P.${currentExercise.page})` : 'Guía Teórica'}</span>
             </button>
           </div>
         </div>
