@@ -9,7 +9,6 @@ import {
 } from '../lib/strokeTypes';
 import { generateStrokeChallenge } from '../lib/strokeProceduralGenerator';
 import { evaluateStrokeSubmission, buildStrokeDebugReport } from '../lib/strokeEvaluator';
-import { getUserSpeedProfile, getBiomechanicalComparison } from '../lib/strokeKinematics';
 import {
   Dices,
   Eye,
@@ -21,15 +20,14 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Layers,
   Flame,
-  Info,
   RotateCcw,
   AlertTriangle,
   Check,
   ArrowRight,
-  Activity,
-  Gauge,
+  Menu,
 } from 'lucide-react';
 
 interface StrokeLabViewProps {
@@ -87,6 +85,7 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
   const [showGuides, setShowGuides] = useState<boolean>(true);
   const [evaluation, setEvaluation] = useState<StrokeEvaluation | null>(null);
   const [showBookModal, setShowBookModal] = useState<boolean>(false);
+  const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
   const [imgError, setImgError] = useState<boolean>(false);
 
   // Calistenia dinámica: Racha de aciertos y estado de copia de reporte
@@ -651,34 +650,43 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
 
   return (
     <div className="w-full flex-1 flex flex-col justify-start items-center bg-neutral-50 px-2 sm:px-4 py-2 sm:py-3 min-h-[calc(100vh-64px)]">
-      {/* Contenedor en 3 columnas: Lateral Izquierdo (Selector) | Centro (Canvas) | Lateral Derecho (Telemetría) */}
-      <div className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)_300px] xl:grid-cols-[300px_minmax(0,1fr)_320px] gap-3 items-start">
-        
-        {/* ========================================================
-            COLUMNA LATERAL IZQUIERDA: SELECTOR Y NAVEGADOR
-           ======================================================== */}
-        <aside className="w-full flex flex-col gap-2.5 order-2 lg:order-1">
-          {/* Tarjeta de Control y Navegación de Ejercicios */}
-          <div className="border-2 border-black bg-white p-3 shadow-[3px_3px_0px_#000000]">
-            <div className="flex items-center justify-between pb-2 mb-2 border-b-2 border-black">
-              <span className="text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5">
-                <Layers className="w-4 h-4 stroke-[2.5]" />
-                <span>Plan de Trazos ({ALL_LAB_EXERCISES.length})</span>
-              </span>
-              <span className="text-[10px] font-mono bg-black text-white px-1.5 py-0.5 font-bold">
-                {currentExercise.code}
-              </span>
+      {/* Drawer Colapsable de Selección de Ejercicios */}
+      {drawerOpen && (
+        <div className="fixed inset-0 z-50 flex">
+          {/* Backdrop con desenfoque suave */}
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
+            onClick={() => setDrawerOpen(false)}
+          />
+
+          {/* Panel deslizante lateral */}
+          <div className="relative z-10 w-full max-w-sm sm:max-w-md bg-white border-r-4 border-black h-full flex flex-col shadow-[8px_0px_0px_#000000] p-4 overflow-y-auto animate-in slide-in-from-left duration-200">
+            {/* Cabecera del Drawer */}
+            <div className="flex items-center justify-between pb-3 border-b-2 border-black mb-3">
+              <div className="flex items-center gap-2">
+                <Layers className="w-5 h-5 stroke-[2.5]" />
+                <h2 className="font-display font-black text-sm uppercase tracking-wide">
+                  Plan de Trazos ({ALL_LAB_EXERCISES.length})
+                </h2>
+              </div>
+              <button
+                onClick={() => setDrawerOpen(false)}
+                className="p-1 border-2 border-black hover:bg-neutral-100 cursor-pointer text-black"
+                title="Cerrar panel"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
             {/* 1. Selector de Bloque */}
-            <div className="mb-2">
+            <div className="mb-3">
               <label className="text-[10px] font-mono uppercase font-bold text-neutral-600 block mb-1">
                 Filtrar por Bloque:
               </label>
               <select
                 value={selectedBlock}
                 onChange={(e) => handleBlockChange(e.target.value)}
-                className="w-full border-2 border-black px-2 py-1 text-xs font-mono font-bold bg-white shadow-[2px_2px_0px_#000000] cursor-pointer"
+                className="w-full border-2 border-black px-2 py-1.5 text-xs font-mono font-bold bg-white shadow-[2px_2px_0px_#000000] cursor-pointer"
               >
                 {BLOCKS_LIST.map((b) => (
                   <option key={b} value={b}>
@@ -689,18 +697,21 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
             </div>
 
             {/* 2. Selector Desplegable de Ejercicios */}
-            <div className="mb-2.5">
-              <label className="text-[10px] font-mono uppercase font-bold text-neutral-600 block mb-1 flex justify-between">
-                <span>Ejercicio:</span>
-                <span className="text-neutral-500 font-bold">{filteredExercises.length} retos</span>
+            <div className="mb-3">
+              <label className="text-[10px] font-mono uppercase font-bold text-neutral-600 mb-1 flex justify-between">
+                <span>Ejercicio ({filteredExercises.length} retos):</span>
+                <span className="font-mono font-black text-black">{currentExercise.code}</span>
               </label>
               <select
                 value={currentExercise.code}
                 onChange={(e) => {
                   const ex = ALL_LAB_EXERCISES.find((item) => item.code === e.target.value);
-                  if (ex) handleSelectExercise(ex);
+                  if (ex) {
+                    handleSelectExercise(ex);
+                    setDrawerOpen(false);
+                  }
                 }}
-                className="w-full border-2 border-black px-2 py-1 text-xs font-mono font-bold bg-white shadow-[2px_2px_0px_#000000] cursor-pointer truncate"
+                className="w-full border-2 border-black px-2 py-1.5 text-xs font-mono font-bold bg-white shadow-[2px_2px_0px_#000000] cursor-pointer truncate"
               >
                 {filteredExercises.map((ex) => (
                   <option key={ex.code} value={ex.code}>
@@ -712,32 +723,35 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
               </select>
             </div>
 
-            {/* 3. Botones Anterior / Siguiente para navegar rápido */}
-            <div className="flex items-center gap-1.5 mb-3">
+            {/* 3. Navegación Anterior / Siguiente */}
+            <div className="flex items-center gap-2 mb-3">
               <button
                 onClick={handlePrevExercise}
                 disabled={currentExerciseIndex === 0}
-                className="btn-ink-outline flex-1 py-1 text-xs font-mono flex items-center justify-center gap-1 disabled:opacity-30 cursor-pointer"
+                className="btn-ink-outline flex-1 py-1.5 text-xs font-mono flex items-center justify-center gap-1 disabled:opacity-30 cursor-pointer shadow-[1px_1px_0px_#000000]"
                 title="Ejercicio Anterior"
               >
-                <ChevronLeft className="w-3.5 h-3.5" />
+                <ChevronLeft className="w-4 h-4" />
                 <span>Anterior</span>
               </button>
               <button
                 onClick={handleNextExercise}
                 disabled={currentExerciseIndex === ALL_LAB_EXERCISES.length - 1}
-                className="btn-ink-outline flex-1 py-1 text-xs font-mono flex items-center justify-center gap-1 disabled:opacity-30 cursor-pointer"
+                className="btn-ink-outline flex-1 py-1.5 text-xs font-mono flex items-center justify-center gap-1 disabled:opacity-30 cursor-pointer shadow-[1px_1px_0px_#000000]"
                 title="Ejercicio Siguiente"
               >
                 <span>Siguiente</span>
-                <ChevronRight className="w-3.5 h-3.5" />
+                <ChevronRight className="w-4 h-4" />
               </button>
             </div>
 
-            {/* 4. Botón Ver Lámina Original / Guía del Ejercicio */}
+            {/* 4. Ver Lámina Original / Guía */}
             <button
-              onClick={() => setShowBookModal(true)}
-              className="btn-ink-outline w-full py-1.5 text-xs font-mono font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
+              onClick={() => {
+                setShowBookModal(true);
+                setDrawerOpen(false);
+              }}
+              className="btn-ink-outline w-full py-2 text-xs font-mono font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] mb-4"
             >
               <BookOpen className="w-4 h-4 text-black" />
               <span>
@@ -746,573 +760,278 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
                   : `Guía Biomecánica (${currentExercise.code})`}
               </span>
             </button>
-          </div>
 
-          {/* Ficha Descriptiva del Ejercicio Activo */}
-          <div className="border-2 border-black bg-white p-3 shadow-[2px_2px_0px_#000000] text-xs">
-            <div className="flex items-center justify-between gap-1 mb-1">
-              <span className="font-mono font-bold bg-black text-white px-1.5 py-0.5 text-[10px]">
-                {currentExercise.code}
-              </span>
-              <span className="text-[10px] font-mono border border-black px-1.5 py-0.2 font-bold uppercase">
-                Dificultad: {currentExercise.difficulty}
-              </span>
-            </div>
-            <h3 className="font-display font-bold text-sm text-black leading-tight mt-1 mb-1">
-              {currentExercise.title}
-            </h3>
-            <p className="text-[11px] text-neutral-600 font-sans leading-relaxed mb-2">
-              {currentExercise.desc}
-            </p>
-            <div className="bg-neutral-100 border border-neutral-300 p-2 font-mono text-[10px] text-neutral-800">
-              <strong className="block text-black uppercase mb-0.5">Qué se mide:</strong>
-              {currentExercise.metrics}
-            </div>
-          </div>
-        </aside>
-
-        {/* ========================================================
-            COLUMNA CENTRAL: ZONA DE DIBUJO (IDÉNTICA A PRÁCTICA)
-           ======================================================== */}
-        <main className="w-full flex flex-col items-center select-none justify-self-center order-1 lg:order-2">
-          <div
-            className="w-full flex flex-col items-center"
-            style={{
-              width: 'min(100%, 600px, max(280px, calc((100vh - 310px) * 600 / 540)))',
-            }}
-          >
-            {/* Barra superior de info compacta sobre el Canvas */}
-            <div className="w-full flex items-center justify-between gap-2 mb-2 border-b-2 border-black pb-2 flex-nowrap">
-              <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                <span className="font-mono font-bold bg-black text-white px-2 py-0.5 text-xs shrink-0">
-                  {currentExercise.page ? `P.${currentExercise.page}` : currentExercise.code}
+            {/* Ficha Descriptiva del Ejercicio (dentro del drawer para no distraer en el lienzo) */}
+            <div className="border-2 border-black bg-neutral-50 p-3 shadow-[2px_2px_0px_#000000] text-xs mt-auto">
+              <div className="flex items-center justify-between gap-1 mb-1.5 pb-1 border-b border-black">
+                <span className="font-mono font-bold bg-black text-white px-1.5 py-0.5 text-[10px]">
+                  {currentExercise.code}
                 </span>
-                <span className="font-display font-bold text-xs truncate">
-                  {challenge.title}
+                <span className="text-[10px] font-mono border border-black px-1.5 py-0.2 font-bold uppercase bg-white">
+                  Dificultad: {currentExercise.difficulty}
                 </span>
               </div>
-
-              {/* Racha en Calistenia Rápida (Monocromático Estricto) */}
-              {challenge.isSingleStrokeAutoEval && streak > 0 && (
-                <div className="flex items-center gap-1 bg-black text-white px-2 py-0.5 text-xs font-mono font-black shrink-0">
-                  <Flame className="w-3.5 h-3.5 text-white stroke-[2.5]" />
-                  <span>Racha: {streak}</span>
-                </div>
-              )}
-
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  onClick={handleNewRandomChallenge}
-                  className="btn-ink px-2.5 py-1 text-xs font-mono flex items-center gap-1 cursor-pointer shrink-0 shadow-[2px_2px_0px_#000000]"
-                  title="Genera un reto con nuevo ángulo, longitud y medidas para romper el patrón muscular"
-                >
-                  <Dices className="w-3.5 h-3.5" />
-                  <span>Nuevo Reto</span>
-                </button>
+              <h3 className="font-display font-bold text-sm text-black leading-tight mb-1">
+                {currentExercise.title}
+              </h3>
+              <p className="text-[11px] text-neutral-600 font-sans leading-relaxed mb-2">
+                {currentExercise.desc}
+              </p>
+              <div className="bg-white border border-neutral-300 p-2 font-mono text-[10px] text-neutral-800">
+                <strong className="block text-black uppercase mb-0.5">Qué se mide:</strong>
+                {currentExercise.metrics}
               </div>
             </div>
+          </div>
+        </div>
+      )}
 
-            {/* Selector de 3 Fases Cinemáticas (1. Precisión -> 2. Fluidez -> 3. Velocidad) */}
-            {challenge.isSingleStrokeAutoEval && (
-              <div className="w-full mb-2 p-1 border-2 border-black bg-white flex items-center justify-between gap-1 shadow-[2px_2px_0px_#000000]">
-                <div className="flex items-center gap-1 min-w-0">
-                  <span className="text-[10px] font-mono uppercase font-black text-neutral-500 px-1 shrink-0">
-                    Fases:
-                  </span>
-                  <button
-                    onClick={() => handlePhaseSelect(1)}
-                    className={`px-2 py-0.5 text-xs font-mono font-bold border border-black cursor-pointer transition-colors ${
-                      currentPhase === 1
-                        ? 'bg-black text-white'
-                        : 'bg-white text-black hover:bg-neutral-100'
-                    }`}
-                    title="Fase 1: Puntería en ① y ② a ritmo libre y calmado"
-                  >
-                    1. Precisión
-                  </button>
-                  <button
-                    onClick={() => handlePhaseSelect(2)}
-                    className={`px-2 py-0.5 text-xs font-mono font-bold border border-black cursor-pointer transition-colors ${
-                      currentPhase === 2
-                        ? 'bg-black text-white'
-                        : 'bg-white text-black hover:bg-neutral-100'
-                    }`}
-                    title="Fase 2: Ritmo constante y fluido sin micro-paradas ni titubeos"
-                  >
-                    2. Fluidez
-                  </button>
-                  <button
-                    onClick={() => handlePhaseSelect(3)}
-                    className={`px-2 py-0.5 text-xs font-mono font-bold border border-black cursor-pointer transition-colors ${
-                      currentPhase === 3
-                        ? 'bg-black text-white'
-                        : 'bg-white text-black hover:bg-neutral-100'
-                    }`}
-                    title="Fase 3: Disparo balístico veloz y decidido"
-                  >
-                    3. Velocidad
-                  </button>
-                </div>
+      {/* ÁREA PRINCIPAL CENTRADA: CANVAS EXPANSIVO */}
+      <div
+        className="w-full flex flex-col items-center mx-auto"
+        style={{
+          width: 'min(100%, 780px, max(320px, calc((100vh - 165px) * 600 / 540)))',
+        }}
+      >
+        {/* BARRA SUPERIOR: SELECTOR RÁPIDO, FASES COMPACTAS, RACHA Y NUEVO */}
+        <div className="w-full flex items-center justify-between gap-1 sm:gap-2 mb-2 border-b-2 border-black pb-1.5 flex-nowrap">
+          {/* Lado Izquierdo: Botón Desplegable del Reto + Flechas Rápidas */}
+          <div className="flex items-center gap-1 min-w-0">
+            <button
+              onClick={() => setDrawerOpen(true)}
+              className="btn-ink px-2 sm:px-2.5 py-1 text-xs font-mono flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] shrink-0"
+              title="Abrir catálogo y selección de retos"
+            >
+              <Menu className="w-3.5 h-3.5" />
+              <span className="font-bold">{currentExercise.code}</span>
+              <ChevronDown className="w-3 h-3" />
+            </button>
 
-                <div className="text-[10px] font-mono text-neutral-600 font-bold hidden sm:block pr-1 truncate">
-                  {currentPhase === 1 && '🎯 Puntería exacta (ritmo libre)'}
-                  {currentPhase === 2 && '〰️ Trazo continuo sin titubear'}
-                  {currentPhase === 3 && '⚡ Golpe balístico veloz'}
-                </div>
+            <button
+              onClick={handlePrevExercise}
+              disabled={currentExerciseIndex === 0}
+              className="btn-ink-outline p-1 text-xs font-mono disabled:opacity-30 cursor-pointer shadow-[1px_1px_0px_#000000] shrink-0"
+              title="Reto Anterior"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={handleNextExercise}
+              disabled={currentExerciseIndex === ALL_LAB_EXERCISES.length - 1}
+              className="btn-ink-outline p-1 text-xs font-mono disabled:opacity-30 cursor-pointer shadow-[1px_1px_0px_#000000] shrink-0"
+              title="Reto Siguiente"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+
+            <span className="font-display font-bold text-xs truncate hidden md:inline ml-1 text-black">
+              {challenge.title}
+            </span>
+          </div>
+
+          {/* Centro: Fases Cinemáticas Compactas [1] [2] [3] para Calistenia */}
+          {challenge.isSingleStrokeAutoEval && (
+            <div className="flex items-center border-2 border-black bg-white shadow-[2px_2px_0px_#000000] shrink-0">
+              <button
+                onClick={() => handlePhaseSelect(1)}
+                className={`px-2 py-0.5 text-xs font-mono font-bold cursor-pointer transition-colors ${
+                  currentPhase === 1 ? 'bg-black text-white' : 'bg-white text-black hover:bg-neutral-100'
+                }`}
+                title="Fase 1: Precisión y puntería a ritmo libre"
+              >
+                <span className="hidden sm:inline">1. Precisión</span>
+                <span className="sm:hidden">1</span>
+              </button>
+              <button
+                onClick={() => handlePhaseSelect(2)}
+                className={`px-2 py-0.5 text-xs font-mono font-bold border-l border-r border-black cursor-pointer transition-colors ${
+                  currentPhase === 2 ? 'bg-black text-white' : 'bg-white text-black hover:bg-neutral-100'
+                }`}
+                title="Fase 2: Fluidez constante sin titubear"
+              >
+                <span className="hidden sm:inline">2. Fluidez</span>
+                <span className="sm:hidden">2</span>
+              </button>
+              <button
+                onClick={() => handlePhaseSelect(3)}
+                className={`px-2 py-0.5 text-xs font-mono font-bold cursor-pointer transition-colors ${
+                  currentPhase === 3 ? 'bg-black text-white' : 'bg-white text-black hover:bg-neutral-100'
+                }`}
+                title="Fase 3: Disparo balístico veloz"
+              >
+                <span className="hidden sm:inline">3. Velocidad</span>
+                <span className="sm:hidden">3</span>
+              </button>
+            </div>
+          )}
+
+          {/* Lado Derecho: Racha y Botón Nuevo Reto */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {challenge.isSingleStrokeAutoEval && streak > 0 && (
+              <div className="flex items-center gap-1 bg-black text-white px-2 py-0.5 text-xs font-mono font-black shrink-0">
+                <Flame className="w-3.5 h-3.5 text-white stroke-[2.5]" />
+                <span className="hidden xs:inline">Racha: </span>
+                <span>{streak}</span>
               </div>
             )}
-
-            {/* Banner de Instrucción del Nivel */}
-            <div className="w-full mb-2 px-3 py-1.5 border border-black bg-neutral-50 flex items-center justify-between text-xs">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <Info className="w-3.5 h-3.5 text-black shrink-0" />
-                <span className="font-sans text-[11px] text-neutral-800 truncate">
-                  {challenge.instruction}
-                </span>
-              </div>
-            </div>
-
-            {/* Contenedor del Lienzo: Proporción 600x540 exacta */}
-            <div
-              data-canvas-zone="true"
-              className="relative border-4 border-black bg-white shadow-[4px_4px_0px_#000000] w-full aspect-[600/540] overflow-hidden"
+            <button
+              onClick={handleNewRandomChallenge}
+              className="btn-ink px-2 sm:px-2.5 py-1 text-xs font-mono flex items-center gap-1 cursor-pointer shrink-0 shadow-[2px_2px_0px_#000000]"
+              title="Genera un nuevo reto con diferente inclinación o longitud"
             >
-              <canvas
-                ref={canvasRef}
-                width={600}
-                height={540}
-                className="touch-none cursor-crosshair block w-full h-full"
-                onPointerDown={handlePointerDown}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUp}
-                onPointerCancel={handlePointerUp}
-              />
-
-              {/* Insignia de Semilla Procedural */}
-              <div className="absolute top-2.5 left-2 text-[10px] font-mono uppercase bg-white border border-black px-1.5 py-0.5 pointer-events-none shadow-[1px_1px_0px_#000000] z-10">
-                SEMILLA #{challenge.seed}
-              </div>
-
-              {/* Insignia de Parámetros Dinámicos */}
-              <div className="absolute top-2.5 right-2 text-[10px] font-mono bg-white border border-black px-1.5 py-0.5 pointer-events-none shadow-[1px_1px_0px_#000000] z-10 hidden sm:block">
-                {challenge.subtitle}
-              </div>
-
-              {/* Cartel Flotante de Corrección Inmediata para Trazo Único (Estricto B&W Manga) */}
-              {challenge.isSingleStrokeAutoEval && evaluation && (
-                <div className="absolute bottom-2.5 left-2.5 right-2.5 bg-white border-2 border-black p-2.5 shadow-[4px_4px_0px_#000000] flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 z-20 animate-in fade-in">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span
-                      className={`text-sm font-mono font-black border-2 border-black px-2 py-0.5 shrink-0 ${
-                        evaluation.phasePassed ? 'bg-black text-white' : 'bg-neutral-100 text-black'
-                      }`}
-                    >
-                      {evaluation.overallScore}%
-                    </span>
-                    <div className="text-[11px] font-mono leading-tight min-w-0">
-                      <div className="flex items-center gap-1.5 font-bold text-black truncate">
-                        <span>{evaluation.feedbackTitle}</span>
-                        {evaluation.kinematics && (
-                          <span className="text-[10px] text-neutral-600 font-normal">
-                            · {evaluation.kinematics.avgSpeedPxPerSec} px/s ({(evaluation.kinematics.durationMs / 1000).toFixed(2)}s)
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-neutral-600 truncate block max-w-[260px] sm:max-w-md">
-                        {evaluation.directionWarning || evaluation.feedbackMessage}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 shrink-0 ml-auto">
-                    {/* Botón de reporte/depuración idéntico al del Cubo */}
-                    <button
-                      onClick={handleCopyDebugReport}
-                      className="btn-ink-outline px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 cursor-pointer transition-transform active:scale-95 shadow-[1px_1px_0px_#000000]"
-                      title="Copiar informe técnico para revisión de nota o depuración"
-                    >
-                      {copiedDebug ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 text-black stroke-[3]" />
-                          <span className="text-[10px]">¡Copiado!</span>
-                        </>
-                      ) : (
-                        <>
-                          <AlertTriangle className="w-3.5 h-3.5 text-black stroke-[2.5]" />
-                          <span className="text-[10px] hidden xs:inline">Depurar</span>
-                        </>
-                      )}
-                    </button>
-
-                    {/* Botón Reintentar el mismo reto */}
-                    <button
-                      onClick={handleRetryCurrent}
-                      className="btn-ink-outline px-2.5 py-1 text-xs font-mono font-bold flex items-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000000]"
-                      title="Reintentar este mismo reto (R)"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span className="hidden xs:inline">Reintentar</span>
-                    </button>
-
-                    {/* Botón Siguiente / Avanzar de Fase */}
-                    {evaluation.phasePassed && currentPhase < 3 ? (
-                      <button
-                        onClick={() => handlePhaseSelect((currentPhase + 1) as 1 | 2 | 3)}
-                        className="btn-ink px-3 py-1 text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
-                        title={`Avanzar a Fase ${currentPhase + 1} (Espacio / Enter)`}
-                      >
-                        <span>Fase {currentPhase + 1}</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
-                    ) : (
-                      <button
-                        onClick={handleNewRandomChallenge}
-                        className="btn-ink px-3 py-1 text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
-                        title="Generar siguiente reto procedural (Espacio / Enter)"
-                      >
-                        <span>{evaluation.phasePassed && currentPhase === 3 ? '¡Dominado! Siguiente' : 'Siguiente'}</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* BARRA DE HERRAMIENTAS Y ACCIONES INFERIOR (EN 1 SOLA LÍNEA, ESTILO PAPLITZ) */}
-            <div className="w-full mt-2 flex items-center justify-between gap-1.5 sm:gap-2 border-2 border-black bg-white p-2 shadow-[3px_3px_0px_#000000] flex-nowrap min-w-0">
-              <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-                <button
-                  onClick={handleUndo}
-                  disabled={strokes.length === 0}
-                  className="btn-ink-outline px-2 py-1 text-xs font-mono disabled:opacity-30 cursor-pointer flex items-center gap-1 shrink-0 shadow-[1px_1px_0px_#000000]"
-                  title="Deshacer último trazo"
-                >
-                  <Undo2 className="w-3.5 h-3.5" />
-                  <span className="hidden md:inline">Deshacer</span>
-                </button>
-                <button
-                  onClick={handleClear}
-                  disabled={strokes.length === 0}
-                  className="btn-ink-outline px-2 py-1 text-xs font-mono disabled:opacity-30 cursor-pointer flex items-center gap-1 shrink-0 shadow-[1px_1px_0px_#000000]"
-                  title="Borrar lienzo"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span className="hidden md:inline">Borrar</span>
-                </button>
-                <button
-                  onClick={() => setShowGuides(!showGuides)}
-                  className={`btn-ink-outline px-2 py-1 text-xs font-mono cursor-pointer flex items-center gap-1 shrink-0 shadow-[1px_1px_0px_#000000] ${
-                    showGuides ? 'bg-neutral-100' : ''
-                  }`}
-                  title="Alternar Guías Fantasma"
-                >
-                  {showGuides ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                  <span className="hidden sm:inline">Guías</span>
-                </button>
-                <span className="text-[11px] font-mono text-neutral-600 pl-0.5 font-bold shrink-0">
-                  {strokes.length}/{challenge.minRequiredStrokes} trazos
-                  {challenge.minRequiredStrokes > 1 && strokes.length < challenge.minRequiredStrokes && (
-                    <span className="text-neutral-500 font-normal ml-1 hidden xs:inline">
-                      (falta {challenge.minRequiredStrokes - strokes.length})
-                    </span>
-                  )}
-                </span>
-              </div>
-
-              {/* Botón Principal de Validación o Siguiente Intento */}
-              {challenge.isSingleStrokeAutoEval ? (
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {evaluation && (
-                    <button
-                      onClick={handleCopyDebugReport}
-                      className="btn-ink-outline p-1.5 text-xs font-mono font-bold flex items-center gap-1 cursor-pointer transition-transform active:scale-95 shadow-[1px_1px_0px_#000000] shrink-0"
-                      title="Copiar reporte técnico de depuración"
-                    >
-                      {copiedDebug ? (
-                        <Check className="w-3.5 h-3.5 text-black stroke-[3]" />
-                      ) : (
-                        <AlertTriangle className="w-3.5 h-3.5 text-black stroke-[2.5]" />
-                      )}
-                    </button>
-                  )}
-                  {evaluation ? (
-                    evaluation.phasePassed && currentPhase < 3 ? (
-                      <button
-                        onClick={() => handlePhaseSelect((currentPhase + 1) as 1 | 2 | 3)}
-                        className="btn-ink px-3 sm:px-4 py-1 text-xs font-mono font-bold uppercase tracking-wider cursor-pointer flex items-center gap-1.5 shrink-0 shadow-[2px_2px_0px_#000000]"
-                        title={`Avanzar a Fase ${currentPhase + 1} (Espacio / Enter)`}
-                      >
-                        <span>Fase {currentPhase + 1}</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
-                    ) : (
-                      <button
-                        onClick={handleNewRandomChallenge}
-                        className="btn-ink px-3 sm:px-4 py-1 text-xs font-mono font-bold uppercase tracking-wider cursor-pointer flex items-center gap-1.5 shrink-0 shadow-[2px_2px_0px_#000000]"
-                        title="Siguiente reto procedural (Espacio / Enter)"
-                      >
-                        <span>{evaluation.phasePassed && currentPhase === 3 ? '¡Dominado! Siguiente' : 'Siguiente (Espacio)'}</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
-                    )
-                  ) : (
-                    <button
-                      onClick={handleNewRandomChallenge}
-                      className="btn-ink px-3 sm:px-4 py-1 text-xs font-mono font-bold uppercase tracking-wider cursor-pointer flex items-center gap-1.5 shrink-0 shadow-[2px_2px_0px_#000000]"
-                      title="Nuevo reto aleatorio"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span>Nuevo Reto</span>
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <button
-                  onClick={handleEvaluate}
-                  disabled={strokes.length === 0}
-                  className="btn-ink px-3 sm:px-4 py-1 text-xs font-mono font-bold uppercase tracking-wider disabled:opacity-30 cursor-pointer flex items-center gap-1.5 shrink-0 shadow-[2px_2px_0px_#000000]"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Evaluar</span>
-                </button>
-              )}
-            </div>
+              <Dices className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Nuevo Reto</span>
+            </button>
           </div>
-        </main>
+        </div>
 
-        {/* ========================================================
-            COLUMNA LATERAL DERECHA: TELEMETRÍA Y RESULTADOS MATEMÁTICOS
-           ======================================================== */}
-        <aside className="w-full flex flex-col gap-2.5 order-3">
-          {evaluation ? (
-            <div className="border-2 border-black bg-white p-3 shadow-[3px_3px_0px_#000000] flex flex-col gap-3">
-              <div className="flex items-center justify-between pb-2 border-b-2 border-black">
-                <span className="text-xs font-mono font-bold uppercase tracking-wider">
-                  Diagnóstico Físico
-                </span>
-                <span
-                  className={`text-xl font-mono font-black border-2 border-black px-2 py-0.5 ${
-                    evaluation.passed ? 'bg-black text-white' : 'bg-neutral-100 text-black'
+        {/* LIENZO DE DIBUJO LIMPIO: ASPECT 600/540 SIN INSIGNIAS MOLESTAS */}
+        <div
+          data-canvas-zone="true"
+          className="relative border-4 border-black bg-white shadow-[4px_4px_0px_#000000] w-full aspect-[600/540] overflow-hidden"
+        >
+          <canvas
+            ref={canvasRef}
+            width={600}
+            height={540}
+            className="touch-none cursor-crosshair block w-full h-full"
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+          />
+        </div>
+
+        {/* BARRA DE HERRAMIENTAS Y ACCIONES INFERIOR (ESTILO DRAWING CANVAS) */}
+        <div className="w-full mt-2 flex items-center justify-between gap-1.5 sm:gap-2 border-2 border-black bg-white p-2 shadow-[3px_3px_0px_#000000] flex-nowrap min-w-0">
+          {/* Lado Izquierdo: Deshacer, Borrar, Guías, Contador de Trazos */}
+          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+            <button
+              onClick={handleUndo}
+              disabled={strokes.length === 0}
+              className="btn-ink-outline px-2 py-1 text-xs font-mono disabled:opacity-30 cursor-pointer flex items-center gap-1 shrink-0 shadow-[1px_1px_0px_#000000]"
+              title="Deshacer último trazo (Ctrl+Z)"
+            >
+              <Undo2 className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">Deshacer</span>
+            </button>
+            <button
+              onClick={handleClear}
+              disabled={strokes.length === 0}
+              className="btn-ink-outline px-2 py-1 text-xs font-mono disabled:opacity-30 cursor-pointer flex items-center gap-1 shrink-0 shadow-[1px_1px_0px_#000000]"
+              title="Borrar lienzo"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">Borrar</span>
+            </button>
+            <button
+              onClick={() => setShowGuides(!showGuides)}
+              className={`btn-ink-outline px-2 py-1 text-xs font-mono cursor-pointer flex items-center gap-1 shrink-0 shadow-[1px_1px_0px_#000000] ${
+                showGuides ? 'bg-neutral-100' : ''
+              }`}
+              title="Alternar Guías Fantasma"
+            >
+              {showGuides ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+              <span className="hidden sm:inline">Guías</span>
+            </button>
+            <span className="text-[11px] font-mono text-neutral-600 pl-0.5 font-bold shrink-0">
+              {strokes.length}/{challenge.minRequiredStrokes} trazos
+            </span>
+          </div>
+
+          {/* Lado Derecho: Estado de Evaluación / Acciones */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {evaluation && (
+              <>
+                <div
+                  className={`text-xs font-mono font-black border-2 border-black px-2 py-1 shadow-[1px_1px_0px_#000000] shrink-0 ${
+                    evaluation.phasePassed ? 'bg-black text-white' : 'bg-neutral-100 text-black'
                   }`}
                 >
                   {evaluation.overallScore}%
-                </span>
-              </div>
-
-              {/* Alerta de dirección si trazó al revés (Monocromático) */}
-              {evaluation.directionWarning && (
-                <div className="bg-neutral-100 border-2 border-black p-2 font-mono text-[11px] text-black font-bold">
-                  {evaluation.directionWarning}
                 </div>
-              )}
+                <button
+                  onClick={handleCopyDebugReport}
+                  className="btn-ink-outline p-1.5 text-xs font-mono font-bold flex items-center gap-1 cursor-pointer transition-transform active:scale-95 shadow-[1px_1px_0px_#000000] shrink-0"
+                  title="Copiar informe de depuración"
+                >
+                  {copiedDebug ? (
+                    <Check className="w-3.5 h-3.5 text-black stroke-[3]" />
+                  ) : (
+                    <AlertTriangle className="w-3.5 h-3.5 text-black stroke-[2.5]" />
+                  )}
+                </button>
+                <button
+                  onClick={handleRetryCurrent}
+                  className="btn-ink-outline px-2.5 py-1 text-xs font-mono font-bold flex items-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000000] shrink-0"
+                  title="Reintentar este mismo reto (R)"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Reintentar</span>
+                </button>
+              </>
+            )}
 
-              {/* Barras de Desglose Matemático */}
-              <div className="flex flex-col gap-2 text-xs font-mono">
-                <div>
-                  <div className="flex justify-between text-neutral-700 mb-0.5 text-[11px]">
-                    <span>{challenge.isSingleStrokeAutoEval ? 'Puntería en Dianas (① y ②)' : 'Paralelismo & Ángulo'}</span>
-                    <span className="font-bold">
-                      {challenge.isSingleStrokeAutoEval
-                        ? `${evaluation.metrics.boundaryScore}%`
-                        : `${evaluation.metrics.parallelismScore}%`}
-                    </span>
-                  </div>
-                  <div className="w-full bg-neutral-200 h-2 border border-black overflow-hidden">
-                    <div
-                      className="bg-black h-full transition-all duration-300"
-                      style={{
-                        width: `${
-                          challenge.isSingleStrokeAutoEval
-                            ? evaluation.metrics.boundaryScore
-                            : evaluation.metrics.parallelismScore
-                        }%`,
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex justify-between text-neutral-700 mb-0.5 text-[11px]">
-                    <span>{challenge.isSingleStrokeAutoEval ? 'Ángulo & Vector' : 'Ritmo & Espaciado'}</span>
-                    <span className="font-bold">
-                      {challenge.isSingleStrokeAutoEval
-                        ? `${evaluation.metrics.parallelismScore}%`
-                        : `${evaluation.metrics.spacingScore}%`}
-                    </span>
-                  </div>
-                  <div className="w-full bg-neutral-200 h-2 border border-black overflow-hidden">
-                    <div
-                      className="bg-black h-full transition-all duration-300"
-                      style={{
-                        width: `${
-                          challenge.isSingleStrokeAutoEval
-                            ? evaluation.metrics.parallelismScore
-                            : evaluation.metrics.spacingScore
-                        }%`,
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex justify-between text-neutral-700 mb-0.5 text-[11px]">
-                    <span>{challenge.category === 'single_stroke_curve' ? 'Fidelidad de Curvatura' : 'Rectitud & Estabilidad'}</span>
-                    <span className="font-bold">{evaluation.metrics.straightnessScore}%</span>
-                  </div>
-                  <div className="w-full bg-neutral-200 h-2 border border-black overflow-hidden">
-                    <div
-                      className="bg-black h-full transition-all duration-300"
-                      style={{ width: `${evaluation.metrics.straightnessScore}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Mensaje Didáctico del Evaluador */}
-              <div className="bg-neutral-50 border border-black p-2.5 text-xs font-sans">
-                <strong className="block text-black font-display text-xs mb-1">
-                  {evaluation.feedbackTitle}
-                </strong>
-                <p className="text-neutral-700 text-[11px] leading-relaxed mb-1.5">
-                  {evaluation.feedbackMessage}
-                </p>
-                <div className="border-t border-neutral-300 pt-1.5 mt-1 font-mono text-[10px] text-neutral-600">
-                  💡 {evaluation.tipMessage}
-                </div>
-              </div>
-
-              {/* Telemetría Cinemática y Análisis de Derivadas */}
-              {evaluation.kinematics && (
-                <div className="border-t-2 border-black pt-2 flex flex-col gap-1.5 font-mono text-[11px]">
-                  <div className="flex justify-between items-center bg-neutral-100 p-1.5 border border-black">
-                    <span className="font-bold flex items-center gap-1 text-[11px]">
-                      <Gauge className="w-3.5 h-3.5" />
-                      <span>Velocidad Trazo:</span>
-                    </span>
-                    <span className="font-black">
-                      {evaluation.kinematics.avgSpeedPxPerSec} px/s
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-1 text-[10px]">
-                    <div className="border border-neutral-300 p-1 bg-white">
-                      <span className="text-neutral-500 block">Tiempo real:</span>
-                      <strong className="text-black font-bold">{(evaluation.kinematics.durationMs / 1000).toFixed(2)}s</strong>
-                    </div>
-                    <div className="border border-neutral-300 p-1 bg-white">
-                      <span className="text-neutral-500 block">Índice Fluidez:</span>
-                      <strong className="text-black font-bold">{evaluation.kinematics.fluencyScore}%</strong>
-                    </div>
-                  </div>
-
-                  <div className="text-[10px] text-neutral-700 bg-neutral-50 p-1.5 border border-neutral-200 leading-tight">
-                    Tu media en esta dirección: <strong>{evaluation.kinematics.userBaselineSpeedPxPerSec} px/s</strong> (
-                    {evaluation.kinematics.speedRatioVsBaseline >= 1 ? '+' : ''}
-                    {Math.round((evaluation.kinematics.speedRatioVsBaseline - 1) * 100)}%)
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="border-2 border-black bg-white p-4 shadow-[3px_3px_0px_#000000] text-center">
-              <span className="text-xs font-mono font-bold uppercase tracking-wider block mb-1">
-                {challenge.isSingleStrokeAutoEval ? `Fase ${currentPhase}: Calistenia Adaptativa` : 'Lienzo en Espera'}
-              </span>
-              <p className="text-xs text-neutral-600 font-sans leading-relaxed">
-                {challenge.isSingleStrokeAutoEval
-                  ? currentPhase === 1
-                    ? 'Fase 1 (Precisión): Dibuja a tu propio ritmo conectando ① con ② sin preocuparte por el tiempo.'
-                    : currentPhase === 2
-                    ? 'Fase 2 (Fluidez): Mantén una velocidad constante con el antebrazo sin titubear ni pararte.'
-                    : 'Fase 3 (Velocidad): Realiza pasadas en el aire y dispara un trazo rápido y balístico.'
-                  : 'Dibuja las líneas en el lienzo blanco y presiona "Evaluar" para obtener el diagnóstico físico.'}
-              </p>
-            </div>
-          )}
-
-          {/* Tarjeta de Perfil Biomecánico Adaptativo del Usuario */}
-          {challenge.isSingleStrokeAutoEval && (
-            <div className="border-2 border-black bg-white p-3 shadow-[2px_2px_0px_#000000] text-xs">
-              <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-black">
-                <span className="text-[10px] font-mono font-bold uppercase tracking-wider flex items-center gap-1 text-black">
-                  <Activity className="w-3.5 h-3.5" />
-                  <span>Tu Perfil Biomecánico</span>
-                </span>
-                <span className="text-[9px] font-mono bg-neutral-100 border border-black px-1 font-bold">
-                  Adaptativo
-                </span>
-              </div>
-
-              {(() => {
-                const profile = getUserSpeedProfile();
-                const dirs = profile.directions;
-                const dList = [
-                  { key: 'bottom_up_left_right', label: 'D1 (↗ Asc. Der)', stat: dirs['bottom_up_left_right'] },
-                  { key: 'top_down_right_left', label: 'D2 (↙ Desc. Izq)', stat: dirs['top_down_right_left'] },
-                  { key: 'top_down_left_right', label: 'D3 (↘ Desc. Der)', stat: dirs['top_down_left_right'] },
-                  { key: 'bottom_up_right_left', label: 'D4 (↖ Asc. Izq)', stat: dirs['bottom_up_right_left'] },
-                ];
-                const insight = getBiomechanicalComparison(profile);
-
-                return (
-                  <div className="space-y-2">
-                    <div className="grid grid-cols-2 gap-1 text-[10px] font-mono">
-                      {dList.map((d) => (
-                        <div
-                          key={d.key}
-                          className={`p-1.5 border ${
-                            challenge.directionKey === d.key
-                              ? 'border-black bg-neutral-100 font-bold shadow-[1px_1px_0px_#000000]'
-                              : 'border-neutral-200 bg-neutral-50'
-                          }`}
-                        >
-                          <span className="block text-[9px] text-neutral-600 truncate">{d.label}</span>
-                          <span className="text-black font-bold">
-                            {d.stat ? `${d.stat.avgSpeedPxPerSec} px/s` : 'Sin datos'}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {insight ? (
-                      <p className="text-[10px] text-neutral-700 font-sans leading-tight bg-neutral-50 p-1.5 border border-neutral-200">
-                        💡 {insight}
-                      </p>
-                    ) : (
-                      <p className="text-[10px] text-neutral-500 font-sans leading-tight">
-                        Completa trazos en diferentes ángulos para calcular tus diferencias de velocidad biomecánica.
-                      </p>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-          )}
-
-          {/* Tarjeta de Memoria Muscular */}
-          <div className="border-2 border-black bg-neutral-100 p-3 shadow-[2px_2px_0px_#000000] text-xs">
-            <span className="text-[10px] font-mono font-bold uppercase tracking-wider block text-neutral-600 mb-1">
-              {challenge.isSingleStrokeAutoEval ? 'Biomecánica del Trazo' : 'Anti-Memoria Muscular'}
-            </span>
-            <p className="text-[11px] text-neutral-700 font-sans leading-relaxed mb-2">
-              {challenge.isSingleStrokeAutoEval
-                ? 'El cerebro aprende mediante micro-ajustes por repetición rápida con diana y corrección inmediata.'
-                : 'Dibujar siempre el mismo ángulo engaña al cerebro. La aleatoriedad procedural obliga a adaptar el antebrazo.'}
-            </p>
-            <div className="font-mono text-[10px] bg-white border border-neutral-300 p-2 space-y-1">
-              <div>
-                <strong>Ángulo:</strong> {Math.round(challenge.targetAngleDeg)}°
-              </div>
-              <div>
-                <strong>Longitud:</strong> {Math.round(challenge.targetLengthPx)}px
-              </div>
-              <div>
-                <strong>Semilla:</strong> #{challenge.seed}
-              </div>
-            </div>
+            {challenge.isSingleStrokeAutoEval ? (
+              evaluation ? (
+                evaluation.phasePassed && currentPhase < 3 ? (
+                  <button
+                    onClick={() => handlePhaseSelect((currentPhase + 1) as 1 | 2 | 3)}
+                    className="btn-ink px-3 sm:px-4 py-1 text-xs font-mono font-bold uppercase tracking-wider cursor-pointer flex items-center gap-1.5 shrink-0 shadow-[2px_2px_0px_#000000]"
+                    title={`Avanzar a Fase ${currentPhase + 1} (Espacio / Enter)`}
+                  >
+                    <span>Fase {currentPhase + 1}</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleNewRandomChallenge}
+                    className="btn-ink px-3 sm:px-4 py-1 text-xs font-mono font-bold uppercase tracking-wider cursor-pointer flex items-center gap-1.5 shrink-0 shadow-[2px_2px_0px_#000000]"
+                    title="Siguiente reto procedural (Espacio / Enter)"
+                  >
+                    <span>{evaluation.phasePassed && currentPhase === 3 ? '¡Dominado! Siguiente' : 'Siguiente'}</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                )
+              ) : null
+            ) : (
+              <button
+                onClick={handleEvaluate}
+                disabled={strokes.length === 0}
+                className="btn-ink px-3 sm:px-4 py-1 text-xs font-mono font-bold uppercase tracking-wider disabled:opacity-30 cursor-pointer flex items-center gap-1.5 shrink-0 shadow-[2px_2px_0px_#000000]"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Evaluar</span>
+              </button>
+            )}
           </div>
-        </aside>
+        </div>
+
+        {/* FEEDBACK LIMPIO DEBAJO DE LA BARRA (1 LÍNEA, SIN OBSTRUIR EL LIENZO) */}
+        {evaluation && (
+          <div className="w-full mt-1.5 px-3 py-1.5 border-2 border-black bg-neutral-50 flex items-center justify-between gap-2 text-xs shadow-[2px_2px_0px_#000000] min-w-0">
+            <div className="flex items-center gap-2 truncate min-w-0 flex-1">
+              <span
+                className={`text-[10px] font-mono px-1.5 py-0.5 font-bold uppercase shrink-0 ${
+                  evaluation.phasePassed
+                    ? 'bg-black text-white'
+                    : 'bg-white text-black border border-black'
+                }`}
+              >
+                {evaluation.phasePassed ? 'Superado ✓' : 'Ajustar'}
+              </span>
+              <span className="font-bold font-display truncate text-black">{evaluation.feedbackTitle}</span>
+              <span className="text-neutral-600 text-[11px] font-sans truncate hidden sm:inline">
+                · {evaluation.directionWarning || evaluation.feedbackMessage}
+              </span>
+            </div>
+            {evaluation.kinematics && (
+              <span className="text-[10px] font-mono text-neutral-700 shrink-0 font-bold hidden xs:inline">
+                {evaluation.kinematics.avgSpeedPxPerSec} px/s · {(evaluation.kinematics.durationMs / 1000).toFixed(2)}s
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Modal: Visor de Lámina Original o Guía Biomecánica */}
