@@ -8,7 +8,7 @@ import {
   StrokeEvaluation,
 } from '../lib/strokeTypes';
 import { generateStrokeChallenge } from '../lib/strokeProceduralGenerator';
-import { evaluateStrokeSubmission } from '../lib/strokeEvaluator';
+import { evaluateStrokeSubmission, buildStrokeDebugReport } from '../lib/strokeEvaluator';
 import {
   Dices,
   Eye,
@@ -24,6 +24,9 @@ import {
   Flame,
   Info,
   RotateCcw,
+  AlertTriangle,
+  Check,
+  ArrowRight,
 } from 'lucide-react';
 
 interface StrokeLabViewProps {
@@ -76,9 +79,9 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
   const [showBookModal, setShowBookModal] = useState<boolean>(false);
   const [imgError, setImgError] = useState<boolean>(false);
 
-  // Calistenia dinámica: Racha de aciertos y temporizador de 2 segundos
+  // Calistenia dinámica: Racha de aciertos y estado de copia de reporte
   const [streak, setStreak] = useState<number>(0);
-  const [autoCountdown, setAutoCountdown] = useState<number>(0);
+  const [copiedDebug, setCopiedDebug] = useState<boolean>(false);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -98,8 +101,28 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
     currentStrokeRef.current = [];
     setIsDrawing(false);
     setEvaluation(null);
-    setAutoCountdown(0);
   }, [currentExercise]);
+
+  // Reintentar el reto actual (borrar trazos y reiniciar evaluación manteniendo la misma semilla)
+  const handleRetryCurrent = useCallback(() => {
+    setStrokes([]);
+    currentStrokeRef.current = [];
+    setIsDrawing(false);
+    setEvaluation(null);
+  }, []);
+
+  // Copiar reporte detallado al portapapeles para depuración y revisión de notas
+  const handleCopyDebugReport = async () => {
+    if (!evaluation) return;
+    const reportText = buildStrokeDebugReport(challenge, strokes, evaluation);
+    try {
+      await navigator.clipboard.writeText(reportText);
+      setCopiedDebug(true);
+      setTimeout(() => setCopiedDebug(false), 2000);
+    } catch {
+      // Fallback
+    }
+  };
 
   // Cambiar de ejercicio por código
   const handleSelectExercise = (exercise: LabExerciseDef) => {
@@ -107,7 +130,6 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
     if (idx !== -1) {
       setCurrentExerciseIndex(idx);
       setImgError(false);
-      setAutoCountdown(0);
       setStreak(0);
       const newSeed = Math.floor(Math.random() * 90000 + 10000);
       setChallengeSeed(newSeed);
@@ -144,35 +166,23 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
     }
   };
 
-  // Temporizador de 2 segundos para auto-reinicio en calistenia de trazo único
-  useEffect(() => {
-    if (autoCountdown > 0) {
-      const timer = setInterval(() => {
-        setAutoCountdown((prev) => {
-          if (prev <= 0.1) {
-            clearInterval(timer);
-            handleNewRandomChallenge();
-            return 0;
-          }
-          return Math.round((prev - 0.1) * 10) / 10;
-        });
-      }, 100);
-      return () => clearInterval(timer);
-    }
-  }, [autoCountdown, handleNewRandomChallenge]);
-
-  // Atajo de teclado: Barra espaciadora para avanzar inmediatamente sin esperar 2 segundos
+  // Atajos de teclado: Espacio / Enter para avanzar al siguiente reto, R para reintentar
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && (autoCountdown > 0 || (challenge.isSingleStrokeAutoEval && evaluation !== null))) {
+      if (['INPUT', 'SELECT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) {
+        return;
+      }
+      if ((e.code === 'Space' || e.code === 'Enter') && evaluation !== null) {
         e.preventDefault();
-        setAutoCountdown(0);
         handleNewRandomChallenge();
+      } else if (e.key.toLowerCase() === 'r' && evaluation !== null) {
+        e.preventDefault();
+        handleRetryCurrent();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [autoCountdown, challenge.isSingleStrokeAutoEval, evaluation, handleNewRandomChallenge]);
+  }, [evaluation, handleNewRandomChallenge, handleRetryCurrent]);
 
   // Renderizado del lienzo en estética Paplitz (Papel Blanco Técnico + Tinta Negra)
   const renderCanvas = useCallback(() => {
@@ -400,80 +410,22 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
       ctx.restore();
     }
 
-    // H. DIANAS Y PUNTOS CLAVE NUMERADOS ①, ②, ③... (Con flecha de dirección)
+    // H. PUNTOS DIANA MINIMALISTAS (Dots de 3.5px en negro con número de orden pequeño)
     if (challenge.keyPoints && challenge.keyPoints.length > 0) {
       for (const kp of challenge.keyPoints) {
-        const isStart = kp.type === 'start' || kp.order === 1;
-        const isEnd = kp.type === 'end' || kp.order === challenge.keyPoints.length;
-
         ctx.save();
-        if (isStart) {
-          // Diana de Inicio ①: Círculo exterior pulsante y núcleo negro
-          ctx.strokeStyle = '#000000';
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.arc(kp.x, kp.y, 13, 0, Math.PI * 2);
-          ctx.stroke();
+        // Dot negro puro
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.arc(kp.x, kp.y, 3.5, 0, Math.PI * 2);
+        ctx.fill();
 
-          ctx.fillStyle = '#000000';
-          ctx.beginPath();
-          ctx.arc(kp.x, kp.y, 8, 0, Math.PI * 2);
-          ctx.fill();
-
-          ctx.fillStyle = '#FFFFFF';
-          ctx.font = 'bold 10px monospace';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText('1', kp.x, kp.y);
-
-          // Placa de etiqueta "① INICIO"
-          ctx.fillStyle = '#000000';
-          ctx.font = 'bold 9px monospace';
-          ctx.fillText('① INICIO', kp.x, kp.y + 22);
-        } else if (isEnd) {
-          // Diana de Fin ②: Diana con cruz técnica y flecha de dirección
-          ctx.strokeStyle = '#000000';
-          ctx.lineWidth = 2;
-          ctx.fillStyle = '#FFFFFF';
-          ctx.beginPath();
-          ctx.arc(kp.x, kp.y, 11, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.stroke();
-
-          ctx.fillStyle = '#000000';
-          ctx.beginPath();
-          ctx.arc(kp.x, kp.y, 3.5, 0, Math.PI * 2);
-          ctx.fill();
-
-          ctx.fillStyle = '#000000';
-          ctx.font = 'bold 10px monospace';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(String(kp.order), kp.x, kp.y);
-
-          ctx.font = 'bold 9px monospace';
-          ctx.fillText(kp.label || '② FIN', kp.x, kp.y + 20);
-        } else {
-          // Puntos intermedios para curvas (Vértice, Cresta, Inflexión, Valle)
-          ctx.strokeStyle = '#000000';
-          ctx.lineWidth = 1.5;
-          ctx.fillStyle = '#FFFFFF';
-          ctx.beginPath();
-          ctx.arc(kp.x, kp.y, 8, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.stroke();
-
-          ctx.fillStyle = '#000000';
-          ctx.font = 'bold 9px monospace';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(String(kp.order), kp.x, kp.y);
-
-          if (kp.label) {
-            ctx.font = 'bold 8px monospace';
-            ctx.fillText(kp.label, kp.x, kp.y + 16);
-          }
-        }
+        // Número pequeño centrado inmediatamente encima (1, 2, 3...)
+        ctx.fillStyle = '#000000';
+        ctx.font = 'bold 10px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(String(kp.order), kp.x, kp.y - 6);
         ctx.restore();
       }
     }
@@ -515,15 +467,15 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
       ctx.stroke();
     }
 
-    // 5. SUPERPOSICIÓN DE SOLUCIÓN TRAS CORRECCIÓN (Overlay Verde/Rojo estilo Cubos)
+    // 5. SUPERPOSICIÓN DE SOLUCIÓN TRAS CORRECCIÓN (Línea discontinua estrictamente monocromática negra)
     if (evaluation && evaluation.solutionOverlay && evaluation.solutionOverlay.points.length > 1) {
       const sPts = evaluation.solutionOverlay.points;
       ctx.save();
-      ctx.strokeStyle = evaluation.solutionOverlay.color;
-      ctx.lineWidth = 3.2;
+      ctx.strokeStyle = '#000000'; // Estricto blanco y negro
+      ctx.lineWidth = 2.4;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-      ctx.setLineDash([6, 4]);
+      ctx.setLineDash([5, 4]);
 
       ctx.beginPath();
       ctx.moveTo(sPts[0].x, sPts[0].y);
@@ -536,11 +488,11 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
       const lastP = sPts[sPts.length - 1];
       const prevP = sPts[Math.max(0, sPts.length - 4)];
       const theta = Math.atan2(lastP.y - prevP.y, lastP.x - prevP.x);
-      ctx.fillStyle = evaluation.solutionOverlay.color;
+      ctx.fillStyle = '#000000';
       ctx.beginPath();
       ctx.moveTo(lastP.x, lastP.y);
-      ctx.lineTo(lastP.x - 14 * Math.cos(theta - 0.4), lastP.y - 14 * Math.sin(theta - 0.4));
-      ctx.lineTo(lastP.x - 14 * Math.cos(theta + 0.4), lastP.y - 14 * Math.sin(theta + 0.4));
+      ctx.lineTo(lastP.x - 12 * Math.cos(theta - 0.4), lastP.y - 12 * Math.sin(theta - 0.4));
+      ctx.lineTo(lastP.x - 12 * Math.cos(theta + 0.4), lastP.y - 12 * Math.sin(theta + 0.4));
       ctx.closePath();
       ctx.fill();
       ctx.restore();
@@ -573,9 +525,8 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
     e.preventDefault();
     if (activePointerIdRef.current !== null && activePointerIdRef.current !== e.pointerId) return;
 
-    // Si había una cuenta atrás activa, cancelar y limpiar al nuevo contacto
-    if (autoCountdown > 0) {
-      setAutoCountdown(0);
+    // Si había una evaluación activa y el usuario vuelve a tocar, limpiar para nuevo intento
+    if (evaluation !== null && challenge.isSingleStrokeAutoEval) {
       setEvaluation(null);
       setStrokes([]);
     }
@@ -620,7 +571,7 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
       const newStrokes = [...strokes, { points: [...currentStrokeRef.current] }];
       setStrokes(newStrokes);
 
-      // AUTO-EVALUACIÓN INSTANTÁNEA PARA CALISTENIA DE TRAZO ÚNICO
+      // AUTO-EVALUACIÓN INSTANTÁNEA PARA CALISTENIA DE TRAZO ÚNICO (Sin temporizador automático)
       if (challenge.isSingleStrokeAutoEval) {
         currentStrokeRef.current = [];
         const result = evaluateStrokeSubmission(newStrokes, challenge);
@@ -631,8 +582,6 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
         } else {
           setStreak(0);
         }
-        // Iniciar temporizador de 2 segundos para auto-reinicio
-        setAutoCountdown(2.0);
         renderCanvas();
         return;
       }
@@ -645,14 +594,12 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
     if (strokes.length === 0) return;
     setStrokes((prev) => prev.slice(0, -1));
     setEvaluation(null);
-    setAutoCountdown(0);
   };
 
   const handleClear = () => {
     setStrokes([]);
     currentStrokeRef.current = [];
     setEvaluation(null);
-    setAutoCountdown(0);
   };
 
   const handleEvaluate = () => {
@@ -806,10 +753,10 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
                 </span>
               </div>
 
-              {/* Racha de Fuego en Calistenia Rápida */}
+              {/* Racha en Calistenia Rápida (Monocromático Estricto) */}
               {challenge.isSingleStrokeAutoEval && streak > 0 && (
-                <div className="flex items-center gap-1 bg-amber-100 border border-black px-2 py-0.5 text-xs font-mono font-black shrink-0 animate-pulse">
-                  <Flame className="w-3.5 h-3.5 text-orange-600 fill-orange-500" />
+                <div className="flex items-center gap-1 bg-black text-white px-2 py-0.5 text-xs font-mono font-black shrink-0">
+                  <Flame className="w-3.5 h-3.5 text-white stroke-[2.5]" />
                   <span>Racha: {streak}</span>
                 </div>
               )}
@@ -841,16 +788,6 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
               data-canvas-zone="true"
               className="relative border-4 border-black bg-white shadow-[4px_4px_0px_#000000] w-full aspect-[600/540] overflow-hidden"
             >
-              {/* Barra de progreso de auto-reinicio (2 segundos) */}
-              {autoCountdown > 0 && (
-                <div className="absolute top-0 left-0 right-0 h-1.5 bg-neutral-200 z-20 pointer-events-none">
-                  <div
-                    className="h-full bg-black transition-all duration-100"
-                    style={{ width: `${(autoCountdown / 2.0) * 100}%` }}
-                  />
-                </div>
-              )}
-
               <canvas
                 ref={canvasRef}
                 width={600}
@@ -872,35 +809,68 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
                 {challenge.subtitle}
               </div>
 
-              {/* Cartel Flotante de Corrección Inmediata para Trazo Único */}
+              {/* Cartel Flotante de Corrección Inmediata para Trazo Único (Estricto B&W Manga) */}
               {challenge.isSingleStrokeAutoEval && evaluation && (
-                <div className="absolute bottom-2.5 left-2.5 right-2.5 bg-white border-2 border-black p-2 shadow-[3px_3px_0px_#000000] flex items-center justify-between z-20 animate-in fade-in">
-                  <div className="flex items-center gap-2">
+                <div className="absolute bottom-2.5 left-2.5 right-2.5 bg-white border-2 border-black p-2.5 shadow-[4px_4px_0px_#000000] flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 z-20 animate-in fade-in">
+                  <div className="flex items-center gap-2.5 min-w-0">
                     <span
-                      className={`text-sm font-mono font-black border-2 border-black px-2 py-0.5 ${
-                        evaluation.passed ? 'bg-black text-white' : 'bg-red-500 text-white'
+                      className={`text-sm font-mono font-black border-2 border-black px-2 py-0.5 shrink-0 ${
+                        evaluation.passed ? 'bg-black text-white' : 'bg-neutral-100 text-black'
                       }`}
                     >
                       {evaluation.overallScore}%
                     </span>
-                    <div className="text-[11px] font-mono leading-tight">
-                      <strong className="block text-black">{evaluation.feedbackTitle}</strong>
+                    <div className="text-[11px] font-mono leading-tight min-w-0">
+                      <div className="flex items-center gap-1.5 font-bold text-black truncate">
+                        <span>{evaluation.feedbackTitle}</span>
+                        <span className="text-[10px] text-neutral-500 font-normal">
+                          ({evaluation.passed ? 'Aprobado' : 'No superado'})
+                        </span>
+                      </div>
                       <span className="text-neutral-600 truncate block max-w-[260px] sm:max-w-md">
                         {evaluation.directionWarning || evaluation.feedbackMessage}
                       </span>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+                    {/* Botón de reporte/depuración idéntico al del Cubo */}
                     <button
-                      onClick={() => {
-                        setAutoCountdown(0);
-                        handleNewRandomChallenge();
-                      }}
-                      className="btn-ink px-2.5 py-1 text-xs font-mono flex items-center gap-1 cursor-pointer"
+                      onClick={handleCopyDebugReport}
+                      className="btn-ink-outline px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 cursor-pointer transition-transform active:scale-95 shadow-[1px_1px_0px_#000000]"
+                      title="Copiar informe técnico para revisión de nota o depuración"
                     >
-                      <span>Siguiente (Espacio)</span>
-                      {autoCountdown > 0 && <span className="font-bold opacity-80">{autoCountdown.toFixed(1)}s</span>}
+                      {copiedDebug ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-black stroke-[3]" />
+                          <span className="text-[10px]">¡Copiado!</span>
+                        </>
+                      ) : (
+                        <>
+                          <AlertTriangle className="w-3.5 h-3.5 text-black stroke-[2.5]" />
+                          <span className="text-[10px] hidden xs:inline">Depurar</span>
+                        </>
+                      )}
+                    </button>
+
+                    {/* Botón Reintentar el mismo reto */}
+                    <button
+                      onClick={handleRetryCurrent}
+                      className="btn-ink-outline px-2.5 py-1 text-xs font-mono font-bold flex items-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000000]"
+                      title="Reintentar este mismo reto (R)"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span className="hidden xs:inline">Reintentar</span>
+                    </button>
+
+                    {/* Botón Siguiente Reto */}
+                    <button
+                      onClick={handleNewRandomChallenge}
+                      className="btn-ink px-3 py-1 text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
+                      title="Generar siguiente reto procedural (Espacio / Enter)"
+                    >
+                      <span>Siguiente</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
@@ -945,16 +915,40 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
 
               {/* Botón Principal de Validación o Siguiente Intento */}
               {challenge.isSingleStrokeAutoEval ? (
-                <button
-                  onClick={() => {
-                    setAutoCountdown(0);
-                    handleNewRandomChallenge();
-                  }}
-                  className="btn-ink px-3 sm:px-4 py-1 text-xs font-mono font-bold uppercase tracking-wider cursor-pointer flex items-center gap-1.5 shrink-0 shadow-[2px_2px_0px_#000000]"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span>{evaluation ? 'Siguiente (Espacio)' : 'Repetir'}</span>
-                </button>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {evaluation && (
+                    <button
+                      onClick={handleCopyDebugReport}
+                      className="btn-ink-outline p-1.5 text-xs font-mono font-bold flex items-center gap-1 cursor-pointer transition-transform active:scale-95 shadow-[1px_1px_0px_#000000] shrink-0"
+                      title="Copiar reporte técnico de depuración"
+                    >
+                      {copiedDebug ? (
+                        <Check className="w-3.5 h-3.5 text-black stroke-[3]" />
+                      ) : (
+                        <AlertTriangle className="w-3.5 h-3.5 text-black stroke-[2.5]" />
+                      )}
+                    </button>
+                  )}
+                  {evaluation ? (
+                    <button
+                      onClick={handleNewRandomChallenge}
+                      className="btn-ink px-3 sm:px-4 py-1 text-xs font-mono font-bold uppercase tracking-wider cursor-pointer flex items-center gap-1.5 shrink-0 shadow-[2px_2px_0px_#000000]"
+                      title="Siguiente reto procedural (Espacio / Enter)"
+                    >
+                      <span>Siguiente (Espacio)</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleNewRandomChallenge}
+                      className="btn-ink px-3 sm:px-4 py-1 text-xs font-mono font-bold uppercase tracking-wider cursor-pointer flex items-center gap-1.5 shrink-0 shadow-[2px_2px_0px_#000000]"
+                      title="Nuevo reto aleatorio"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Nuevo Reto</span>
+                    </button>
+                  )}
+                </div>
               ) : (
                 <button
                   onClick={handleEvaluate}
@@ -988,9 +982,9 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
                 </span>
               </div>
 
-              {/* Alerta de dirección si trazó al revés */}
+              {/* Alerta de dirección si trazó al revés (Monocromático) */}
               {evaluation.directionWarning && (
-                <div className="bg-red-50 border-2 border-red-500 p-2 font-mono text-[11px] text-red-700">
+                <div className="bg-neutral-100 border-2 border-black p-2 font-mono text-[11px] text-black font-bold">
                   {evaluation.directionWarning}
                 </div>
               )}

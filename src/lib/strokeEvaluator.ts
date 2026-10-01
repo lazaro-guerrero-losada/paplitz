@@ -323,34 +323,58 @@ export function evaluateSingleStrokeSubmission(
   const targetStart = keyPoints[0] || { x: 0, y: 0 };
   const targetEnd = keyPoints[keyPoints.length - 1] || { x: 100, y: 100 };
 
-  // 1. Verificación de dirección biomecánica (¿trazó de ① hacia ②, o al revés?)
-  const distStartToTargetStart = Math.hypot(userStart.x - targetStart.x, userStart.y - targetStart.y);
-  const distStartToTargetEnd = Math.hypot(userStart.x - targetEnd.x, userStart.y - targetEnd.y);
-  const distEndToTargetEnd = Math.hypot(userEnd.x - targetEnd.x, userEnd.y - targetEnd.y);
-  const distEndToTargetStart = Math.hypot(userEnd.x - targetStart.x, userEnd.y - targetStart.y);
+  // 1. Vector diana ideal (del punto 1 al punto 2)
+  const targetDx = targetEnd.x - targetStart.x;
+  const targetDy = targetEnd.y - targetStart.y;
+  let targetVectorAngleDeg = (Math.atan2(targetDy, targetDx) * 180) / Math.PI;
+  if (targetVectorAngleDeg < 0) targetVectorAngleDeg += 360;
 
+  // 2. Vector real del usuario (de inicio a fin del trazo)
+  const userDx = userEnd.x - userStart.x;
+  const userDy = userEnd.y - userStart.y;
+  let userAngleDeg = (Math.atan2(userDy, userDx) * 180) / Math.PI;
+  if (userAngleDeg < 0) userAngleDeg += 360;
+
+  let angleDiff = Math.abs(userAngleDeg - targetVectorAngleDeg);
+  if (angleDiff > 180) angleDiff = 360 - angleDiff;
+  const parallelismScore = Math.round(Math.max(0, 100 - angleDiff * 3.2));
+
+  // 3. Verificación de dirección biomecánica (¿trazó de ① hacia ②, o al revés?)
+  const distStartTo1 = Math.hypot(userStart.x - targetStart.x, userStart.y - targetStart.y);
+  const distStartTo2 = Math.hypot(userStart.x - targetEnd.x, userStart.y - targetEnd.y);
+  const distEndTo2 = Math.hypot(userEnd.x - targetEnd.x, userEnd.y - targetEnd.y);
+  const distEndTo1 = Math.hypot(userEnd.x - targetStart.x, userEnd.y - targetStart.y);
+
+  // Es invertido si empezó cerca de ② y terminó cerca de ①, o si el vector apunta en sentido opuesto (>90°)
   let isReversed = false;
-  if (distStartToTargetEnd < distStartToTargetStart && distEndToTargetStart < distEndToTargetEnd) {
+  if ((distStartTo2 < distStartTo1 && distEndTo1 < distEndTo2) || angleDiff > 90) {
     isReversed = true;
   }
 
-  // 2. Puntería en los puntos diana (Inicio y Fin)
-  const startErr = isReversed ? distStartToTargetEnd : distStartToTargetStart;
-  const endErr = isReversed ? distEndToTargetStart : distEndToTargetEnd;
+  // 4. Puntería en los puntos diana (Inicio en ① y Fin en ②)
+  const startErr = isReversed ? distStartTo2 : distStartTo1;
+  const endErr = isReversed ? distEndTo1 : distEndTo2;
   const avgEndpointErr = (startErr + endErr) / 2;
-  const boundaryScore = Math.round(Math.max(0, 100 - avgEndpointErr * 1.6));
+  // Margen de gracia de 6px; después penalización firme
+  const boundaryScore = Math.round(
+    Math.max(0, 100 - Math.max(0, avgEndpointErr - 6) * 2.4)
+  );
 
-  // 3. Rectitud / Curvatura
+  // 5. Rectitud / Curvatura
   let straightnessScore = 100;
+  let maxPerpDev = 0;
+  let sumDev = 0;
   const isCurve = challenge.category === 'single_stroke_curve';
 
   if (!isCurve) {
-    let maxPerpDev = 0;
     for (let i = 1; i < pts.length - 1; i++) {
       const d = distPointToSegment(pts[i].x, pts[i].y, targetStart.x, targetStart.y, targetEnd.x, targetEnd.y);
       if (d > maxPerpDev) maxPerpDev = d;
+      sumDev += d;
     }
-    straightnessScore = Math.round(Math.max(0, 100 - maxPerpDev * 3.8));
+    const avgDev = pts.length > 2 ? sumDev / (pts.length - 2) : 0;
+    // Si la sagita supera 12px penaliza sensiblemente
+    straightnessScore = Math.round(Math.max(0, 100 - avgDev * 5 - maxPerpDev * 2.8));
   } else {
     const ideal = challenge.idealPath || [];
     if (ideal.length > 0) {
@@ -368,53 +392,61 @@ export function evaluateSingleStrokeSubmission(
     }
   }
 
-  // 4. Precisión de Ángulo
-  const userAngleRad = Math.atan2(userEnd.y - userStart.y, userEnd.x - userStart.x);
-  let userAngleDeg = (userAngleRad * 180) / Math.PI;
-  if (userAngleDeg < 0) userAngleDeg += 360;
-
-  let targetAngleDeg = challenge.targetAngleDeg;
-  if (targetAngleDeg < 0) targetAngleDeg += 360;
-
-  let angleDiff = Math.abs(userAngleDeg - targetAngleDeg);
-  if (angleDiff > 180) angleDiff = 360 - angleDiff;
-  const parallelismScore = Math.round(Math.max(0, 100 - angleDiff * 2.2));
-
-  // 5. Cálculo Global
-  let overallScore = boundaryScore * 0.40 + straightnessScore * 0.40 + parallelismScore * 0.20;
+  // 6. Cálculo Global Ponderado
+  let overallScore = Math.round(
+    boundaryScore * 0.40 + straightnessScore * 0.35 + parallelismScore * 0.25
+  );
   let directionWarning: string | undefined;
 
   if (isReversed) {
-    overallScore = Math.max(0, overallScore - 30);
-    directionWarning = '⚠️ DIRECCIÓN INVERTIDA: Has trazado de ② hacia ①. Inicia siempre en ① y proyecta hacia ②.';
+    overallScore = Math.min(overallScore, 35);
+    directionWarning = '⚠️ DIRECCIÓN INVERTIDA: Has trazado de ② hacia ①. Debes iniciar en ① y proyectar hacia ②.';
   }
 
-  overallScore = Math.min(100, Math.max(0, Math.round(overallScore)));
-  const passed = overallScore >= 70;
+  // Criterios estrictos de aprobación (evitar falsos positivos)
+  let passed = overallScore >= 70;
+  if (isReversed) {
+    passed = false;
+  }
+  // No se aprueba si erró excesivamente los puntos diana o se torció
+  if (startErr > 38 || endErr > 44) {
+    passed = false;
+  }
+  if (!isCurve && angleDiff > 20) {
+    passed = false;
+  }
+  if (!isCurve && straightnessScore < 60) {
+    passed = false;
+  }
 
   let feedbackTitle = '¡Buen Trazo!';
-  let feedbackMessage = `Puntería diana: ${boundaryScore}%, Rectitud/Curva: ${straightnessScore}%.`;
+  let feedbackMessage = `Puntería: ${boundaryScore}%, Rectitud: ${straightnessScore}%, Ángulo: ${parallelismScore}%.`;
   let tipMessage = 'Mantén la velocidad de trazo constante sin titubeos.';
   let avatarMood: AvatarMood = 'wink';
 
-  if (overallScore >= 90) {
+  if (overallScore >= 90 && passed) {
     feedbackTitle = '¡Diana Perfecta! 🎯';
     feedbackMessage = `Trazo magistral: anclaje milimétrico (error: ${Math.round(avgEndpointErr)}px) y rectitud ${straightnessScore}%.`;
     tipMessage = 'Excelente velocidad y seguridad en la trayectoria.';
     avatarMood = 'success-stars';
-  } else if (overallScore >= 75) {
+  } else if (overallScore >= 70 && passed) {
     feedbackTitle = '¡Nivel Superado! ✅';
     feedbackMessage = `Trazo firme y bien dirigido (${overallScore}%).`;
     tipMessage = 'Afina la llegada al punto final sin sobrepasarte.';
     avatarMood = 'wink';
-  } else if (overallScore >= 55) {
+  } else if (isReversed) {
+    feedbackTitle = 'Dirección Invertida 🔄';
+    feedbackMessage = directionWarning || 'Inicia siempre en el punto ① y termina en el ②.';
+    tipMessage = 'Observa el número 1 antes de apoyar el lápiz.';
+    avatarMood = 'fail-spiral';
+  } else if (overallScore >= 50) {
     feedbackTitle = 'Cerca de la Diana 🏹';
-    feedbackMessage = `Desviación en extremos (error: ${Math.round(avgEndpointErr)}px) o arqueo del trazo.`;
+    feedbackMessage = `Desviación en extremos (error: ${Math.round(avgEndpointErr)}px) o ángulo desviado (${Math.round(angleDiff)}°).`;
     tipMessage = 'Haz 1 o 2 pasadas en el aire antes de tocar la pantalla (Ghosting).';
     avatarMood = 'curious';
   } else {
     feedbackTitle = 'Desviación en Trayectoria 💨';
-    feedbackMessage = directionWarning || `El trazo se desvió de la trayectoria objetivo (${overallScore}%).`;
+    feedbackMessage = directionWarning || `El trazo se desvió del objetivo (${overallScore}%).`;
     tipMessage = 'Fija la mirada en el punto ② antes de iniciar el movimiento en ①.';
     avatarMood = 'fail-spiral';
   }
@@ -426,8 +458,8 @@ export function evaluateSingleStrokeSubmission(
     directionWarning,
     solutionOverlay: {
       points: challenge.idealPath || [],
-      color: passed ? '#10B981' : '#EF4444',
-      label: passed ? 'Solución Óptima' : 'Corrección Necesaria',
+      color: '#000000', // Estricto blanco y negro
+      label: 'Solución Guía',
     },
     metrics: {
       parallelismScore,
@@ -448,6 +480,57 @@ export function evaluateSingleStrokeSubmission(
     tipMessage,
     avatarMood,
   };
+}
+
+/**
+ * Genera un informe detallado en texto / markdown de la evaluación para depuración y revisión
+ */
+export function buildStrokeDebugReport(
+  challenge: ProceduralStrokeChallenge,
+  strokes: RawStroke[],
+  evaluation: StrokeEvaluation
+): string {
+  const s0 = strokes[0];
+  const pts = s0?.points || [];
+  const uStart = pts[0] || { x: 0, y: 0 };
+  const uEnd = pts[pts.length - 1] || { x: 0, y: 0 };
+  const kp = challenge.keyPoints || [];
+  const tStart = kp[0] || { x: 0, y: 0 };
+  const tEnd = kp[kp.length - 1] || { x: 0, y: 0 };
+
+  const startErr = Math.hypot(uStart.x - tStart.x, uStart.y - tStart.y);
+  const endErr = Math.hypot(uEnd.x - tEnd.x, uEnd.y - tEnd.y);
+  const uLen = Math.hypot(uEnd.x - uStart.x, uEnd.y - uStart.y);
+  const tLen = Math.hypot(tEnd.x - tStart.x, tEnd.y - tStart.y);
+
+  return [
+    `=== REPORTE DE DEPURACIÓN DE TRAZO (PAPLITZ LAB) ===`,
+    `Fecha: ${new Date().toISOString()}`,
+    `Reto: [${challenge.code}] ${challenge.title} (Semilla: #${challenge.seed})`,
+    `Subtítulo: ${challenge.subtitle}`,
+    ``,
+    `--- OBJETIVO ---`,
+    `Punto ① Objetivo: (${Math.round(tStart.x)}, ${Math.round(tStart.y)})`,
+    `Punto ② Objetivo: (${Math.round(tEnd.x)}, ${Math.round(tEnd.y)})`,
+    `Longitud Objetivo: ${Math.round(tLen)}px`,
+    `Ángulo Objetivo: ${Math.round(challenge.targetAngleDeg)}°`,
+    ``,
+    `--- TRAZO DEL USUARIO ---`,
+    `Puntos muestreados: ${pts.length}`,
+    `Punto Inicio: (${Math.round(uStart.x)}, ${Math.round(uStart.y)}) -> Error en ①: ${Math.round(startErr)}px`,
+    `Punto Fin: (${Math.round(uEnd.x)}, ${Math.round(uEnd.y)}) -> Error en ②: ${Math.round(endErr)}px`,
+    `Longitud Real: ${Math.round(uLen)}px (Δ: ${Math.round(uLen - tLen)}px)`,
+    `Ángulo Medido: ${evaluation.detectedStats.measuredAvgAngleDeg}°`,
+    ``,
+    `--- RESULTADO DE EVALUACIÓN ---`,
+    `Nota Global: ${evaluation.overallScore}% (Superado: ${evaluation.passed ? 'SÍ' : 'NO'})`,
+    `Puntería en Dianas: ${evaluation.metrics.boundaryScore}%`,
+    `Rectitud / Curva: ${evaluation.metrics.straightnessScore}%`,
+    `Paralelismo / Vector: ${evaluation.metrics.parallelismScore}%`,
+    evaluation.directionWarning ? `Aviso Dirección: ${evaluation.directionWarning}` : `Dirección: Correcta`,
+    `Diagnóstico: ${evaluation.feedbackTitle} - ${evaluation.feedbackMessage}`,
+    `================================================`,
+  ].join('\n');
 }
 
 /**

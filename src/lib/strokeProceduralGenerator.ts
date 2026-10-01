@@ -75,55 +75,95 @@ export function generateSingleStrokeChallenge(
     L = rng.range(130, 310);
   }
 
-  // 3. Ángulo de dirección
-  let angleDeg = 60;
+  // 3. Ángulo y coordenadas según dirección biomecánica
   let dirArrow = '↗';
   let dirLabel = 'Abajo a Arriba (↗)';
+  let angleDeg = 55;
+
+  const halfL = L / 2;
+  let pStart = { x: cx, y: cy };
+  let pEnd = { x: cx, y: cy };
 
   if (cfg.direction === 'bottom_up_left_right') {
+    // ↗ D1: Abajo hacia Arriba, Izquierda hacia Derecha
+    // Inicio (1) = Abajo-Izquierda (x menor, y mayor en canvas)
+    // Fin (2) = Arriba-Derecha (x mayor, y menor en canvas)
     dirArrow = '↗';
-    dirLabel = 'Abajo a Arriba (↗)';
-    angleDeg = 60;
+    dirLabel = 'Abajo a Arriba, Izquierda a Derecha (↗)';
+    angleDeg = 55;
     if (
       cfg.variationType === 'rotation' ||
       cfg.variationType === 'rotation_length' ||
       cfg.variationType === 'total_random'
     ) {
-      angleDeg = rng.range(38, 75);
+      angleDeg = rng.range(35, 75);
     }
+    const thetaRad = (angleDeg * Math.PI) / 180;
+    const dx = halfL * Math.cos(thetaRad);
+    const dy = halfL * Math.sin(thetaRad);
+    pStart = { x: cx - dx, y: cy + dy }; // Abajo-Izquierda
+    pEnd = { x: cx + dx, y: cy - dy };   // Arriba-Derecha
+
   } else if (cfg.direction === 'top_down_right_left') {
+    // ↙ D2: Arriba hacia Abajo, Derecha hacia Izquierda
+    // Inicio (1) = Arriba-Derecha (x mayor, y menor en canvas)
+    // Fin (2) = Abajo-Izquierda (x menor, y mayor en canvas)
     dirArrow = '↙';
-    dirLabel = 'Arriba a Abajo (↙)';
-    angleDeg = 240;
+    dirLabel = 'Arriba a Abajo, Derecha a Izquierda (↙)';
+    angleDeg = 55;
     if (
       cfg.variationType === 'rotation' ||
       cfg.variationType === 'rotation_length' ||
       cfg.variationType === 'total_random'
     ) {
-      angleDeg = rng.range(218, 255);
+      angleDeg = rng.range(35, 75);
     }
+    const thetaRad = (angleDeg * Math.PI) / 180;
+    const dx = halfL * Math.cos(thetaRad);
+    const dy = halfL * Math.sin(thetaRad);
+    pStart = { x: cx + dx, y: cy - dy }; // Arriba-Derecha
+    pEnd = { x: cx - dx, y: cy + dy };   // Abajo-Izquierda
+
   } else if (cfg.direction === 'top_down_left_right') {
+    // ↘ D3: Arriba hacia Abajo, Izquierda hacia Derecha
+    // Inicio (1) = Arriba-Izquierda (x menor, y menor en canvas)
+    // Fin (2) = Abajo-Derecha (x mayor, y mayor en canvas)
     dirArrow = '↘';
-    dirLabel = 'Arriba a Abajo (↘)';
-    angleDeg = 315;
+    dirLabel = 'Arriba a Abajo, Izquierda a Derecha (↘)';
+    angleDeg = 45;
     if (
       cfg.variationType === 'rotation' ||
       cfg.variationType === 'rotation_length' ||
       cfg.variationType === 'total_random'
     ) {
-      angleDeg = rng.range(295, 335);
+      angleDeg = rng.range(25, 65);
     }
+    const thetaRad = (angleDeg * Math.PI) / 180;
+    const dx = halfL * Math.cos(thetaRad);
+    const dy = halfL * Math.sin(thetaRad);
+    pStart = { x: cx - dx, y: cy - dy }; // Arriba-Izquierda
+    pEnd = { x: cx + dx, y: cy + dy };   // Abajo-Derecha
+
   } else if (cfg.direction === 'bottom_up_right_left') {
+    // ↖ D4: Abajo hacia Arriba, Derecha hacia Izquierda
+    // Inicio (1) = Abajo-Derecha (x mayor, y mayor en canvas)
+    // Fin (2) = Arriba-Izquierda (x menor, y menor en canvas)
     dirArrow = '↖';
-    dirLabel = 'Abajo a Arriba (↖)';
-    angleDeg = 135;
+    dirLabel = 'Abajo a Arriba, Derecha a Izquierda (↖)';
+    angleDeg = 45;
     if (
       cfg.variationType === 'rotation' ||
       cfg.variationType === 'rotation_length' ||
       cfg.variationType === 'total_random'
     ) {
-      angleDeg = rng.range(118, 155);
+      angleDeg = rng.range(25, 65);
     }
+    const thetaRad = (angleDeg * Math.PI) / 180;
+    const dx = halfL * Math.cos(thetaRad);
+    const dy = halfL * Math.sin(thetaRad);
+    pStart = { x: cx + dx, y: cy + dy }; // Abajo-Derecha
+    pEnd = { x: cx - dx, y: cy - dy };   // Arriba-Izquierda
+
   } else if (isCurve) {
     dirArrow = '〜';
     dirLabel = cfg.direction === 'curve_c' ? 'Arco en C' : 'Onda en S';
@@ -148,38 +188,39 @@ export function generateSingleStrokeChallenge(
     else if (cfg.curvature === 'medium') sagitta = L * 0.28;
     else if (cfg.curvature === 'pronounced') sagitta = L * 0.48;
 
-    const pStart = {
+    const cStart = {
       x: cx - (L / 2) * Math.cos(angleRad),
-      y: cy - (L / 2) * Math.sin(angleRad),
-    };
-    const pEnd = {
-      x: cx + (L / 2) * Math.cos(angleRad),
       y: cy + (L / 2) * Math.sin(angleRad),
+    };
+    const cEnd = {
+      x: cx + (L / 2) * Math.cos(angleRad),
+      y: cy - (L / 2) * Math.sin(angleRad),
     };
 
     const perpAngle = angleRad - Math.PI / 2;
-    const pMid = {
-      x: (pStart.x + pEnd.x) / 2 + Math.cos(perpAngle) * sagitta,
-      y: (pStart.y + pEnd.y) / 2 + Math.sin(perpAngle) * sagitta,
+    const cMid = {
+      x: (cStart.x + cEnd.x) / 2 + Math.cos(perpAngle) * sagitta,
+      y: (cStart.y + cEnd.y) / 2 + Math.sin(perpAngle) * sagitta,
     };
 
     // Punto de control cuadrático
     const cp = {
-      x: 2 * pMid.x - 0.5 * pStart.x - 0.5 * pEnd.x,
-      y: 2 * pMid.y - 0.5 * pStart.y - 0.5 * pEnd.y,
+      x: 2 * cMid.x - 0.5 * cStart.x - 0.5 * cEnd.x,
+      y: 2 * cMid.y - 0.5 * cStart.y - 0.5 * cEnd.y,
     };
 
     const STEPS = 40;
     for (let i = 0; i <= STEPS; i++) {
       const t = i / STEPS;
-      const x = (1 - t) * (1 - t) * pStart.x + 2 * (1 - t) * t * cp.x + t * t * pEnd.x;
-      const y = (1 - t) * (1 - t) * pStart.y + 2 * (1 - t) * t * cp.y + t * t * pEnd.y;
+      const x = (1 - t) * (1 - t) * cStart.x + 2 * (1 - t) * t * cp.x + t * t * cEnd.x;
+      const y = (1 - t) * (1 - t) * cStart.y + 2 * (1 - t) * t * cp.y + t * t * cEnd.y;
       idealPoints.push({ x, y });
     }
 
-    keyPoints.push({ x: pStart.x, y: pStart.y, order: 1, label: '① INICIO', type: 'start' });
-    keyPoints.push({ x: pMid.x, y: pMid.y, order: 2, label: '② VÉRTICE', type: 'mid' });
-    keyPoints.push({ x: pEnd.x, y: pEnd.y, order: 3, label: '③ FIN', type: 'end' });
+    keyPoints.push({ x: cStart.x, y: cStart.y, order: 1, label: '1', type: 'start' });
+    keyPoints.push({ x: cMid.x, y: cMid.y, order: 2, label: '2', type: 'mid' });
+    keyPoints.push({ x: cEnd.x, y: cEnd.y, order: 3, label: '3', type: 'end' });
+
   } else if (cfg.direction === 'curve_s') {
     // Onda en S: sinusoidal
     let amplitude = 25;
@@ -195,33 +236,24 @@ export function generateSingleStrokeChallenge(
       const s = (t - 0.5) * L;
       const wave = Math.sin(t * Math.PI * 2) * amplitude;
       const x = cx + s * Math.cos(angleRad) + wave * Math.cos(perpAngle);
-      const y = cy + s * Math.sin(angleRad) + wave * Math.sin(perpAngle);
+      const y = cy - s * Math.sin(angleRad) - wave * Math.sin(perpAngle);
       idealPoints.push({ x, y });
     }
 
-    const pStart = idealPoints[0];
-    const pCrest = idealPoints[Math.round(STEPS * 0.25)];
-    const pInflection = idealPoints[Math.round(STEPS * 0.5)];
-    const pTrough = idealPoints[Math.round(STEPS * 0.75)];
-    const pEnd = idealPoints[STEPS];
+    const sStart = idealPoints[0];
+    const sCrest = idealPoints[Math.round(STEPS * 0.25)];
+    const sInflection = idealPoints[Math.round(STEPS * 0.5)];
+    const sTrough = idealPoints[Math.round(STEPS * 0.75)];
+    const sEnd = idealPoints[STEPS];
 
-    keyPoints.push({ x: pStart.x, y: pStart.y, order: 1, label: '① INICIO', type: 'start' });
-    keyPoints.push({ x: pCrest.x, y: pCrest.y, order: 2, label: '② CRESTA', type: 'mid' });
-    keyPoints.push({ x: pInflection.x, y: pInflection.y, order: 3, label: '③ INFLEXIÓN', type: 'mid' });
-    keyPoints.push({ x: pTrough.x, y: pTrough.y, order: 4, label: '④ VALLE', type: 'mid' });
-    keyPoints.push({ x: pEnd.x, y: pEnd.y, order: 5, label: '⑤ FIN', type: 'end' });
+    keyPoints.push({ x: sStart.x, y: sStart.y, order: 1, label: '1', type: 'start' });
+    keyPoints.push({ x: sCrest.x, y: sCrest.y, order: 2, label: '2', type: 'mid' });
+    keyPoints.push({ x: sInflection.x, y: sInflection.y, order: 3, label: '3', type: 'mid' });
+    keyPoints.push({ x: sTrough.x, y: sTrough.y, order: 4, label: '4', type: 'mid' });
+    keyPoints.push({ x: sEnd.x, y: sEnd.y, order: 5, label: '5', type: 'end' });
+
   } else {
-    // Línea Recta: punto inicial ① y punto final ②
-    const halfL = L / 2;
-    const pStart = {
-      x: cx - halfL * Math.cos(angleRad),
-      y: cy - halfL * Math.sin(angleRad),
-    };
-    const pEnd = {
-      x: cx + halfL * Math.cos(angleRad),
-      y: cy + halfL * Math.sin(angleRad),
-    };
-
+    // Línea Recta: punto inicial 1 y punto final 2
     const STEPS = 30;
     for (let i = 0; i <= STEPS; i++) {
       const t = i / STEPS;
@@ -231,8 +263,8 @@ export function generateSingleStrokeChallenge(
       });
     }
 
-    keyPoints.push({ x: pStart.x, y: pStart.y, order: 1, label: '① INICIO', type: 'start' });
-    keyPoints.push({ x: pEnd.x, y: pEnd.y, order: 2, label: '② FIN', type: 'end' });
+    keyPoints.push({ x: pStart.x, y: pStart.y, order: 1, label: '1', type: 'start' });
+    keyPoints.push({ x: pEnd.x, y: pEnd.y, order: 2, label: '2', type: 'end' });
   }
 
   return {
