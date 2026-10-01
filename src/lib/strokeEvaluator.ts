@@ -283,12 +283,189 @@ export function calculateOpticalDensity(
 }
 
 /**
+ * Evaluación instantánea de Calistenia de Trazo Único (Línea o Curva)
+ */
+export function evaluateSingleStrokeSubmission(
+  strokes: RawStroke[],
+  challenge: ProceduralStrokeChallenge
+): StrokeEvaluation {
+  if (strokes.length === 0 || strokes[0].points.length === 0) {
+    return {
+      overallScore: 0,
+      passed: false,
+      isSingleStroke: true,
+      metrics: {
+        parallelismScore: 0,
+        spacingScore: 0,
+        straightnessScore: 0,
+        tonalDensityScore: 0,
+        boundaryScore: 0,
+      },
+      detectedStats: {
+        strokeCount: 0,
+        measuredAvgSpacingPx: 0,
+        spacingVariance: 0,
+        measuredAvgAngleDeg: 0,
+        measuredOpticalDensityPct: 0,
+      },
+      feedbackTitle: 'Sin trazo detectado',
+      feedbackMessage: 'Dibuja una línea o curva para evaluar.',
+      tipMessage: 'Pulsa y arrastra desde el punto ① hacia el ②.',
+    };
+  }
+
+  const userStroke = strokes[0];
+  const pts = userStroke.points;
+  const userStart = pts[0];
+  const userEnd = pts[pts.length - 1];
+
+  const keyPoints = challenge.keyPoints || [];
+  const targetStart = keyPoints[0] || { x: 0, y: 0 };
+  const targetEnd = keyPoints[keyPoints.length - 1] || { x: 100, y: 100 };
+
+  // 1. Verificación de dirección biomecánica (¿trazó de ① hacia ②, o al revés?)
+  const distStartToTargetStart = Math.hypot(userStart.x - targetStart.x, userStart.y - targetStart.y);
+  const distStartToTargetEnd = Math.hypot(userStart.x - targetEnd.x, userStart.y - targetEnd.y);
+  const distEndToTargetEnd = Math.hypot(userEnd.x - targetEnd.x, userEnd.y - targetEnd.y);
+  const distEndToTargetStart = Math.hypot(userEnd.x - targetStart.x, userEnd.y - targetStart.y);
+
+  let isReversed = false;
+  if (distStartToTargetEnd < distStartToTargetStart && distEndToTargetStart < distEndToTargetEnd) {
+    isReversed = true;
+  }
+
+  // 2. Puntería en los puntos diana (Inicio y Fin)
+  const startErr = isReversed ? distStartToTargetEnd : distStartToTargetStart;
+  const endErr = isReversed ? distEndToTargetStart : distEndToTargetEnd;
+  const avgEndpointErr = (startErr + endErr) / 2;
+  const boundaryScore = Math.round(Math.max(0, 100 - avgEndpointErr * 1.6));
+
+  // 3. Rectitud / Curvatura
+  let straightnessScore = 100;
+  const isCurve = challenge.category === 'single_stroke_curve';
+
+  if (!isCurve) {
+    let maxPerpDev = 0;
+    for (let i = 1; i < pts.length - 1; i++) {
+      const d = distPointToSegment(pts[i].x, pts[i].y, targetStart.x, targetStart.y, targetEnd.x, targetEnd.y);
+      if (d > maxPerpDev) maxPerpDev = d;
+    }
+    straightnessScore = Math.round(Math.max(0, 100 - maxPerpDev * 3.8));
+  } else {
+    const ideal = challenge.idealPath || [];
+    if (ideal.length > 0) {
+      let totalDist = 0;
+      for (const p of pts) {
+        let minDist = Infinity;
+        for (const ip of ideal) {
+          const d = Math.hypot(p.x - ip.x, p.y - ip.y);
+          if (d < minDist) minDist = d;
+        }
+        totalDist += minDist;
+      }
+      const avgCurveDist = totalDist / pts.length;
+      straightnessScore = Math.round(Math.max(0, 100 - avgCurveDist * 2.8));
+    }
+  }
+
+  // 4. Precisión de Ángulo
+  const userAngleRad = Math.atan2(userEnd.y - userStart.y, userEnd.x - userStart.x);
+  let userAngleDeg = (userAngleRad * 180) / Math.PI;
+  if (userAngleDeg < 0) userAngleDeg += 360;
+
+  let targetAngleDeg = challenge.targetAngleDeg;
+  if (targetAngleDeg < 0) targetAngleDeg += 360;
+
+  let angleDiff = Math.abs(userAngleDeg - targetAngleDeg);
+  if (angleDiff > 180) angleDiff = 360 - angleDiff;
+  const parallelismScore = Math.round(Math.max(0, 100 - angleDiff * 2.2));
+
+  // 5. Cálculo Global
+  let overallScore = boundaryScore * 0.40 + straightnessScore * 0.40 + parallelismScore * 0.20;
+  let directionWarning: string | undefined;
+
+  if (isReversed) {
+    overallScore = Math.max(0, overallScore - 30);
+    directionWarning = '⚠️ DIRECCIÓN INVERTIDA: Has trazado de ② hacia ①. Inicia siempre en ① y proyecta hacia ②.';
+  }
+
+  overallScore = Math.min(100, Math.max(0, Math.round(overallScore)));
+  const passed = overallScore >= 70;
+
+  let feedbackTitle = '¡Buen Trazo!';
+  let feedbackMessage = `Puntería diana: ${boundaryScore}%, Rectitud/Curva: ${straightnessScore}%.`;
+  let tipMessage = 'Mantén la velocidad de trazo constante sin titubeos.';
+  let avatarMood: AvatarMood = 'wink';
+
+  if (overallScore >= 90) {
+    feedbackTitle = '¡Diana Perfecta! 🎯';
+    feedbackMessage = `Trazo magistral: anclaje milimétrico (error: ${Math.round(avgEndpointErr)}px) y rectitud ${straightnessScore}%.`;
+    tipMessage = 'Excelente velocidad y seguridad en la trayectoria.';
+    avatarMood = 'success-stars';
+  } else if (overallScore >= 75) {
+    feedbackTitle = '¡Nivel Superado! ✅';
+    feedbackMessage = `Trazo firme y bien dirigido (${overallScore}%).`;
+    tipMessage = 'Afina la llegada al punto final sin sobrepasarte.';
+    avatarMood = 'wink';
+  } else if (overallScore >= 55) {
+    feedbackTitle = 'Cerca de la Diana 🏹';
+    feedbackMessage = `Desviación en extremos (error: ${Math.round(avgEndpointErr)}px) o arqueo del trazo.`;
+    tipMessage = 'Haz 1 o 2 pasadas en el aire antes de tocar la pantalla (Ghosting).';
+    avatarMood = 'curious';
+  } else {
+    feedbackTitle = 'Desviación en Trayectoria 💨';
+    feedbackMessage = directionWarning || `El trazo se desvió de la trayectoria objetivo (${overallScore}%).`;
+    tipMessage = 'Fija la mirada en el punto ② antes de iniciar el movimiento en ①.';
+    avatarMood = 'fail-spiral';
+  }
+
+  return {
+    overallScore,
+    passed,
+    isSingleStroke: true,
+    directionWarning,
+    solutionOverlay: {
+      points: challenge.idealPath || [],
+      color: passed ? '#10B981' : '#EF4444',
+      label: passed ? 'Solución Óptima' : 'Corrección Necesaria',
+    },
+    metrics: {
+      parallelismScore,
+      spacingScore: 100,
+      straightnessScore,
+      tonalDensityScore: 100,
+      boundaryScore,
+    },
+    detectedStats: {
+      strokeCount: 1,
+      measuredAvgSpacingPx: 0,
+      spacingVariance: 0,
+      measuredAvgAngleDeg: Math.round(userAngleDeg),
+      measuredOpticalDensityPct: 0,
+    },
+    feedbackTitle,
+    feedbackMessage,
+    tipMessage,
+    avatarMood,
+  };
+}
+
+/**
  * Validador principal para evaluar cualquier reto del laboratorio
  */
 export function evaluateStrokeSubmission(
   strokes: RawStroke[],
   challenge: ProceduralStrokeChallenge
 ): StrokeEvaluation {
+  // Si es un reto de trazo único, usar el evaluador de calistenia instantánea
+  if (
+    challenge.isSingleStrokeAutoEval ||
+    challenge.category === 'single_stroke_line' ||
+    challenge.category === 'single_stroke_curve'
+  ) {
+    return evaluateSingleStrokeSubmission(strokes, challenge);
+  }
+
   if (strokes.length === 0) {
     return {
       overallScore: 0,

@@ -1,8 +1,10 @@
 import {
   ProceduralStrokeChallenge,
   WorkbookExerciseDef,
-  ALL_42_EXERCISES,
+  LabExerciseDef,
+  ALL_LAB_EXERCISES,
   PolyFace,
+  KeyPoint,
 } from './strokeTypes';
 
 /**
@@ -15,7 +17,7 @@ export class SeededRNG {
   private state: number;
 
   constructor(seed: number) {
-    this.state = Math.abs(seed) % (this.m - 1) + 1;
+    this.state = (Math.abs(seed) % (this.m - 1)) + 1;
   }
 
   nextFloat(): number {
@@ -33,7 +35,238 @@ export class SeededRNG {
 }
 
 /**
- * Genera un reto procedural único según el ejercicio del cuaderno y una semilla
+ * Genera un reto de Calistenia Dinámica de Trazo Único (Línea o Curva)
+ */
+export function generateSingleStrokeChallenge(
+  exercise: LabExerciseDef,
+  seed: number,
+  canvasWidth = 600,
+  canvasHeight = 540
+): ProceduralStrokeChallenge {
+  const rng = new SeededRNG(seed);
+  const cfg = exercise.singleStrokeConfig || {
+    direction: 'bottom_up_left_right',
+    variationType: 'fixed',
+    guideType: 'gray_line',
+  };
+
+  const isCurve = cfg.direction === 'curve_c' || cfg.direction === 'curve_s';
+
+  // 1. Centro (cx, cy)
+  let cx = canvasWidth / 2;
+  let cy = canvasHeight / 2;
+  if (
+    cfg.variationType === 'position' ||
+    cfg.variationType === 'position_length' ||
+    cfg.variationType === 'total_random'
+  ) {
+    cx = rng.range(210, canvasWidth - 210);
+    cy = rng.range(190, canvasHeight - 190);
+  }
+
+  // 2. Longitud L
+  let L = 220;
+  if (
+    cfg.variationType === 'length' ||
+    cfg.variationType === 'rotation_length' ||
+    cfg.variationType === 'position_length' ||
+    cfg.variationType === 'total_random'
+  ) {
+    L = rng.range(130, 310);
+  }
+
+  // 3. Ángulo de dirección
+  let angleDeg = 60;
+  let dirArrow = '↗';
+  let dirLabel = 'Abajo a Arriba (↗)';
+
+  if (cfg.direction === 'bottom_up_left_right') {
+    dirArrow = '↗';
+    dirLabel = 'Abajo a Arriba (↗)';
+    angleDeg = 60;
+    if (
+      cfg.variationType === 'rotation' ||
+      cfg.variationType === 'rotation_length' ||
+      cfg.variationType === 'total_random'
+    ) {
+      angleDeg = rng.range(38, 75);
+    }
+  } else if (cfg.direction === 'top_down_right_left') {
+    dirArrow = '↙';
+    dirLabel = 'Arriba a Abajo (↙)';
+    angleDeg = 240;
+    if (
+      cfg.variationType === 'rotation' ||
+      cfg.variationType === 'rotation_length' ||
+      cfg.variationType === 'total_random'
+    ) {
+      angleDeg = rng.range(218, 255);
+    }
+  } else if (cfg.direction === 'top_down_left_right') {
+    dirArrow = '↘';
+    dirLabel = 'Arriba a Abajo (↘)';
+    angleDeg = 315;
+    if (
+      cfg.variationType === 'rotation' ||
+      cfg.variationType === 'rotation_length' ||
+      cfg.variationType === 'total_random'
+    ) {
+      angleDeg = rng.range(295, 335);
+    }
+  } else if (cfg.direction === 'bottom_up_right_left') {
+    dirArrow = '↖';
+    dirLabel = 'Abajo a Arriba (↖)';
+    angleDeg = 135;
+    if (
+      cfg.variationType === 'rotation' ||
+      cfg.variationType === 'rotation_length' ||
+      cfg.variationType === 'total_random'
+    ) {
+      angleDeg = rng.range(118, 155);
+    }
+  } else if (isCurve) {
+    dirArrow = '〜';
+    dirLabel = cfg.direction === 'curve_c' ? 'Arco en C' : 'Onda en S';
+    angleDeg = 0;
+    if (
+      cfg.variationType === 'rotation' ||
+      cfg.variationType === 'rotation_length' ||
+      cfg.variationType === 'total_random'
+    ) {
+      angleDeg = rng.range(-35, 35);
+    }
+  }
+
+  const angleRad = (angleDeg * Math.PI) / 180;
+  const keyPoints: KeyPoint[] = [];
+  const idealPoints: { x: number; y: number }[] = [];
+
+  if (cfg.direction === 'curve_c') {
+    // Arco en C: parametrizado a lo largo de una cuerda L
+    let sagitta = 35;
+    if (cfg.curvature === 'subtle') sagitta = L * 0.14;
+    else if (cfg.curvature === 'medium') sagitta = L * 0.28;
+    else if (cfg.curvature === 'pronounced') sagitta = L * 0.48;
+
+    const pStart = {
+      x: cx - (L / 2) * Math.cos(angleRad),
+      y: cy - (L / 2) * Math.sin(angleRad),
+    };
+    const pEnd = {
+      x: cx + (L / 2) * Math.cos(angleRad),
+      y: cy + (L / 2) * Math.sin(angleRad),
+    };
+
+    const perpAngle = angleRad - Math.PI / 2;
+    const pMid = {
+      x: (pStart.x + pEnd.x) / 2 + Math.cos(perpAngle) * sagitta,
+      y: (pStart.y + pEnd.y) / 2 + Math.sin(perpAngle) * sagitta,
+    };
+
+    // Punto de control cuadrático
+    const cp = {
+      x: 2 * pMid.x - 0.5 * pStart.x - 0.5 * pEnd.x,
+      y: 2 * pMid.y - 0.5 * pStart.y - 0.5 * pEnd.y,
+    };
+
+    const STEPS = 40;
+    for (let i = 0; i <= STEPS; i++) {
+      const t = i / STEPS;
+      const x = (1 - t) * (1 - t) * pStart.x + 2 * (1 - t) * t * cp.x + t * t * pEnd.x;
+      const y = (1 - t) * (1 - t) * pStart.y + 2 * (1 - t) * t * cp.y + t * t * pEnd.y;
+      idealPoints.push({ x, y });
+    }
+
+    keyPoints.push({ x: pStart.x, y: pStart.y, order: 1, label: '① INICIO', type: 'start' });
+    keyPoints.push({ x: pMid.x, y: pMid.y, order: 2, label: '② VÉRTICE', type: 'mid' });
+    keyPoints.push({ x: pEnd.x, y: pEnd.y, order: 3, label: '③ FIN', type: 'end' });
+  } else if (cfg.direction === 'curve_s') {
+    // Onda en S: sinusoidal
+    let amplitude = 25;
+    if (cfg.curvature === 'subtle') amplitude = 18;
+    else if (cfg.curvature === 'medium') amplitude = 32;
+    else if (cfg.curvature === 'pronounced') amplitude = 52;
+
+    const STEPS = 50;
+    const perpAngle = angleRad - Math.PI / 2;
+
+    for (let i = 0; i <= STEPS; i++) {
+      const t = i / STEPS;
+      const s = (t - 0.5) * L;
+      const wave = Math.sin(t * Math.PI * 2) * amplitude;
+      const x = cx + s * Math.cos(angleRad) + wave * Math.cos(perpAngle);
+      const y = cy + s * Math.sin(angleRad) + wave * Math.sin(perpAngle);
+      idealPoints.push({ x, y });
+    }
+
+    const pStart = idealPoints[0];
+    const pCrest = idealPoints[Math.round(STEPS * 0.25)];
+    const pInflection = idealPoints[Math.round(STEPS * 0.5)];
+    const pTrough = idealPoints[Math.round(STEPS * 0.75)];
+    const pEnd = idealPoints[STEPS];
+
+    keyPoints.push({ x: pStart.x, y: pStart.y, order: 1, label: '① INICIO', type: 'start' });
+    keyPoints.push({ x: pCrest.x, y: pCrest.y, order: 2, label: '② CRESTA', type: 'mid' });
+    keyPoints.push({ x: pInflection.x, y: pInflection.y, order: 3, label: '③ INFLEXIÓN', type: 'mid' });
+    keyPoints.push({ x: pTrough.x, y: pTrough.y, order: 4, label: '④ VALLE', type: 'mid' });
+    keyPoints.push({ x: pEnd.x, y: pEnd.y, order: 5, label: '⑤ FIN', type: 'end' });
+  } else {
+    // Línea Recta: punto inicial ① y punto final ②
+    const halfL = L / 2;
+    const pStart = {
+      x: cx - halfL * Math.cos(angleRad),
+      y: cy - halfL * Math.sin(angleRad),
+    };
+    const pEnd = {
+      x: cx + halfL * Math.cos(angleRad),
+      y: cy + halfL * Math.sin(angleRad),
+    };
+
+    const STEPS = 30;
+    for (let i = 0; i <= STEPS; i++) {
+      const t = i / STEPS;
+      idealPoints.push({
+        x: pStart.x + (pEnd.x - pStart.x) * t,
+        y: pStart.y + (pEnd.y - pStart.y) * t,
+      });
+    }
+
+    keyPoints.push({ x: pStart.x, y: pStart.y, order: 1, label: '① INICIO', type: 'start' });
+    keyPoints.push({ x: pEnd.x, y: pEnd.y, order: 2, label: '② FIN', type: 'end' });
+  }
+
+  return {
+    id: `single-${exercise.code}-${seed}`,
+    pageNumber: exercise.page || 0,
+    code: exercise.code,
+    category: exercise.category,
+    title: exercise.title,
+    subtitle: `${dirArrow} ${dirLabel} · L: ${Math.round(L)}px · ${
+      cfg.guideType === 'gray_line' ? 'Guía Gris Continua' : 'Solo Puntos Diana'
+    }`,
+    blockTitle: exercise.block,
+    seed,
+    instruction: exercise.instruction,
+    targetMetricsText: exercise.metrics,
+    targetAngleDeg: angleDeg,
+    targetSpacingPx: 0,
+    targetLengthPx: L,
+    minRequiredStrokes: 1,
+    isSingleStrokeAutoEval: true,
+    guideMode: cfg.guideType,
+    keyPoints,
+    ghostSolutionStrokes: [{ points: idealPoints }],
+    idealPath: idealPoints,
+    expectedDirectionAngleDeg: angleDeg,
+    guideLines:
+      cfg.guideType === 'gray_line' && !isCurve
+        ? [{ x1: keyPoints[0].x, y1: keyPoints[0].y, x2: keyPoints[1].x, y2: keyPoints[1].y, dashed: false }]
+        : [],
+  };
+}
+
+/**
+ * Genera un reto procedural único según el ejercicio y una semilla
  */
 export function generateStrokeChallenge(
   exerciseOrPage: WorkbookExerciseDef | number,
@@ -41,18 +274,28 @@ export function generateStrokeChallenge(
   canvasWidth = 600,
   canvasHeight = 540
 ): ProceduralStrokeChallenge {
-  const exercise: WorkbookExerciseDef =
+  const exercise: LabExerciseDef =
     typeof exerciseOrPage === 'number'
-      ? ALL_42_EXERCISES.find((e) => e.page === exerciseOrPage) || ALL_42_EXERCISES[0]
+      ? ALL_LAB_EXERCISES.find((e) => e.page === exerciseOrPage) || ALL_LAB_EXERCISES[0]
       : exerciseOrPage;
+
+  // Si es un ejercicio de trazo único de calistenia, generamos reto de trazo único
+  if (
+    exercise.isSingleStroke ||
+    exercise.family === 'calisthenics_single' ||
+    exercise.category === 'single_stroke_line' ||
+    exercise.category === 'single_stroke_curve'
+  ) {
+    return generateSingleStrokeChallenge(exercise, seed, canvasWidth, canvasHeight);
+  }
 
   const rng = new SeededRNG(seed);
   const cx = canvasWidth / 2;
   const cy = canvasHeight / 2;
 
   const baseChallenge: ProceduralStrokeChallenge = {
-    id: `stroke-${exercise.page}-${seed}`,
-    pageNumber: exercise.page,
+    id: `stroke-${exercise.page || exercise.code}-${seed}`,
+    pageNumber: exercise.page || 0,
     code: exercise.code,
     category: exercise.category,
     title: exercise.title,
@@ -66,11 +309,11 @@ export function generateStrokeChallenge(
     targetLengthPx: 120,
     minRequiredStrokes: 6,
     guideLines: [],
+    ghostSolutionStrokes: [],
   };
 
   switch (exercise.category) {
     case 'parallel_lines': {
-      // Ángulo aleatorio que rompe la memoria muscular
       const angleDeg = rng.range(35, 145);
       const angleRad = (angleDeg * Math.PI) / 180;
       const targetSpacingPx = rng.rangeInt(10, 20);
@@ -81,19 +324,35 @@ export function generateStrokeChallenge(
       const halfW = corridorWidth / 2;
       const halfL = targetLengthPx / 2;
 
-      // Raíl 1
       const r1x1 = cx - Math.cos(perpRad) * halfW - Math.cos(angleRad) * halfL;
       const r1y1 = cy - Math.sin(perpRad) * halfW - Math.sin(angleRad) * halfL;
       const r1x2 = cx + Math.cos(perpRad) * halfW - Math.cos(angleRad) * halfL;
       const r1y2 = cy + Math.sin(perpRad) * halfW - Math.sin(angleRad) * halfL;
 
-      // Raíl 2
       const r2x1 = cx - Math.cos(perpRad) * halfW + Math.cos(angleRad) * halfL;
       const r2y1 = cy - Math.sin(perpRad) * halfW + Math.sin(angleRad) * halfL;
       const r2x2 = cx + Math.cos(perpRad) * halfW + Math.cos(angleRad) * halfL;
       const r2y2 = cy + Math.sin(perpRad) * halfW + Math.sin(angleRad) * halfL;
 
       const expectedStrokes = Math.round(corridorWidth / targetSpacingPx);
+      const ghostSolutionStrokes: { points: { x: number; y: number }[] }[] = [];
+      const strokeCount = Math.min(expectedStrokes, 16);
+
+      for (let i = 0; i < strokeCount; i++) {
+        const offset = -halfW + (i / (strokeCount - 1 || 1)) * corridorWidth;
+        ghostSolutionStrokes.push({
+          points: [
+            {
+              x: cx + Math.cos(perpRad) * offset - Math.cos(angleRad) * halfL,
+              y: cy + Math.sin(perpRad) * offset - Math.sin(angleRad) * halfL,
+            },
+            {
+              x: cx + Math.cos(perpRad) * offset + Math.cos(angleRad) * halfL,
+              y: cy + Math.sin(perpRad) * offset + Math.sin(angleRad) * halfL,
+            },
+          ],
+        });
+      }
 
       return {
         ...baseChallenge,
@@ -106,15 +365,30 @@ export function generateStrokeChallenge(
           { x1: r1x1, y1: r1y1, x2: r1x2, y2: r1y2, dashed: true },
           { x1: r2x1, y1: r2y1, x2: r2x2, y2: r2y2, dashed: true },
         ],
+        ghostSolutionStrokes,
       };
     }
 
     case 'contour_lines': {
-      // Cintas o cuñas con contornos curvos delimitadores
       const w = rng.range(180, 240);
       const h = rng.range(140, 190);
       const leftX = cx - w / 2;
       const rightX = cx + w / 2;
+
+      const ghostSolutionStrokes: { points: { x: number; y: number }[] }[] = [];
+      for (let i = 1; i <= 8; i++) {
+        const t = i / 9;
+        const x = leftX + (rightX - leftX) * t;
+        const yTop = cy - h * 0.45;
+        const yBot = cy + h * 0.45;
+        ghostSolutionStrokes.push({
+          points: [
+            { x: x - 10, y: yTop },
+            { x: x + 5, y: (yTop + yBot) / 2 },
+            { x: x - 10, y: yBot },
+          ],
+        });
+      }
 
       return {
         ...baseChallenge,
@@ -127,11 +401,11 @@ export function generateStrokeChallenge(
           { x1: leftX, y1: cy - h / 2, x2: leftX, y2: cy + h / 2, dashed: false },
           { x1: rightX, y1: cy - h * 0.4, x2: rightX, y2: cy + h * 0.4, dashed: false },
         ],
+        ghostSolutionStrokes,
       };
     }
 
     case 'angles_zigzags': {
-      // Quiebros angulares secos (chevrones o relámpagos)
       const apexAngle = rng.range(50, 110);
       const chevronCount = rng.rangeInt(3, 5);
       const chevronH = 80;
@@ -139,6 +413,7 @@ export function generateStrokeChallenge(
 
       const guideLines: { x1: number; y1: number; x2: number; y2: number; dashed?: boolean }[] = [];
       const startX = cx - ((chevronCount - 1) * step) / 2;
+      const ghostPts: { x: number; y: number }[] = [];
 
       for (let i = 0; i < chevronCount; i++) {
         const x = startX + i * step;
@@ -146,6 +421,9 @@ export function generateStrokeChallenge(
           { x1: x - 25, y1: cy + chevronH / 2, x2: x, y2: cy - chevronH / 2, dashed: true },
           { x1: x, y1: cy - chevronH / 2, x2: x + 25, y2: cy + chevronH / 2, dashed: true }
         );
+        ghostPts.push({ x: x - 25, y: cy + chevronH / 2 });
+        ghostPts.push({ x: x, y: cy - chevronH / 2 });
+        ghostPts.push({ x: x + 25, y: cy + chevronH / 2 });
       }
 
       return {
@@ -154,6 +432,7 @@ export function generateStrokeChallenge(
         targetAngleDeg: apexAngle,
         minRequiredStrokes: chevronCount * 2,
         guideLines,
+        ghostSolutionStrokes: [{ points: ghostPts }],
       };
     }
 
@@ -165,6 +444,17 @@ export function generateStrokeChallenge(
 
       const startX = cx - waveLengthTotal / 2;
       const startY = cy;
+
+      const ghostSolutionStrokes: { points: { x: number; y: number }[] }[] = [];
+      for (let row = -2; row <= 2; row++) {
+        const wavePts: { x: number; y: number }[] = [];
+        const yOffset = row * 16;
+        for (let x = startX; x <= startX + waveLengthTotal; x += 8) {
+          const y = startY + yOffset + amplitude * Math.sin(((x - startX) / wavelength) * Math.PI * 2);
+          wavePts.push({ x, y });
+        }
+        ghostSolutionStrokes.push({ points: wavePts });
+      }
 
       return {
         ...baseChallenge,
@@ -184,183 +474,216 @@ export function generateStrokeChallenge(
           { x1: startX, y1: startY - amplitude * 1.5, x2: startX + waveLengthTotal, y2: startY - amplitude * 1.5, dashed: true },
           { x1: startX, y1: startY + amplitude * 1.5, x2: startX + waveLengthTotal, y2: startY + amplitude * 1.5, dashed: true },
         ],
+        ghostSolutionStrokes,
       };
     }
 
     case 'radial_focal': {
-      // Radios desde foco común
       const spokeCount = rng.rangeInt(10, 16);
       const innerR = 15;
       const outerR = rng.range(110, 150);
 
       const guideLines: { x1: number; y1: number; x2: number; y2: number; dashed?: boolean }[] = [];
-      for (let i = 0; i < spokeCount; i += 2) {
+      const ghostSolutionStrokes: { points: { x: number; y: number }[] }[] = [];
+
+      for (let i = 0; i < spokeCount; i++) {
         const a = (i / spokeCount) * Math.PI * 2;
-        guideLines.push({
-          x1: cx + Math.cos(a) * innerR,
-          y1: cy + Math.sin(a) * innerR,
-          x2: cx + Math.cos(a) * outerR,
-          y2: cy + Math.sin(a) * outerR,
-          dashed: true,
+        if (i % 2 === 0) {
+          guideLines.push({
+            x1: cx + Math.cos(a) * innerR,
+            y1: cy + Math.sin(a) * innerR,
+            x2: cx + Math.cos(a) * outerR,
+            y2: cy + Math.sin(a) * outerR,
+            dashed: true,
+          });
+        }
+        ghostSolutionStrokes.push({
+          points: [
+            { x: cx + Math.cos(a) * innerR, y: cy + Math.sin(a) * innerR },
+            { x: cx + Math.cos(a) * outerR, y: cy + Math.sin(a) * outerR },
+          ],
         });
       }
 
       return {
         ...baseChallenge,
-        subtitle: `Convergencia Focal · ${spokeCount} radios alrededor de (${Math.round(cx)}, ${Math.round(cy)})`,
+        subtitle: `Foco Radial · ${spokeCount} Radios Confluyentes`,
+        targetAngleDeg: 0,
         minRequiredStrokes: spokeCount,
         guideLines,
+        ghostSolutionStrokes,
       };
     }
 
     case 'trailing_flicks': {
-      // Espina central con desvanecidos
-      const spineLen = 220;
-      const sAngle = rng.range(20, 60);
-      const sRad = (sAngle * Math.PI) / 180;
-      const p1 = { x: cx - Math.cos(sRad) * (spineLen / 2), y: cy - Math.sin(sRad) * (spineLen / 2) };
-      const p2 = { x: cx + Math.cos(sRad) * (spineLen / 2), y: cy + Math.sin(sRad) * (spineLen / 2) };
+      const flickCount = 12;
+      const guideLines = [
+        { x1: cx - 140, y1: cy + 50, x2: cx + 140, y2: cy + 50, dashed: true },
+      ];
+      const ghostSolutionStrokes: { points: { x: number; y: number }[] }[] = [];
+      for (let i = 0; i < flickCount; i++) {
+        const x = cx - 120 + i * 22;
+        ghostSolutionStrokes.push({
+          points: [
+            { x, y: cy + 50 },
+            { x: x + 12, y: cy - 40 },
+          ],
+        });
+      }
 
       return {
         ...baseChallenge,
-        subtitle: `Desvanecimiento de Pluma (Flicks) · Espina a ${Math.round(sAngle)}°`,
-        targetAngleDeg: sAngle + 45,
-        targetLengthPx: 60,
-        minRequiredStrokes: 12,
-        guideLines: [{ x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, dashed: false }],
+        subtitle: `Flicks · Desvanecimiento Terminal Rápido`,
+        minRequiredStrokes: 10,
+        guideLines,
+        ghostSolutionStrokes,
       };
     }
 
     case 'basic_strokes':
     case 'hatching_params':
-    case 'even_value_strip': {
-      // Marcos de trama y valores tonales
-      const boxW = exercise.category === 'even_value_strip' ? rng.rangeInt(280, 360) : rng.rangeInt(180, 220);
-      const boxH = exercise.category === 'even_value_strip' ? rng.rangeInt(70, 95) : rng.rangeInt(130, 160);
-      const targetDensityTones = [20, 35, 55];
-      const targetDensityPct = targetDensityTones[rng.rangeInt(0, targetDensityTones.length - 1)];
-      const targetAngleDeg = rng.rangeInt(30, 65);
+    case 'cross_hatch_density': {
+      const boxW = 160;
+      const boxH = 140;
+      const boxX = cx - boxW / 2;
+      const boxY = cy - boxH / 2;
 
-      const bx = cx - boxW / 2;
-      const by = cy - boxH / 2;
-
-      return {
-        ...baseChallenge,
-        subtitle: `Tono Objetivo: ${targetDensityPct}% (${targetDensityPct < 30 ? 'Claro' : targetDensityPct < 50 ? 'Medio' : 'Sombra'})`,
-        targetAngleDeg,
-        targetSpacingPx: 12,
-        targetLengthPx: boxH,
-        minRequiredStrokes: 10,
-        guideBounds: { x: bx, y: by, width: boxW, height: boxH },
-        guideLines: [
-          { x1: bx, y1: by, x2: bx + boxW, y2: by, dashed: false },
-          { x1: bx + boxW, y1: by, x2: bx + boxW, y2: by + boxH, dashed: false },
-          { x1: bx + boxW, y1: by + boxH, x2: bx, y2: by + boxH, dashed: false },
-          { x1: bx, y1: by + boxH, x2: bx, y2: by, dashed: false },
-        ],
-      };
-    }
-
-    case 'cross_contour_blob':
-    case 'compound_forms': {
-      // Blobs armónicos orgánicos con eje rector
-      const numPoints = 24;
-      const baseR = rng.range(75, 95);
-      const a1 = rng.range(0.15, 0.35);
-      const a2 = rng.range(0.1, 0.25);
-      const phi1 = rng.range(0, Math.PI * 2);
-      const phi2 = rng.range(0, Math.PI * 2);
-
-      const splinePoints: { x: number; y: number }[] = [];
-      for (let i = 0; i < numPoints; i++) {
-        const theta = (i / numPoints) * Math.PI * 2;
-        const r = baseR * (1 + a1 * Math.cos(theta + phi1) + a2 * Math.sin(2 * theta + phi2));
-        splinePoints.push({
-          x: cx + r * Math.cos(theta),
-          y: cy + r * Math.sin(theta),
+      const ghostSolutionStrokes: { points: { x: number; y: number }[] }[] = [];
+      for (let i = 0; i < 14; i++) {
+        const offset = -boxW / 2 + (i / 13) * boxW;
+        ghostSolutionStrokes.push({
+          points: [
+            { x: cx + offset - 20, y: boxY + boxH },
+            { x: cx + offset + 20, y: boxY },
+          ],
         });
       }
 
-      const axisAngle = rng.range(25, 75);
-      const axisRad = (axisAngle * Math.PI) / 180;
-      const axisLen = baseR * 1.5;
-      const ax1 = cx - Math.cos(axisRad) * axisLen;
-      const ay1 = cy - Math.sin(axisRad) * axisLen;
-      const ax2 = cx + Math.cos(axisRad) * axisLen;
-      const ay2 = cy + Math.sin(axisRad) * axisLen;
+      return {
+        ...baseChallenge,
+        subtitle: `Trama en Ventana · Paso 12px`,
+        guideBounds: { x: boxX, y: boxY, width: boxW, height: boxH },
+        minRequiredStrokes: 10,
+        guideLines: [
+          { x1: boxX, y1: boxY, x2: boxX + boxW, y2: boxY, dashed: false },
+          { x1: boxX + boxW, y1: boxY, x2: boxX + boxW, y2: boxY + boxH, dashed: false },
+          { x1: boxX + boxW, y1: boxY + boxH, x2: boxX, y2: boxY + boxH, dashed: false },
+          { x1: boxX, y1: boxY + boxH, x2: boxX, y2: boxY, dashed: false },
+        ],
+        ghostSolutionStrokes,
+      };
+    }
+
+    case 'cross_contour_blob': {
+      const axisAngleDeg = rng.range(20, 60);
+      const axisAngleRad = (axisAngleDeg * Math.PI) / 180;
+      const axisLength = 220;
+
+      const ax1 = cx - (Math.cos(axisAngleRad) * axisLength) / 2;
+      const ay1 = cy - (Math.sin(axisAngleRad) * axisLength) / 2;
+      const ax2 = cx + (Math.cos(axisAngleRad) * axisLength) / 2;
+      const ay2 = cy + (Math.sin(axisAngleRad) * axisLength) / 2;
+
+      const splinePoints = [
+        { x: ax1 - 35, y: ay1 },
+        { x: cx - 55, y: cy - 40 },
+        { x: ax2 + 35, y: ay2 - 15 },
+        { x: cx + 55, y: cy + 40 },
+      ];
+
+      const ghostSolutionStrokes: { points: { x: number; y: number }[] }[] = [];
+      for (let i = 1; i <= 6; i++) {
+        const t = i / 7;
+        const curAx = ax1 + (ax2 - ax1) * t;
+        const curAy = ay1 + (ay2 - ay1) * t;
+        const perpX = -Math.sin(axisAngleRad) * 45;
+        const perpY = Math.cos(axisAngleRad) * 45;
+        ghostSolutionStrokes.push({
+          points: [
+            { x: curAx - perpX, y: curAy - perpY },
+            { x: curAx + Math.cos(axisAngleRad) * 15, y: curAy + Math.sin(axisAngleRad) * 15 },
+            { x: curAx + perpX, y: curAy + perpY },
+          ],
+        });
+      }
 
       return {
         ...baseChallenge,
-        subtitle: `Silueta Orgánica · Eje Rector a ${Math.round(axisAngle)}°`,
-        targetAngleDeg: axisAngle + 90,
-        targetSpacingPx: 16,
-        targetLengthPx: baseR * 2,
-        minRequiredStrokes: 5,
+        subtitle: `Silueta Orgánica · Contornos Ortogonales a la Varilla`,
+        minRequiredStrokes: 8,
         blobShape: {
           splinePoints,
           axisLine: { x1: ax1, y1: ay1, x2: ax2, y2: ay2 },
         },
-        guideLines: [{ x1: ax1, y1: ay1, x2: ax2, y2: ay2, dashed: true }],
+        ghostSolutionStrokes,
       };
     }
 
-    case 'direction_gradation':
-    case 'curved_surfaces': {
-      // Cinta curvada con degradado direccional
-      const w = 240;
-      const h = 140;
-      const bx = cx - w / 2;
-      const by = cy - h / 2;
+    case 'even_value_strip':
+    case 'direction_gradation': {
+      const stripW = 280;
+      const stripH = 65;
+      const stripX = cx - stripW / 2;
+      const stripY = cy - stripH / 2;
+
+      const ghostSolutionStrokes: { points: { x: number; y: number }[] }[] = [];
+      for (let i = 0; i < 20; i++) {
+        const x = stripX + (i / 19) * stripW;
+        ghostSolutionStrokes.push({
+          points: [
+            { x, y: stripY },
+            { x, y: stripY + stripH },
+          ],
+        });
+      }
 
       return {
         ...baseChallenge,
-        subtitle: `Gradación Direccional Continua`,
-        targetAngleDeg: 45,
-        targetSpacingPx: 10,
+        subtitle: `Franja Tonal · Densidad Homogénea`,
+        guideBounds: { x: stripX, y: stripY, width: stripW, height: stripH },
         minRequiredStrokes: 12,
-        guideBounds: { x: bx, y: by, width: w, height: h },
         guideLines: [
-          { x1: bx, y1: by, x2: bx + w, y2: by, dashed: false },
-          { x1: bx + w, y1: by, x2: bx + w, y2: by + h, dashed: false },
-          { x1: bx + w, y1: by + h, x2: bx, y2: by + h, dashed: false },
-          { x1: bx, y1: by + h, x2: bx, y2: by, dashed: false },
-          // Flecha de dirección en el centro
-          { x1: cx - 40, y1: cy, x2: cx + 40, y2: cy, dashed: true },
+          { x1: stripX, y1: stripY, x2: stripX + stripW, y2: stripY, dashed: false },
+          { x1: stripX, y1: stripY + stripH, x2: stripX + stripW, y2: stripY + stripH, dashed: false },
+          { x1: stripX, y1: stripY, x2: stripX, y2: stripY + stripH, dashed: false },
+          { x1: stripX + stripW, y1: stripY, x2: stripX + stripW, y2: stripY + stripH, dashed: false },
         ],
+        ghostSolutionStrokes,
       };
     }
 
-    case 'revealing_planes':
     case 'isometric_rhombille': {
-      // Panal isométrico de cubos (Rhombille)
-      const s = 45;
-      const rhombilleFaces: { orientation: 'top' | 'left' | 'right'; vertices: { x: number; y: number }[]; targetAngleDeg: number }[] = [];
+      const r = 55;
+      const centerPt = { x: cx, y: cy };
+      const topPt = { x: cx, y: cy - r * 1.73 };
+      const botPt = { x: cx, y: cy + r * 1.73 };
+      const leftPt = { x: cx - r * 1.5, y: cy };
+      const rightPt = { x: cx + r * 1.5, y: cy };
 
-      // Un cubo isométrico central
-      const cCenter = { x: cx, y: cy };
-      const cTop = { x: cx, y: cy - s };
-      const cTopR = { x: cx + s * Math.cos(Math.PI / 6), y: cy - s * Math.sin(Math.PI / 6) };
-      const cTopL = { x: cx - s * Math.cos(Math.PI / 6), y: cy - s * Math.sin(Math.PI / 6) };
-      const cBotR = { x: cx + s * Math.cos(Math.PI / 6), y: cy + s * Math.sin(Math.PI / 6) + s * 0.5 };
-      const cBotL = { x: cx - s * Math.cos(Math.PI / 6), y: cy + s * Math.sin(Math.PI / 6) + s * 0.5 };
-      const cBot = { x: cx, y: cy + s };
-
-      rhombilleFaces.push(
-        { orientation: 'top', vertices: [cTop, cTopR, cCenter, cTopL], targetAngleDeg: 0 },
-        { orientation: 'left', vertices: [cTopL, cCenter, cBot, cBotL], targetAngleDeg: 60 },
-        { orientation: 'right', vertices: [cCenter, cTopR, cBotR, cBot], targetAngleDeg: 120 }
-      );
+      const ghostSolutionStrokes: { points: { x: number; y: number }[] }[] = [];
+      for (let i = -3; i <= 3; i++) {
+        ghostSolutionStrokes.push({
+          points: [
+            { x: cx - 25, y: cy - 45 + i * 9 },
+            { x: cx + 25, y: cy - 45 + i * 9 },
+          ],
+        });
+      }
 
       return {
         ...baseChallenge,
-        subtitle: `Estructura Isométrica · Trama a 0° (arriba), 60° (izq) y 120° (der)`,
-        minRequiredStrokes: 12,
-        rhombilleFaces,
+        subtitle: `Red Isométrica · Top: 0°, Left: 60°, Right: 120°`,
+        minRequiredStrokes: 15,
+        rhombilleFaces: [
+          { orientation: 'top', vertices: [centerPt, leftPt, topPt, rightPt], targetAngleDeg: 0 },
+          { orientation: 'left', vertices: [centerPt, leftPt, { x: cx - r * 1.5, y: cy + r }, botPt], targetAngleDeg: 60 },
+          { orientation: 'right', vertices: [centerPt, rightPt, { x: cx + r * 1.5, y: cy + r }, botPt], targetAngleDeg: 120 },
+        ],
+        ghostSolutionStrokes,
       };
     }
 
     case 'cylinder_shading': {
-      // Cilindro en perspectiva
       const cylW = 120;
       const cylH = 180;
       const x1 = cx - cylW / 2;
@@ -368,58 +691,68 @@ export function generateStrokeChallenge(
       const y1 = cy - cylH / 2;
       const y2 = cy + cylH / 2;
 
+      const ghostSolutionStrokes: { points: { x: number; y: number }[] }[] = [];
+      for (let i = 0; i < 14; i++) {
+        const x = x1 + cylW * 0.4 + (i / 13) * (cylW * 0.45);
+        ghostSolutionStrokes.push({
+          points: [
+            { x, y: y1 },
+            { x, y: y2 },
+          ],
+        });
+      }
+
       return {
         ...baseChallenge,
         subtitle: `Cilindro · Sombra Núcleo y Luz Reflejada`,
         targetAngleDeg: 90,
         minRequiredStrokes: 12,
         guideLines: [
-          { x1: x1, y1: y1, x2: x2, y2: y1, dashed: false },
-          { x1: x1, y1: y1, x2: x1, y2: y2, dashed: false },
-          { x1: x2, y1: y1, x2: x2, y2: y2, dashed: false },
-          { x1: x1, y1: y2, x2: x2, y2: y2, dashed: false },
-          // Línea central de sombra núcleo
-          { x1: cx + 20, y1: y1, x2: cx + 20, y2: y2, dashed: true },
+          { x1, y1, x2, y2: y1, dashed: false },
+          { x1, y1, x2: x1, y2, dashed: false },
+          { x1: x2, y1, x2, y2, dashed: false },
+          { x1, y1: y2, x2, y2, dashed: false },
+          { x1: cx + 20, y1, x2: cx + 20, y2, dashed: true },
         ],
+        ghostSolutionStrokes,
       };
     }
 
     case 'sphere_shading': {
-      // Esfera con arcos geodésicos
       const r = 90;
+      const ghostSolutionStrokes: { points: { x: number; y: number }[] }[] = [];
+      for (let rad = 25; rad <= 85; rad += 14) {
+        const arcPts: { x: number; y: number }[] = [];
+        for (let a = Math.PI * 0.2; a <= Math.PI * 0.8; a += 0.1) {
+          arcPts.push({ x: cx + Math.cos(a) * rad, y: cy + Math.sin(a) * rad });
+        }
+        ghostSolutionStrokes.push({ points: arcPts });
+      }
+
       return {
         ...baseChallenge,
         subtitle: `Esfera · Terminador Semilunar y Arcos Geodésicos`,
         minRequiredStrokes: 14,
         guideLines: [
-          // Eje de iluminación
-          { x1: cx - r * 1.2, y1: cy - r * 1.2, x2: cx + r * 1.2, y2: cy + r * 1.2, dashed: true },
+          { x1: cx - r, y1: cy, x2: cx + r, y2: cy, dashed: true },
+          { x1: cx, y1: cy - r, x2: cx, y2: cy + r, dashed: true },
         ],
-        guideBounds: { x: cx - r, y: cy - r, width: r * 2, height: r * 2 },
+        ghostSolutionStrokes,
       };
     }
 
-    case 'polyhedron_shading':
-    case 'composition_forms':
-    case 'local_value':
     default: {
-      // Sólido poliédrico 3D con Sol Lambertiano
-      const prismW = rng.range(130, 160);
-      const prismH = rng.range(110, 140);
+      const sunX = rng.range(80, canvasWidth - 80);
+      const sunY = rng.range(60, 140);
 
-      const vTop = { x: cx, y: cy - prismH * 0.6 };
-      const vMidL = { x: cx - prismW * 0.55, y: cy - prismH * 0.05 };
-      const vMidR = { x: cx + prismW * 0.55, y: cy - prismH * 0.05 };
-      const vCenter = { x: cx, y: cy + prismH * 0.15 };
-      const vBotL = { x: cx - prismW * 0.55, y: cy + prismH * 0.65 };
-      const vBotR = { x: cx + prismW * 0.55, y: cy + prismH * 0.65 };
-      const vBottom = { x: cx, y: cy + prismH * 0.85 };
-
-      const sunAngleDeg = rng.range(25, 155);
-      const sunRad = (sunAngleDeg * Math.PI) / 180;
-      const sunDist = 190;
-      const sunX = cx - Math.cos(sunRad) * sunDist;
-      const sunY = cy - Math.sin(sunRad) * sunDist;
+      const size = 110;
+      const vCenter = { x: cx, y: cy };
+      const vTop = { x: cx, y: cy - size };
+      const vBottom = { x: cx, y: cy + size };
+      const vMidL = { x: cx - size * 0.86, y: cy - size * 0.5 };
+      const vMidR = { x: cx + size * 0.86, y: cy - size * 0.5 };
+      const vBotL = { x: cx - size * 0.86, y: cy + size * 0.5 };
+      const vBotR = { x: cx + size * 0.86, y: cy + size * 0.5 };
 
       const faces: PolyFace[] = [
         {
@@ -448,6 +781,22 @@ export function generateStrokeChallenge(
         },
       ];
 
+      const ghostSolutionStrokes: { points: { x: number; y: number }[] }[] = [];
+      for (let i = 0; i < 8; i++) {
+        ghostSolutionStrokes.push({
+          points: [
+            { x: cx - 50 + i * 7, y: cy + 15 },
+            { x: cx - 20 + i * 7, y: cy + 55 },
+          ],
+        });
+        ghostSolutionStrokes.push({
+          points: [
+            { x: cx + 10 + i * 7, y: cy + 55 },
+            { x: cx + 40 + i * 7, y: cy + 15 },
+          ],
+        });
+      }
+
       return {
         ...baseChallenge,
         subtitle: `Foco Solar en (${Math.round(sunX)}, ${Math.round(sunY)}) · Ley de Lambert`,
@@ -456,6 +805,7 @@ export function generateStrokeChallenge(
           sunPosition: { x: sunX, y: sunY },
           faces,
         },
+        ghostSolutionStrokes,
       };
     }
   }
