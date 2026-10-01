@@ -285,6 +285,7 @@ export function generateSingleStrokeChallenge(
     targetLengthPx: L,
     minRequiredStrokes: 1,
     isSingleStrokeAutoEval: true,
+    directionKey: cfg.direction,
     guideMode: cfg.guideType,
     keyPoints,
     ghostSolutionStrokes: [{ points: idealPoints }],

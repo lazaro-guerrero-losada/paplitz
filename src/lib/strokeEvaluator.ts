@@ -1,5 +1,6 @@
 import { RawStroke, ProceduralStrokeChallenge, StrokeEvaluation } from './strokeTypes';
 import { AvatarMood } from './avatarTypes';
+import { analyzeStrokeKinematics, recordStrokeSpeed } from './strokeKinematics';
 
 /**
  * Distancia euclídea entre dos puntos
@@ -419,36 +420,78 @@ export function evaluateSingleStrokeSubmission(
     passed = false;
   }
 
+  // 7. Análisis Cinemático y Derivadas (Velocidad, Aceleración, Fluidez y Fase)
+  const activePhase = challenge.activePhase || 1;
+  const directionKey =
+    challenge.directionKey || (challenge.category === 'single_stroke_curve' ? 'curve_c' : 'general');
+  const kinematics = analyzeStrokeKinematics(
+    userStroke,
+    directionKey,
+    activePhase,
+    challenge.targetLengthPx || 220
+  );
+
+  // Si no está invertido y tiene un anclaje razonable, registrar la velocidad para nutrir el perfil adaptativo del usuario
+  if (!isReversed && boundaryScore >= 60) {
+    recordStrokeSpeed(directionKey, kinematics.avgSpeedPxPerSec);
+  }
+
+  // La fase se aprueba si cumple tanto la geometría como el criterio de velocidad/fluidez de su fase
+  const phasePassed = passed && kinematics.phasePassed;
+
   let feedbackTitle = '¡Buen Trazo!';
   let feedbackMessage = `Puntería: ${boundaryScore}%, Rectitud: ${straightnessScore}%, Ángulo: ${parallelismScore}%.`;
   let tipMessage = 'Mantén la velocidad de trazo constante sin titubeos.';
   let avatarMood: AvatarMood = 'wink';
 
-  if (overallScore >= 90 && passed) {
-    feedbackTitle = '¡Diana Perfecta! 🎯';
-    feedbackMessage = `Trazo magistral: anclaje milimétrico (error: ${Math.round(avgEndpointErr)}px) y rectitud ${straightnessScore}%.`;
-    tipMessage = 'Excelente velocidad y seguridad en la trayectoria.';
-    avatarMood = 'success-stars';
-  } else if (overallScore >= 70 && passed) {
-    feedbackTitle = '¡Nivel Superado! ✅';
-    feedbackMessage = `Trazo firme y bien dirigido (${overallScore}%).`;
-    tipMessage = 'Afina la llegada al punto final sin sobrepasarte.';
-    avatarMood = 'wink';
-  } else if (isReversed) {
+  if (isReversed) {
     feedbackTitle = 'Dirección Invertida 🔄';
     feedbackMessage = directionWarning || 'Inicia siempre en el punto ① y termina en el ②.';
     tipMessage = 'Observa el número 1 antes de apoyar el lápiz.';
     avatarMood = 'fail-spiral';
-  } else if (overallScore >= 50) {
-    feedbackTitle = 'Cerca de la Diana 🏹';
-    feedbackMessage = `Desviación en extremos (error: ${Math.round(avgEndpointErr)}px) o ángulo desviado (${Math.round(angleDiff)}°).`;
-    tipMessage = 'Haz 1 o 2 pasadas en el aire antes de tocar la pantalla (Ghosting).';
-    avatarMood = 'curious';
+  } else if (!passed) {
+    if (overallScore >= 50) {
+      feedbackTitle = 'Cerca de la Diana 🏹';
+      feedbackMessage = `Desviación en extremos (error: ${Math.round(avgEndpointErr)}px) o ángulo desviado (${Math.round(angleDiff)}°).`;
+      tipMessage = 'Haz 1 o 2 pasadas en el aire antes de tocar la pantalla (Ghosting).';
+      avatarMood = 'curious';
+    } else {
+      feedbackTitle = 'Desviación en Trayectoria 💨';
+      feedbackMessage = `El trazo se desvió del objetivo (${overallScore}%).`;
+      tipMessage = 'Fija la mirada en el punto ② antes de iniciar el movimiento en ①.';
+      avatarMood = 'fail-spiral';
+    }
+  } else if (!kinematics.phasePassed) {
+    // Geometría aprobada, pero no cumplió la velocidad/fluidez requerida para esta fase
+    if (activePhase === 2) {
+      feedbackTitle = 'Línea Precisa pero Falta Fluidez 〰️';
+      feedbackMessage = `${kinematics.speedDiagnosisLabel}. Fluidez: ${kinematics.fluencyScore}%. ${kinematics.phaseRequirementText}.`;
+      tipMessage = 'Bloquea la muñeca y mueve el antebrazo en un único impulso sin corregir a mitad de camino.';
+      avatarMood = 'curious';
+    } else if (activePhase === 3) {
+      feedbackTitle = 'Buena Línea pero Requiere Velocidad ⚡';
+      feedbackMessage = `Velocidad: ${kinematics.avgSpeedPxPerSec} px/s (${kinematics.speedDiagnosisLabel}). ${kinematics.phaseRequirementText}.`;
+      tipMessage = 'Proyecta el movimiento con dos pasadas rápidas en el aire y dispara sin miedo a fallar.';
+      avatarMood = 'wink';
+    }
   } else {
-    feedbackTitle = 'Desviación en Trayectoria 💨';
-    feedbackMessage = directionWarning || `El trazo se desvió del objetivo (${overallScore}%).`;
-    tipMessage = 'Fija la mirada en el punto ② antes de iniciar el movimiento en ①.';
-    avatarMood = 'fail-spiral';
+    // Fase plenamente superada (Geometría + Cinemática)
+    if (activePhase === 1) {
+      feedbackTitle = '¡Fase 1 Superada: Puntería Diáfana! 🎯';
+      feedbackMessage = `Anclaje exacto (${boundaryScore}% puntería). ${kinematics.durationMs}ms a ${kinematics.avgSpeedPxPerSec} px/s.`;
+      tipMessage = '¡Excelente! Ahora avanza a la Fase 2 (Fluidez) para mecanizar el ritmo.';
+      avatarMood = overallScore >= 90 ? 'success-stars' : 'wink';
+    } else if (activePhase === 2) {
+      feedbackTitle = '¡Fase 2 Superada: Ritmo & Fluidez! 〰️';
+      feedbackMessage = `Trazo continuo sin titubeos (Fluidez: ${kinematics.fluencyScore}%, ${kinematics.avgSpeedPxPerSec} px/s).`;
+      tipMessage = '¡Gran soltura! Listo para la Fase 3: Disparo balístico a máxima velocidad.';
+      avatarMood = 'success-stars';
+    } else {
+      feedbackTitle = '¡Fase 3 Dominada: Velocidad Pura! ⚡';
+      feedbackMessage = `Trazo balístico magistral (${kinematics.avgSpeedPxPerSec} px/s, ${kinematics.durationMs}ms) sin perder puntería (${boundaryScore}%).`;
+      tipMessage = '¡Memoria muscular forjada! Tienes este ángulo dominado en todos los registros.';
+      avatarMood = 'success-stars';
+    }
   }
 
   return {
@@ -456,6 +499,9 @@ export function evaluateSingleStrokeSubmission(
     passed,
     isSingleStroke: true,
     directionWarning,
+    currentPhase: activePhase,
+    phasePassed,
+    kinematics,
     solutionOverlay: {
       points: challenge.idealPath || [],
       color: '#000000', // Estricto blanco y negro
@@ -524,13 +570,26 @@ export function buildStrokeDebugReport(
     ``,
     `--- RESULTADO DE EVALUACIÓN ---`,
     `Nota Global: ${evaluation.overallScore}% (Superado: ${evaluation.passed ? 'SÍ' : 'NO'})`,
+    evaluation.currentPhase ? `Fase Activa: Fase ${evaluation.currentPhase} (Fase Superada: ${evaluation.phasePassed ? 'SÍ' : 'NO'})` : '',
     `Puntería en Dianas: ${evaluation.metrics.boundaryScore}%`,
     `Rectitud / Curva: ${evaluation.metrics.straightnessScore}%`,
     `Paralelismo / Vector: ${evaluation.metrics.parallelismScore}%`,
+    ``,
+    evaluation.kinematics
+      ? [
+          `--- CINEMÁTICA Y BIOMECÁNICA ---`,
+          `Duración: ${evaluation.kinematics.durationMs}ms`,
+          `Velocidad Media: ${evaluation.kinematics.avgSpeedPxPerSec} px/s (Pico: ${evaluation.kinematics.peakSpeedPxPerSec} px/s)`,
+          `Media Adaptativa del Usuario: ${evaluation.kinematics.userBaselineSpeedPxPerSec} px/s (${Math.round(evaluation.kinematics.speedRatioVsBaseline * 100)}% de tu media)`,
+          `Índice de Fluidez: ${evaluation.kinematics.fluencyScore}% (Micro-frenazos: ${evaluation.kinematics.microStopCount})`,
+          `Diagnóstico Velocidad: ${evaluation.kinematics.speedDiagnosisLabel}`,
+        ].join('\n')
+      : '',
+    ``,
     evaluation.directionWarning ? `Aviso Dirección: ${evaluation.directionWarning}` : `Dirección: Correcta`,
     `Diagnóstico: ${evaluation.feedbackTitle} - ${evaluation.feedbackMessage}`,
     `================================================`,
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 }
 
 /**

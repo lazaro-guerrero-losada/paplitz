@@ -104,8 +104,10 @@ export interface ProceduralStrokeChallenge {
   targetLengthPx: number;
   minRequiredStrokes: number;
 
-  // Trazo Único Dinámico y Solución Fantasma
+  // Trazo Único Dinámico, Fases y Solución Fantasma
   isSingleStrokeAutoEval?: boolean;
+  directionKey?: StrokeDirection;
+  activePhase?: 1 | 2 | 3;
   guideMode?: 'gray_line' | 'points_only';
   keyPoints?: KeyPoint[];
   ghostSolutionStrokes?: { points: { x: number; y: number }[] }[];
@@ -171,6 +173,9 @@ export interface StrokeEvaluation {
   directionWarning?: string;
   solutionOverlay?: { points: { x: number; y: number }[]; color: string; label: string };
   avatarMood?: import('./avatarTypes').AvatarMood;
+  kinematics?: import('./strokeKinematics').StrokeKinematicsResult;
+  currentPhase?: 1 | 2 | 3;
+  phasePassed?: boolean;
 }
 
 function buildSingleStrokeLevel(

@@ -9,6 +9,7 @@ import {
 } from '../lib/strokeTypes';
 import { generateStrokeChallenge } from '../lib/strokeProceduralGenerator';
 import { evaluateStrokeSubmission, buildStrokeDebugReport } from '../lib/strokeEvaluator';
+import { getUserSpeedProfile, getBiomechanicalComparison } from '../lib/strokeKinematics';
 import {
   Dices,
   Eye,
@@ -27,6 +28,8 @@ import {
   AlertTriangle,
   Check,
   ArrowRight,
+  Activity,
+  Gauge,
 } from 'lucide-react';
 
 interface StrokeLabViewProps {
@@ -59,13 +62,18 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
   const currentExercise: LabExerciseDef =
     ALL_LAB_EXERCISES[currentExerciseIndex] || ALL_LAB_EXERCISES[0];
 
+  // Fase didáctica activa para calistenia (1: Precisión/Lento, 2: Fluidez/Ritmo, 3: Velocidad/Disparo)
+  const [currentPhase, setCurrentPhase] = useState<1 | 2 | 3>(1);
+
   // Reto procedural generado con semilla
   const [challengeSeed, setChallengeSeed] = useState<number>(() =>
     Math.floor(Math.random() * 90000 + 10000)
   );
-  const [challenge, setChallenge] = useState<ProceduralStrokeChallenge>(() =>
-    generateStrokeChallenge(currentExercise, challengeSeed, 600, 540)
-  );
+  const [challenge, setChallenge] = useState<ProceduralStrokeChallenge>(() => {
+    const ch = generateStrokeChallenge(currentExercise, challengeSeed, 600, 540);
+    ch.activePhase = 1;
+    return ch;
+  });
 
   // Estado del dibujo del usuario
   const [strokes, setStrokes] = useState<RawStroke[]>([]);
@@ -96,12 +104,23 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
     const newSeed = Math.floor(Math.random() * 90000 + 10000);
     setChallengeSeed(newSeed);
     const newChallenge = generateStrokeChallenge(currentExercise, newSeed, 600, 540);
+    newChallenge.activePhase = currentPhase;
     setChallenge(newChallenge);
     setStrokes([]);
     currentStrokeRef.current = [];
     setIsDrawing(false);
     setEvaluation(null);
-  }, [currentExercise]);
+  }, [currentExercise, currentPhase]);
+
+  // Cambiar manualmente de fase (1: Precisión, 2: Fluidez, 3: Velocidad)
+  const handlePhaseSelect = useCallback((phase: 1 | 2 | 3) => {
+    setCurrentPhase(phase);
+    setChallenge((prev) => ({ ...prev, activePhase: phase }));
+    setStrokes([]);
+    currentStrokeRef.current = [];
+    setIsDrawing(false);
+    setEvaluation(null);
+  }, []);
 
   // Reintentar el reto actual (borrar trazos y reiniciar evaluación manteniendo la misma semilla)
   const handleRetryCurrent = useCallback(() => {
@@ -131,9 +150,11 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
       setCurrentExerciseIndex(idx);
       setImgError(false);
       setStreak(0);
+      setCurrentPhase(1);
       const newSeed = Math.floor(Math.random() * 90000 + 10000);
       setChallengeSeed(newSeed);
       const newChallenge = generateStrokeChallenge(exercise, newSeed, 600, 540);
+      newChallenge.activePhase = 1;
       setChallenge(newChallenge);
       setStrokes([]);
       currentStrokeRef.current = [];
@@ -166,7 +187,7 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
     }
   };
 
-  // Atajos de teclado: Espacio / Enter para avanzar al siguiente reto, R para reintentar
+  // Atajos de teclado: Espacio / Enter para avanzar (o cambiar de fase), R para reintentar
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (['INPUT', 'SELECT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) {
@@ -174,7 +195,11 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
       }
       if ((e.code === 'Space' || e.code === 'Enter') && evaluation !== null) {
         e.preventDefault();
-        handleNewRandomChallenge();
+        if (evaluation.phasePassed && currentPhase < 3) {
+          handlePhaseSelect((currentPhase + 1) as 1 | 2 | 3);
+        } else {
+          handleNewRandomChallenge();
+        }
       } else if (e.key.toLowerCase() === 'r' && evaluation !== null) {
         e.preventDefault();
         handleRetryCurrent();
@@ -182,7 +207,7 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [evaluation, handleNewRandomChallenge, handleRetryCurrent]);
+  }, [currentPhase, evaluation, handleNewRandomChallenge, handlePhaseSelect, handleRetryCurrent]);
 
   // Renderizado del lienzo en estética Paplitz (Papel Blanco Técnico + Tinta Negra)
   const renderCanvas = useCallback(() => {
@@ -773,6 +798,56 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
               </div>
             </div>
 
+            {/* Selector de 3 Fases Cinemáticas (1. Precisión -> 2. Fluidez -> 3. Velocidad) */}
+            {challenge.isSingleStrokeAutoEval && (
+              <div className="w-full mb-2 p-1 border-2 border-black bg-white flex items-center justify-between gap-1 shadow-[2px_2px_0px_#000000]">
+                <div className="flex items-center gap-1 min-w-0">
+                  <span className="text-[10px] font-mono uppercase font-black text-neutral-500 px-1 shrink-0">
+                    Fases:
+                  </span>
+                  <button
+                    onClick={() => handlePhaseSelect(1)}
+                    className={`px-2 py-0.5 text-xs font-mono font-bold border border-black cursor-pointer transition-colors ${
+                      currentPhase === 1
+                        ? 'bg-black text-white'
+                        : 'bg-white text-black hover:bg-neutral-100'
+                    }`}
+                    title="Fase 1: Puntería en ① y ② a ritmo libre y calmado"
+                  >
+                    1. Precisión
+                  </button>
+                  <button
+                    onClick={() => handlePhaseSelect(2)}
+                    className={`px-2 py-0.5 text-xs font-mono font-bold border border-black cursor-pointer transition-colors ${
+                      currentPhase === 2
+                        ? 'bg-black text-white'
+                        : 'bg-white text-black hover:bg-neutral-100'
+                    }`}
+                    title="Fase 2: Ritmo constante y fluido sin micro-paradas ni titubeos"
+                  >
+                    2. Fluidez
+                  </button>
+                  <button
+                    onClick={() => handlePhaseSelect(3)}
+                    className={`px-2 py-0.5 text-xs font-mono font-bold border border-black cursor-pointer transition-colors ${
+                      currentPhase === 3
+                        ? 'bg-black text-white'
+                        : 'bg-white text-black hover:bg-neutral-100'
+                    }`}
+                    title="Fase 3: Disparo balístico veloz y decidido"
+                  >
+                    3. Velocidad
+                  </button>
+                </div>
+
+                <div className="text-[10px] font-mono text-neutral-600 font-bold hidden sm:block pr-1 truncate">
+                  {currentPhase === 1 && '🎯 Puntería exacta (ritmo libre)'}
+                  {currentPhase === 2 && '〰️ Trazo continuo sin titubear'}
+                  {currentPhase === 3 && '⚡ Golpe balístico veloz'}
+                </div>
+              </div>
+            )}
+
             {/* Banner de Instrucción del Nivel */}
             <div className="w-full mb-2 px-3 py-1.5 border border-black bg-neutral-50 flex items-center justify-between text-xs">
               <div className="flex items-center gap-1.5 min-w-0">
@@ -815,7 +890,7 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
                   <div className="flex items-center gap-2.5 min-w-0">
                     <span
                       className={`text-sm font-mono font-black border-2 border-black px-2 py-0.5 shrink-0 ${
-                        evaluation.passed ? 'bg-black text-white' : 'bg-neutral-100 text-black'
+                        evaluation.phasePassed ? 'bg-black text-white' : 'bg-neutral-100 text-black'
                       }`}
                     >
                       {evaluation.overallScore}%
@@ -823,9 +898,11 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
                     <div className="text-[11px] font-mono leading-tight min-w-0">
                       <div className="flex items-center gap-1.5 font-bold text-black truncate">
                         <span>{evaluation.feedbackTitle}</span>
-                        <span className="text-[10px] text-neutral-500 font-normal">
-                          ({evaluation.passed ? 'Aprobado' : 'No superado'})
-                        </span>
+                        {evaluation.kinematics && (
+                          <span className="text-[10px] text-neutral-600 font-normal">
+                            · {evaluation.kinematics.avgSpeedPxPerSec} px/s ({(evaluation.kinematics.durationMs / 1000).toFixed(2)}s)
+                          </span>
+                        )}
                       </div>
                       <span className="text-neutral-600 truncate block max-w-[260px] sm:max-w-md">
                         {evaluation.directionWarning || evaluation.feedbackMessage}
@@ -863,15 +940,26 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
                       <span className="hidden xs:inline">Reintentar</span>
                     </button>
 
-                    {/* Botón Siguiente Reto */}
-                    <button
-                      onClick={handleNewRandomChallenge}
-                      className="btn-ink px-3 py-1 text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
-                      title="Generar siguiente reto procedural (Espacio / Enter)"
-                    >
-                      <span>Siguiente</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
+                    {/* Botón Siguiente / Avanzar de Fase */}
+                    {evaluation.phasePassed && currentPhase < 3 ? (
+                      <button
+                        onClick={() => handlePhaseSelect((currentPhase + 1) as 1 | 2 | 3)}
+                        className="btn-ink px-3 py-1 text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
+                        title={`Avanzar a Fase ${currentPhase + 1} (Espacio / Enter)`}
+                      >
+                        <span>Fase {currentPhase + 1}</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleNewRandomChallenge}
+                        className="btn-ink px-3 py-1 text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
+                        title="Generar siguiente reto procedural (Espacio / Enter)"
+                      >
+                        <span>{evaluation.phasePassed && currentPhase === 3 ? '¡Dominado! Siguiente' : 'Siguiente'}</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -930,14 +1018,25 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
                     </button>
                   )}
                   {evaluation ? (
-                    <button
-                      onClick={handleNewRandomChallenge}
-                      className="btn-ink px-3 sm:px-4 py-1 text-xs font-mono font-bold uppercase tracking-wider cursor-pointer flex items-center gap-1.5 shrink-0 shadow-[2px_2px_0px_#000000]"
-                      title="Siguiente reto procedural (Espacio / Enter)"
-                    >
-                      <span>Siguiente (Espacio)</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
+                    evaluation.phasePassed && currentPhase < 3 ? (
+                      <button
+                        onClick={() => handlePhaseSelect((currentPhase + 1) as 1 | 2 | 3)}
+                        className="btn-ink px-3 sm:px-4 py-1 text-xs font-mono font-bold uppercase tracking-wider cursor-pointer flex items-center gap-1.5 shrink-0 shadow-[2px_2px_0px_#000000]"
+                        title={`Avanzar a Fase ${currentPhase + 1} (Espacio / Enter)`}
+                      >
+                        <span>Fase {currentPhase + 1}</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleNewRandomChallenge}
+                        className="btn-ink px-3 sm:px-4 py-1 text-xs font-mono font-bold uppercase tracking-wider cursor-pointer flex items-center gap-1.5 shrink-0 shadow-[2px_2px_0px_#000000]"
+                        title="Siguiente reto procedural (Espacio / Enter)"
+                      >
+                        <span>{evaluation.phasePassed && currentPhase === 3 ? '¡Dominado! Siguiente' : 'Siguiente (Espacio)'}</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    )
                   ) : (
                     <button
                       onClick={handleNewRandomChallenge}
@@ -1063,17 +1162,112 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
                   💡 {evaluation.tipMessage}
                 </div>
               </div>
+
+              {/* Telemetría Cinemática y Análisis de Derivadas */}
+              {evaluation.kinematics && (
+                <div className="border-t-2 border-black pt-2 flex flex-col gap-1.5 font-mono text-[11px]">
+                  <div className="flex justify-between items-center bg-neutral-100 p-1.5 border border-black">
+                    <span className="font-bold flex items-center gap-1 text-[11px]">
+                      <Gauge className="w-3.5 h-3.5" />
+                      <span>Velocidad Trazo:</span>
+                    </span>
+                    <span className="font-black">
+                      {evaluation.kinematics.avgSpeedPxPerSec} px/s
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-1 text-[10px]">
+                    <div className="border border-neutral-300 p-1 bg-white">
+                      <span className="text-neutral-500 block">Tiempo real:</span>
+                      <strong className="text-black font-bold">{(evaluation.kinematics.durationMs / 1000).toFixed(2)}s</strong>
+                    </div>
+                    <div className="border border-neutral-300 p-1 bg-white">
+                      <span className="text-neutral-500 block">Índice Fluidez:</span>
+                      <strong className="text-black font-bold">{evaluation.kinematics.fluencyScore}%</strong>
+                    </div>
+                  </div>
+
+                  <div className="text-[10px] text-neutral-700 bg-neutral-50 p-1.5 border border-neutral-200 leading-tight">
+                    Tu media en esta dirección: <strong>{evaluation.kinematics.userBaselineSpeedPxPerSec} px/s</strong> (
+                    {evaluation.kinematics.speedRatioVsBaseline >= 1 ? '+' : ''}
+                    {Math.round((evaluation.kinematics.speedRatioVsBaseline - 1) * 100)}%)
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="border-2 border-black bg-white p-4 shadow-[3px_3px_0px_#000000] text-center">
               <span className="text-xs font-mono font-bold uppercase tracking-wider block mb-1">
-                {challenge.isSingleStrokeAutoEval ? 'Modo Trazo Instantáneo' : 'Lienzo en Espera'}
+                {challenge.isSingleStrokeAutoEval ? `Fase ${currentPhase}: Calistenia Adaptativa` : 'Lienzo en Espera'}
               </span>
               <p className="text-xs text-neutral-600 font-sans leading-relaxed">
                 {challenge.isSingleStrokeAutoEval
-                  ? 'Traza desde el punto ① hacia el ②. La web evaluará tu trazo automáticamente en cuanto levantes la pluma y mostrará la solución.'
+                  ? currentPhase === 1
+                    ? 'Fase 1 (Precisión): Dibuja a tu propio ritmo conectando ① con ② sin preocuparte por el tiempo.'
+                    : currentPhase === 2
+                    ? 'Fase 2 (Fluidez): Mantén una velocidad constante con el antebrazo sin titubear ni pararte.'
+                    : 'Fase 3 (Velocidad): Realiza pasadas en el aire y dispara un trazo rápido y balístico.'
                   : 'Dibuja las líneas en el lienzo blanco y presiona "Evaluar" para obtener el diagnóstico físico.'}
               </p>
+            </div>
+          )}
+
+          {/* Tarjeta de Perfil Biomecánico Adaptativo del Usuario */}
+          {challenge.isSingleStrokeAutoEval && (
+            <div className="border-2 border-black bg-white p-3 shadow-[2px_2px_0px_#000000] text-xs">
+              <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-black">
+                <span className="text-[10px] font-mono font-bold uppercase tracking-wider flex items-center gap-1 text-black">
+                  <Activity className="w-3.5 h-3.5" />
+                  <span>Tu Perfil Biomecánico</span>
+                </span>
+                <span className="text-[9px] font-mono bg-neutral-100 border border-black px-1 font-bold">
+                  Adaptativo
+                </span>
+              </div>
+
+              {(() => {
+                const profile = getUserSpeedProfile();
+                const dirs = profile.directions;
+                const dList = [
+                  { key: 'bottom_up_left_right', label: 'D1 (↗ Asc. Der)', stat: dirs['bottom_up_left_right'] },
+                  { key: 'top_down_right_left', label: 'D2 (↙ Desc. Izq)', stat: dirs['top_down_right_left'] },
+                  { key: 'top_down_left_right', label: 'D3 (↘ Desc. Der)', stat: dirs['top_down_left_right'] },
+                  { key: 'bottom_up_right_left', label: 'D4 (↖ Asc. Izq)', stat: dirs['bottom_up_right_left'] },
+                ];
+                const insight = getBiomechanicalComparison(profile);
+
+                return (
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-1 text-[10px] font-mono">
+                      {dList.map((d) => (
+                        <div
+                          key={d.key}
+                          className={`p-1.5 border ${
+                            challenge.directionKey === d.key
+                              ? 'border-black bg-neutral-100 font-bold shadow-[1px_1px_0px_#000000]'
+                              : 'border-neutral-200 bg-neutral-50'
+                          }`}
+                        >
+                          <span className="block text-[9px] text-neutral-600 truncate">{d.label}</span>
+                          <span className="text-black font-bold">
+                            {d.stat ? `${d.stat.avgSpeedPxPerSec} px/s` : 'Sin datos'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {insight ? (
+                      <p className="text-[10px] text-neutral-700 font-sans leading-tight bg-neutral-50 p-1.5 border border-neutral-200">
+                        💡 {insight}
+                      </p>
+                    ) : (
+                      <p className="text-[10px] text-neutral-500 font-sans leading-tight">
+                        Completa trazos en diferentes ángulos para calcular tus diferencias de velocidad biomecánica.
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )}
 
