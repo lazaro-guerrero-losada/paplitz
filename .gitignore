@@ -29,6 +29,18 @@ dist-ssr
 *.apk
 *.aab
 *.exe
+docs/extracted_pages/
+extracted_pages/
+public/extracted_pages/
+*.jpg
+*.jpeg
+*.png
+scratch/
+*.docx
+*.pptx
+*.tsbuildinfo
+
+
 
 # Android build outputs
 android/.gradle/

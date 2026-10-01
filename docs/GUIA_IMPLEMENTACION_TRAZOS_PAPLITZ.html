@@ -1,0 +1,1436 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Paplitz — Guía Maestra de Trazos y Tramado (42 Páginas)</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: #131b2e;
+      --card-border: #1e293b;
+      --accent: #f59e0b;
+      --accent-glow: rgba(245, 158, 11, 0.15);
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --info: #38bdf8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding-bottom: 80px;
+    }
+    header {
+      background: linear-gradient(180deg, #1e293b 0%, #090d16 100%);
+      border-bottom: 1px solid var(--card-border);
+      padding: 40px 24px 30px;
+      text-align: center;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      background: var(--accent-glow);
+      color: var(--accent);
+      border: 1px solid var(--accent);
+    }
+    h1 { font-size: 2.2rem; font-weight: 800; color: #fff; margin-bottom: 8px; }
+    .subtitle { color: var(--text-muted); font-size: 1.05rem; max-width: 800px; margin: 0 auto 20px; }
+    .meta-bar {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      flex-wrap: wrap;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+    .meta-item strong { color: var(--accent); }
+    .container { max-width: 1280px; margin: 0 auto; padding: 24px; }
+    
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+    .stat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+    }
+    .stat-val { font-size: 2.2rem; font-weight: 800; color: var(--accent); margin-bottom: 4px; }
+    .stat-lbl { font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
+
+    .block-header {
+      background: #1e293b;
+      border-left: 4px solid var(--accent);
+      padding: 16px 20px;
+      border-radius: 8px;
+      margin: 40px 0 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .block-title { font-size: 1.3rem; font-weight: 700; color: #fff; }
+
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+    .page-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .page-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 25px -5px rgba(0,0,0,0.5), 0 0 15px var(--accent-glow);
+      border-color: var(--accent);
+    }
+    .card-img-wrap {
+      width: 100%;
+      height: 300px;
+      background: #000;
+      overflow: hidden;
+      position: relative;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .card-img-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: #fff;
+    }
+    .page-pill {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(4px);
+      color: #fff;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    .viability-pill {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: rgba(16, 185, 129, 0.9);
+      color: #fff;
+    }
+    .viability-pill.parcial {
+      background: rgba(245, 158, 11, 0.9);
+    }
+    .card-body {
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      flex-grow: 1;
+      gap: 12px;
+    }
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.4;
+    }
+    .card-desc {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+    .detail-box {
+      background: #0b1120;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 0.8rem;
+    }
+    .detail-label {
+      color: var(--accent);
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 0.7rem;
+      letter-spacing: 0.05em;
+      margin-bottom: 2px;
+    }
+    .detail-val {
+      color: #cbd5e1;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.78rem;
+    }
+
+    .print-btn {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--accent);
+      color: #000;
+      border: none;
+      padding: 12px 22px;
+      border-radius: 9999px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+      z-index: 100;
+    }
+    .print-btn:hover { background: #d97706; }
+
+    @media print {
+      body { background: #fff; color: #000; }
+      header { background: #fff; color: #000; border-bottom: 2px solid #000; }
+      h1, .card-title, .block-title { color: #000 !important; }
+      .page-card { break-inside: avoid; border: 1px solid #ccc; background: #fff; color: #000; box-shadow: none; margin-bottom: 20px; }
+      .detail-box { background: #f8fafc; border: 1px solid #e2e8f0; }
+      .detail-val { color: #334155; }
+      .print-btn { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="badge">Especificación Técnica & Pedagógica</div>
+    <h1>Paplitz: Deconstrucción del Cuaderno de Trazos (42 Páginas)</h1>
+    <p class="subtitle">
+      Guía integral de implementación web: viabilidad en Canvas, captura con PointerEvents, métricas algorítmicas, 
+      sistema procedural anti-memoria muscular y diseño de niveles para Paplitz.
+    </p>
+    <div class="meta-bar">
+      <div class="meta-item">Páginas Analizadas: <strong>42 de 42</strong></div>
+      <div class="meta-item">Viabilidad Web: <strong>41 Directas / 1 Adaptable</strong></div>
+      <div class="meta-item">Módulo: <strong>Trazado y Tramado Libre</strong></div>
+      <div class="meta-item">Hardware: <strong>Stylus / Touch / Mouse</strong></div>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="summary-grid">
+      <div class="stat-card">
+        <div class="stat-val">42</div>
+        <div class="stat-lbl">Páginas Desgranadas</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val">100%</div>
+        <div class="stat-lbl">Medición en Web Canvas</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val">8</div>
+        <div class="stat-lbl">Unidades Pedagógicas</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val">∞</div>
+        <div class="stat-lbl">Retos Procedurales Únicos</div>
+      </div>
+    </div>
+
+      <div class="block-header">
+        <div class="block-title">📁 Bloque 1: Consistencia & Calistenia</div>
+      </div>
+      <div class="cards-grid">
+    
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 1</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_01.jpg" alt="Página 1" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 1.1: Consistency (Making Strokes Consistent)</div>
+        <div class="card-desc">Cuatro filas de entrenamiento: espaciado, longitud, grosor y dirección. Es la base de todo sombreado.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Spacing variance, length error, angular variance, pressure stability</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Score = 100 - 30(σ_spacing / d_avg) - 30(ΔL / L_target) - 25(σ_θ / 10°) - 15(curvatura)</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Ángulo de carril aleatorio (45°-135°), paso objetivo (8-16px) y longitud (60-180px).</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 2</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_02.jpg" alt="Página 2" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 1.2: Consistency across Contour Outlines</div>
+        <div class="card-desc">Siluetas orgánicas (cintas, cuñas, caracol) rellenadas con tramas que siguen la curvatura.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Anclaje en bordes, progresión de curvatura, espaciado medial</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Penalización por trazos que no tocan ambos bordes o cruzan abruptamente el contorno.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Splines cúbicas Bézier con vértices aleatorios para generar cintas y caracoles únicos.</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 3</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_03.jpg" alt="Página 3" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 1.3: Pen Control — Straight Lines</div>
+        <div class="card-desc">Líneas rectas en 8 cuadrantes espaciales para entrenar el pivote de codo y hombro.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Rectitud del trazo (sagita < 2.5px), alineación angular Δθ, Jitter Index</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Distancia perpendicular de cada punto intermedio al segmento euclídeo P1-PM.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Ángulo diana rotado de 0° a 360° y distancia variable de 50px a 300px.</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 4</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_04.jpg" alt="Página 4" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 1.4: Pen Control — Angles & Zigzags</div>
+        <div class="card-desc">Quiebros secos: bayonetas, chevrones, vértices en V, zigzags triples y relámpagos Z/N.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Radio de curvatura de vértice R -> 0px, alineación de cúspides, rectitud de alas</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Segmentación de esquinas y cálculo de ángulo de deflexión instantáneo en el vértice.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Ángulo de apertura α de 45° a 120° y número de quiebros (2 a 4) aleatorio.</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 5</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_05.jpg" alt="Página 5" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 1.5: Pen Control — Curved Lines</div>
+        <div class="card-desc">Curvas en C en 4 orientaciones y curvas en S sinusoidales horizontales y verticales.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Continuidad de curvatura C2, distancia de Fréchet, paralelismo de arcos</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Segunda derivada d²y/dx² con signo constante en arcos C y un solo punto de inflexión en S.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Amplitud A, longitud de onda λ y radio de curvatura R generados por semilla.</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 6</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_06.jpg" alt="Página 6" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 1.6: Pen Control — Radial & Complex Organic Strokes</div>
+        <div class="card-desc">Molinetes en espiral, estrella de radios rectos divergentes, llamas y ojos concéntricos.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Confluencia focal (distancia al punto central ε <= 6px), paso angular regular</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Prolongación vectorial del trazo hacia el núcleo central (x0, y0).</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Posición de núcleo, número de radios (8 a 20) y torsión espiral aleatoria.</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 7</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_07.jpg" alt="Página 7" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 1.7: Pen Control — Trailing Lines (Flicks)</div>
+        <div class="card-desc">Líneas con escape de pluma (flick): soltar presión al final del trazo para crear remate afilado.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Aceleración terminal dv/dt > 0, presión decreciente p -> 0, ángulo de inserción</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Perfil cinemático de despegue comparando velocidad terminal vs velocidad media.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Spline rectora y longitud variable de cerdas generadas proceduralmente.</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 8</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_08.jpg" alt="Página 8" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 1.8: Pen Control — Advanced Spines & Contours</div>
+        <div class="card-desc">Espinas complejas: tubos en U, cintas onduladas, orugas y espinas simétricas.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Normalidad ortogonal v · n_spine ≈ 1, densidad regular a lo largo del arco s</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Cálculo del marco de Frenet-Serret a lo largo de la spline guía.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Trayectoria paramétrica Catmull-Rom con puntos de control aleatorios.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+      <div class="block-header">
+        <div class="block-title">📁 Bloque 2: Trazos Fundamentales & Trama</div>
+      </div>
+      <div class="cards-grid">
+    
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 9</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_09.jpg" alt="Página 9" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 1.9: The Basic Strokes (Los 7 Trazos)</div>
+        <div class="card-desc">Los 7 estilos canónicos: Hatching, Cross-hatch, Uneven, Curved, Scribble, Stipple, Flowing.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Clasificador de estilo, confinamiento en marco, densidad óptica superficial ρ</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Red de clasificación de morfología de trazo y cálculo de ocupación de área.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Objetivos de densidad tonal (20%, 40%, 60%) y dimensiones de celda.</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 10</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_10.jpg" alt="Página 10" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 1.10: Basic Strokes Variations</div>
+        <div class="card-desc">Variaciones estilísticas: abanicos, diamante fino, pelaje arremolinado, lazos cerrados.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Homogeneidad textural, entropía espacial, distribución de longitud de trazo</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Análisis de matriz de coocurrencia de niveles de gris (GLCM) sobre OffscreenCanvas.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Tipo de variación y nivel de grano textural requerido.</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 11</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_11.jpg" alt="Página 11" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 1.11: Stroke Variations — Hatching Parameters</div>
+        <div class="card-desc">Aislamiento de variables en trama recta: Tamaño, Espaciado, Capas, Dirección y Grosor.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Gradiente diferencial entre pasos contiguos, precisión de cota d y L</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Verificación de que el usuario alteró el parámetro solicitado manteniendo fijos los demás.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Secuencia dinámica de instrucciones escaladas (ej. paso 15px -> 8px).</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 12</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_12.jpg" alt="Página 12" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 1.12: Stroke Variations — Cross-Hatching Parameters</div>
+        <div class="card-desc">Variaciones paramétricas de trama cruzada: tamaño, paso, número de capas (2 a 4), ángulo.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Ángulo entre capas Δθ ≈ 45° o 90°, densidad de nodos de intersección</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Detección geométrica de puntos de cruce entre familias vectoriales de trazos.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Número de capas (2 a 4) y ángulos oblicuos generados al azar.</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 13</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_13.jpg" alt="Página 13" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 1.13: Stroke Variations — Uneven Hatching Parameters</div>
+        <div class="card-desc">Trama discontinua traslapada para corteza de árbol, hierba y pelaje orgánico.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Distribución aperiódica sin costuras, longitud media de segmento L_avg</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Autocorrelación espacial 2D para comprobar que no se forman líneas continuas accidentales.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Densidad objetivo y longitud de cerda aleatorizada.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+      <div class="block-header">
+        <div class="block-title">📁 Bloque 3: Contornos Cruzados (3D)</div>
+      </div>
+      <div class="cards-grid">
+    
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 14</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_14.jpg" alt="Página 14" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 2.5: Cross-Contour Lines (Contornos Cruzados)</div>
+        <div class="card-desc">Líneas transversales envolventes sobre peras, cantos rodados, alubias y manzanas.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Curvatura volumétrica coherente, anclaje en perímetro, apertura en perspectiva</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Comparación con isocurvas ortogonales del modelo 3D proyectado.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Sólidos de revolución paramétricos con radios aleatorios a lo largo del eje.</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 15</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_15.jpg" alt="Página 15" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 2.6: Cross-Contour Lines on Freeform Silhouettes</div>
+        <div class="card-desc">8 siluetas orgánicas libres con varilla de orientación 3D. El trazo abraza la masa.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Perpendicularidad al eje rector local v_stroke ⊥ t_axis, ajuste a silueta</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Comprobación de que el trazo cruza la varilla interior a 90° ± 15°.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Generador armónico de Fourier polar: r(θ) = R0 + Σ a_k cos(kθ + φ_k).</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 16</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_16.jpg" alt="Página 16" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 2.7: Cross-Contour Lines — Curved Sheets & Shells</div>
+        <div class="card-desc">Láminas curvadas, canalones, sillas de montar, collarines y conchas de tortuga.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Signo de curvatura acorde a concavidad/convexidad de lámina alabeada</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Alineación con las líneas de flujo de la superficie reglada subyacente.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Superficies cilíndricas y cónicas alabeadas con factores de torsión aleatorios.</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 17</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_17.jpg" alt="Página 17" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 2.8: Cross-Contour Lines — Advanced Twisted Forms</div>
+        <div class="card-desc">Cintas dobladas, tubos torcidos en U, salchichas en S, cojines hinchados y rocas.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Continuidad de secciones transversales a lo largo de spline 3D con torsión</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Interpolación de secciones de elipse a lo largo del eje 3D.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Curvas B-Spline 3D proyectadas en perspectiva con rotación arbitraria.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+      <div class="block-header">
+        <div class="block-title">📁 Bloque 4: Valor Plano & Gradación</div>
+      </div>
+      <div class="cards-grid">
+    
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 18</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_18.jpg" alt="Página 18" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 2.9: Creating Even Value (Valor Plano Homogéneo)</div>
+        <div class="card-desc">7 franjas rectangulares. En cada una, crear un tono gris completamente uniforme sin bandas.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Varianza espacial de densidad σ²(ρ_1..ρ_10) ≈ 0, ajuste al valor objetivo</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Subdivisión del rectángulo en 10 celdas y cálculo de densidad óptica por celda.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Nivel de valor tonal diana aleatorio (del 10% al 70%).</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 19</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_19.jpg" alt="Página 19" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 2.10: Creating Even Value — Topographical Map</div>
+        <div class="card-desc">Franjas curvas orográficas numeradas 0 a 5. Mantener valor plano en cada estrato irregular.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Monotonía estricta ρ(0) < ρ(1) < .. < ρ(5), confinamiento en orografía</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Comprobación de valor medio por estrato poligonal y penalización por desborde.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Curvas de nivel generadas con ruido Perlin / Simplex procedural.</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 20</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_20.jpg" alt="Página 20" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 2.19: Direction of Gradation (Flujo de Sombra)</div>
+        <div class="card-desc">Gradientes que siguen la forma: pétalo curvo, toroide concéntrico, collar y rampa.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Alineación de gradiente ∇ρ con campo vectorial diana D, suavidad sin bandas</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Cálculo del gradiente de densidad espacial ∇ρ = (∂ρ/∂x, ∂ρ/∂y).</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Ángulo de inicio del gradiente y vector de flujo variable.</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 21</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_21.jpg" alt="Página 21" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 2.20: Direction of Gradation (Formas Complejas)</div>
+        <div class="card-desc">Collar en C, cúpula campaniforme, piragua cóncava y cono truncado.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Gradiente de densidad simultáneo longitudinal y transversal</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Muestreo polar de densidad en regiones en abanico.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Aperturas cónicas y proporciones de curvatura generadas aleatoriamente.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+      <div class="block-header">
+        <div class="block-title">📁 Bloque 5: Planos, Facetas & Isometría</div>
+      </div>
+      <div class="cards-grid">
+    
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 22</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_22.jpg" alt="Página 22" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 2.21: Revealing Planes (Facetado Low-Poly)</div>
+        <div class="card-desc">Deconstrucción de formas redondeadas (canto rodado, melón, jengibre) en bloques poliédricos.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Rectitud de aristas, polígonos cerrados, envolvente convexa del volumen</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Detección de polígonos cerrados dibujados por el alumno envolviendo la forma.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Mallas orgánicas 3D y su correspondiente simplificación en K caras.</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 23</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_23.jpg" alt="Página 23" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 2.22: Shading Organic Curves via Plane Breaks</div>
+        <div class="card-desc">Sombreado de curvas orgánicas donde el valor cambia abruptamente en la arista de corte.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Salto de valor tonal en la cresta divisoria, dirección de trama coherente</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Contraste diferencial entre las regiones a izquierda y derecha de la cresta.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Crestas procedurales sobre siluetas de alubias y bulbos.</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 24</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_24.jpg" alt="Página 24" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 2.23: Line Direction & Structure (Red Isométrica)</div>
+        <div class="card-desc">Panal isométrico de cubos entrelazados. La dirección de trama hace emerger la ilusión 3D.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Ángulo de trama por orientación de plano (0°, 60°, 120°), confinamiento</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Comprobación de histograma angular en cada uno de los romboides de la red.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Laberinto procedural de cubos apilados en pirámides o escaleras.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+      <div class="block-header">
+        <div class="block-title">📁 Bloque 6: Sombreado de Poliedros</div>
+      </div>
+      <div class="cards-grid">
+    
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 25</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_25.jpg" alt="Página 25" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 2.25: 3-Value Shading on Block Forms (Muestra)</div>
+        <div class="card-desc">8 prismas en círculo alrededor de un foco solar central sombreados a 3 valores.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Fidelidad a valores 0 (Luz), 1 (Mediotono), 2 (Sombra) según sol central</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Cálculo del producto escalar cara-sol: cos(α) = n_face · L_vector.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Posición del foco solar y rotaciones 3D de los prismas.</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 26</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_26.jpg" alt="Página 26" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 2.26: 3-Value Shading on Block Forms (Práctica)</div>
+        <div class="card-desc">Plantilla de práctica en alambre con números en cada cara guiados por la luz.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Densidad óptica en cada cara polígono matching con el número (0, 1, 2)</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Extracción de máscara de cara y medición de porcentaje de cobertura de tinta.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Generación paramétrica de los 8 prismas y ángulos de fuga.</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 27</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_27.jpg" alt="Página 27" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 2.27: Shading Block Forms (6-Value Range)</div>
+        <div class="card-desc">Rueda de poliedros complejos (caja abierta, fuelle, dodecaedro, prisma biselado, tuerca).</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Precisión tonal en escala discreta de 6 niveles (0 a 5)</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Verificación de que cada una de las 6 tonalidades se sitúa en su rango de densidad óptico.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Mallas 3D procedurales y traslación del foco de luz.</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 28</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_28.jpg" alt="Página 28" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 2.28: Shading Block Forms (6-Value Practice)</div>
+        <div class="card-desc">Plantilla de práctica con poliedros complejos numerados de 0 a 5.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Cumplimiento de valores 0 a 5 en cada cara numerada</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Scoring proporcional al error absoluto |ρ_dibujada - ρ_objetivo| en cada cara.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Generación aleatoria de caras poliédricas por reto.</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 29</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_29.jpg" alt="Página 29" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 2.29: Clustered Cityscape (Ciudadela de Bloques)</div>
+        <div class="card-desc">Skyline denso de cajas solapadas bajo luz solar en la esquina superior izquierda.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Consistencia global de luz lejana, respeto a caras ocluidas en sombra</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Mapeo de iluminación global direccional y detección de sangrado en caras ocultas.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Generador procedural de edificios en perspectiva a 2 puntos de fuga.</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 30</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_30.jpg" alt="Página 30" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 2.30: Complex Geometric Still Life (Sin Números)</div>
+        <div class="card-desc">Bodegón de poliedros sin números guía. El alumno deduce los tonos 0-5 mentalmente.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Ordenación relativa de densidades ρ_A < ρ_B según normales calculadas</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Ordenamiento topológico de valores de cara según su producto escalar real con la luz.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Composición procedural de 4 o 5 poliedros aleatorios de la librería.</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 31</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_31.jpg" alt="Página 31" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 2.31: Dominant Form Composition (Con Números)</div>
+        <div class="card-desc">Gran caja cúbica central con solapas y cajas secundarias adheridas. Numerada 0-5.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Jerarquía de valor tonal entre caja madre y elementos satélite</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Comprobación de contraste relativo y homogeneidad en planos mayores.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Ensamblaje procedural de cubo maestro y cajas hijas adosadas.</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 32</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_32.jpg" alt="Página 32" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 2.32: Dominant Form Composition (Sin Números)</div>
+        <div class="card-desc">Cubo dominante con poliedros encastrados y tuerca hexagonal sin guía numérica.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Deducción autónoma de valores 3D bajo luz superior derecha</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Comparación con el mapa de luz computado por el motor 3D de Paplitz.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Variación de ángulo cenital de la luz solar.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+      <div class="block-header">
+        <div class="block-title">📁 Bloque 7: Superficies Curvas, Cilindro, Esfera</div>
+      </div>
+      <div class="cards-grid">
+    
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 33</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_33.jpg" alt="Página 33" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 2.33: Shading Curved Surfaces (Cinta Curva)</div>
+        <div class="card-desc">Sombreado en 4 pasos de una cinta curva: base clara -> mediotono -> sombra núcleo -> final.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Gradiente continuo suave I(s) ∝ cos(θ(s)), ausencia de cortes duros</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Ajuste de mínimos cuadrados a la curva de iluminación cilíndrica teórica.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Curvatura Bézier de la cinta y orientación del vector de luz.</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 34</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_34.jpg" alt="Página 34" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 2.34: Shading Curved Surfaces (Multi-Técnica)</div>
+        <div class="card-desc">Práctica de la cinta curva con Hatching, Cross-hatch, Uneven, Scribbling, Stippling, Flowing.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Gradiente continuo ejecutado con 6 técnicas de trazo distintas</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Clasificación de técnica y evaluación de degradado tonal en cada una.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Asignación aleatoria de técnica por cinta.</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 35</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_35.jpg" alt="Página 35" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 2.35: Shading Cylinders in Perspective</div>
+        <div class="card-desc">Cilindros en perspectiva. Líneas axiales vs líneas de contorno elíptico cruzado.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Posición de sombra núcleo, luz reflejada en borde opuesto, dirección de línea</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Localización del pico de máxima densidad en la generatriz ortogonal al rayo de luz.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Orientación 3D del eje del cilindro y ángulo de cámara.</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 36</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_36.jpg" alt="Página 36" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 2.36: Shading Cylinders (6 Estilos de Tinta)</div>
+        <div class="card-desc">6 cilindros sombreados con técnicas diversas manteniendo la física de luz.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Fidelidad al volumen cilíndrico en garabato, puntillismo y mallas</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Verificación de que el centro de masas de la tinta coincide con la sombra núcleo.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Inclinación procedural de los cilindros.</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 37</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_37.jpg" alt="Página 37" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 2.37: Shading Spherical Forms (La Esfera)</div>
+        <div class="card-desc">La esfera perfecta: trazos que siguen la red de latitud/longitud esférica.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Trazos en arcos elípticos meridianos, sombra terminadora creciente, luz reflejada</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Fidelidad de los trazos a las geodésicas de la esfera en proyección ortográfica.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Coordenadas esféricas de la luz solar (azimut y elevación).</div>
+        </div>
+      </div>
+    </div>
+  </div>
+      <div class="block-header">
+        <div class="block-title">📁 Bloque 8: Composiciones & Síntesis</div>
+      </div>
+      <div class="cards-grid">
+    
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 38</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_38.jpg" alt="Página 38" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 2.38 / 2.39: Simple Forms Composition</div>
+        <div class="card-desc">Bodegón de cono, cubo, esferas con varillas, cilindros y peana bajo luz superior izquierda.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Coherencia lumínica global en todas las primitivas simultáneas</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Vector de luz L unificado aplicado a todos los volúmenes de la escena.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Disposición aleatoria de las piezas sobre la mesa.</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 39</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_39.jpg" alt="Página 39" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 2.40: Advanced Forms Composition</div>
+        <div class="card-desc">Bodegón con jarrón curvo, caja de cartón con esferas, icosaedro y cilindro.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Sombreado mixto de caras planas y caras curvas en un mismo bodegón</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Validación simultánea de caras planas homogéneas y superficies de gradación continua.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Selección de 5 objetos de la librería paramétrica.</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 40</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_40.jpg" alt="Página 40" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 2.41: Local Value (Albedo y Material)</div>
+        <div class="card-desc">Cubos blanco, gris y negro bajo la misma luz. Sombra de blanco vs luz de negro.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Offset de valor local: Densidad = Albedo(material) + Shading(n · L)</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Verificación de que la relación de brillos respeta el albedo de cada material.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Asignación procedural de materiales a los bloques de la estructura.</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 41</span>
+        <span class="viability-pill ">100% Viable</span>
+        <img src="extracted_pages/page_41.jpg" alt="Página 41" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 2.45: Compound Forms (Fusión de Piezas)</div>
+        <div class="card-desc">Vista explosionada de piezas orgánicas que se fusionan en una escultura única.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Continuidad de contornos cruzados en las zonas de unión/soldadura</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Evaluación de las líneas de contorno transversal sobre la silueta fusionada.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Piezas paramétricas ensambladas con desplazamientos aleatorios.</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="page-card">
+      <div class="card-img-wrap">
+        <span class="page-pill">Página 42</span>
+        <span class="viability-pill parcial">Parcial (Adaptable)</span>
+        <img src="extracted_pages/page_42.jpg" alt="Página 42" loading="lazy">
+      </div>
+      <div class="card-body">
+        <div class="card-title">Exercise 2.46: Compound Forms — Creative Assembly</div>
+        <div class="card-desc">Formas flotantes para ensamblaje libre en blanco. Máxima libertad creativa.</div>
+        
+        <div class="detail-box">
+          <div class="detail-label">📏 Variables a Medir</div>
+          <div class="detail-val">Interpretación con silueta fantasma procedural / puntos de anclaje</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🧮 Algoritmo & Scoring</div>
+          <div class="detail-val">Paplitz proyectará una silueta guía translúcida dinámica o evaluará consistencia física.</div>
+        </div>
+
+        <div class="detail-box">
+          <div class="detail-label">🎲 Aleatoriedad Procedural</div>
+          <div class="detail-val">Disposición flotante de las piezas de origen y parámetros de soldadura.</div>
+        </div>
+      </div>
+    </div>
+  
+    </div>
+  </div>
+
+  <button class="print-btn" onclick="window.print()">
+    🖨️ Imprimir / Guardar en PDF
+  </button>
+</body>
+</html>

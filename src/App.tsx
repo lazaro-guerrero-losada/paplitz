@@ -10,10 +10,11 @@ import { ProfileView } from './components/ProfileView';
 import { MinigamesView } from './components/MinigamesView';
 import { LevelGuideModal } from './components/LevelGuideModal';
 import { PlacementModal } from './components/PlacementModal';
+import { StrokeLabView } from './components/StrokeLabView';
 import { calculatePlayerLevel } from './lib/levelSystem';
 import { SenseiCubo } from './components/avatar/SenseiCubo';
 import { AvatarMood } from './lib/avatarTypes';
-import { Flame, Printer, Compass, Map, User, RefreshCw, Filter, PenTool, Gamepad2, BookOpen, Zap, Menu, X, ChevronRight } from 'lucide-react';
+import { Flame, Printer, Compass, Map, User, RefreshCw, Filter, PenTool, Gamepad2, BookOpen, Zap, Menu, X, ChevronRight, FlaskConical } from 'lucide-react';
 import { PaplitzSaveData, applySaveDataToLocalStorage, fastForwardCurriculum } from './lib/saveSystem';
 
 function GithubIcon({ className = 'w-3.5 h-3.5' }: { className?: string }) {
@@ -26,8 +27,8 @@ function GithubIcon({ className = 'w-3.5 h-3.5' }: { className?: string }) {
 }
 
 export function App() {
-  // Pestañas principales: 'practice' (Home / Práctica Rápida), 'path' (El Camino), 'minigames' (Minijuegos), 'profile' (Perfil)
-  const [activeTab, setActiveTab] = useState<'practice' | 'path' | 'minigames' | 'profile'>('practice');
+  // Pestañas principales: 'practice' (Home / Práctica Rápida), 'path' (El Camino), 'minigames' (Minijuegos), 'profile' (Perfil), 'strokelab' (Laboratorio de Trazos Beta)
+  const [activeTab, setActiveTab] = useState<'practice' | 'path' | 'minigames' | 'profile' | 'strokelab'>('practice');
 
   // Estado del Menú Lateral Móvil (Drawer) y Detección de Orientación
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
@@ -439,6 +440,19 @@ export function App() {
               <User className="w-4 h-4 shrink-0" />
               <span>Perfil</span>
             </button>
+            <button
+              onClick={() => setActiveTab('strokelab')}
+              className={`px-2 sm:px-3 py-1.5 text-xs font-mono uppercase font-bold flex items-center gap-1 sm:gap-1.5 transition-colors cursor-pointer ${
+                activeTab === 'strokelab'
+                  ? 'bg-amber-500 text-slate-950 shadow-sm'
+                  : 'hover:bg-amber-50 text-amber-900 border-l border-neutral-300'
+              }`}
+              title="Laboratorio de Trazos y Patrones Procedurales (Beta)"
+            >
+              <FlaskConical className="w-4 h-4 shrink-0 text-amber-600" />
+              <span>Lab Trazos</span>
+              <span className="text-[9px] bg-amber-200 text-amber-900 font-extrabold px-1 py-0.2 rounded">BETA</span>
+            </button>
           </nav>
 
           {/* Estadísticas de Gamificación & Hojas A4 en Desktop (>= lg) */}
@@ -613,6 +627,19 @@ export function App() {
                   <div className="flex items-center gap-2.5">
                     <User className="w-4 h-4 stroke-[2.5]" />
                     <span className="uppercase">Perfil & Nube</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab('strokelab'); setMobileMenuOpen(false); }}
+                  className={`w-full p-2.5 text-xs font-mono font-bold flex items-center justify-between border-2 border-black shadow-[2px_2px_0px_#000000] transition-colors cursor-pointer ${
+                    activeTab === 'strokelab' ? 'bg-amber-500 text-slate-950' : 'bg-amber-50 text-amber-950 hover:bg-amber-100'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <FlaskConical className="w-4 h-4 stroke-[2.5] text-amber-700" />
+                    <span className="uppercase font-bold">Lab de Trazos (Beta)</span>
                   </div>
                   <ChevronRight className="w-4 h-4" />
                 </button>
@@ -901,6 +928,14 @@ export function App() {
             onOpenGuide={() => setShowLevelGuide(true)}
             onRestoreSave={handleRestoreSave}
             onOpenPlacementModal={() => setIsPlacementModalOpen(true)}
+          />
+        )}
+
+        {/* PESTAÑA 5: LABORATORIO DE TRAZOS Y PATRONES (BETA) */}
+        {activeTab === 'strokelab' && (
+          <StrokeLabView
+            onAwardXP={(amount) => setXp((prev) => prev + amount)}
+            onAvatarMoodChange={(mood) => setAvatarMood(mood)}
           />
         )}
       </main>
