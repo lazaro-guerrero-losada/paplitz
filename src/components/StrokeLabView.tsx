@@ -9,6 +9,7 @@ import {
 } from '../lib/strokeTypes';
 import { generateStrokeChallenge } from '../lib/strokeProceduralGenerator';
 import { evaluateStrokeSubmission, buildStrokeDebugReport } from '../lib/strokeEvaluator';
+import { copyReportToClipboard, downloadReportJson } from '../lib/debugReport';
 import {
   Dices,
   Eye,
@@ -28,6 +29,8 @@ import {
   Check,
   ArrowRight,
   Menu,
+  Copy,
+  Download,
 } from 'lucide-react';
 
 interface StrokeLabViewProps {
@@ -85,6 +88,8 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
   const [showGuides, setShowGuides] = useState<boolean>(true);
   const [evaluation, setEvaluation] = useState<StrokeEvaluation | null>(null);
   const [showBookModal, setShowBookModal] = useState<boolean>(false);
+  const [showDebugModal, setShowDebugModal] = useState<boolean>(false);
+  const [debugComment, setDebugComment] = useState<string>('');
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
   const [imgError, setImgError] = useState<boolean>(false);
 
@@ -111,6 +116,8 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
     currentStrokeRef.current = [];
     setIsDrawing(false);
     setEvaluation(null);
+    setShowDebugModal(false);
+    setDebugComment('');
   }, [currentExercise, currentPhase]);
 
   // Cambiar manualmente de fase (1: Precisión, 2: Fluidez, 3: Velocidad)
@@ -121,6 +128,8 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
     currentStrokeRef.current = [];
     setIsDrawing(false);
     setEvaluation(null);
+    setShowDebugModal(false);
+    setDebugComment('');
   }, []);
 
   // Reintentar el reto actual (borrar trazos y reiniciar evaluación manteniendo la misma semilla)
@@ -129,20 +138,57 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
     currentStrokeRef.current = [];
     setIsDrawing(false);
     setEvaluation(null);
+    setShowDebugModal(false);
+    setDebugComment('');
   }, []);
 
-  // Copiar reporte detallado al portapapeles para depuración y revisión de notas
-  const handleCopyDebugReport = async () => {
-    if (!evaluation) return;
-    const reportText = buildStrokeDebugReport(challenge, strokes, evaluation);
-    try {
-      await navigator.clipboard.writeText(reportText);
-      setCopiedDebug(true);
-      setTimeout(() => setCopiedDebug(false), 2000);
-    } catch {
-      // Fallback
+  // Genera el texto completo del reporte incluyendo comentarios del usuario
+  const getFullReportText = useCallback(() => {
+    if (!evaluation) return '';
+    let text = buildStrokeDebugReport(challenge, strokes, evaluation);
+    if (debugComment.trim()) {
+      text += `\n\n--- COMENTARIO / OBSERVACIÓN DEL USUARIO ---\n${debugComment.trim()}\n`;
     }
-  };
+    return text;
+  }, [challenge, strokes, evaluation, debugComment]);
+
+  // Genera el objeto JSON completo estructurado para descarga
+  const getReportJson = useCallback(() => {
+    return JSON.stringify(
+      {
+        reportType: 'STROKE_LAB',
+        timestamp: new Date().toISOString(),
+        challenge: {
+          code: challenge.code,
+          title: challenge.title,
+          seed: challenge.seed,
+          activePhase: currentPhase,
+          category: challenge.category,
+          keyPoints: challenge.keyPoints,
+          targetLines: challenge.targetLines,
+          targetAngleDeg: challenge.targetAngleDeg,
+          targetLengthPx: challenge.targetLengthPx,
+        },
+        userComment: debugComment.trim(),
+        strokes: strokes.map((s, i) => ({
+          index: i,
+          pointCount: s.points.length,
+          points: s.points,
+        })),
+        evaluation,
+        environment: {
+          userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+          devicePixelRatio: typeof window !== 'undefined' ? window.devicePixelRatio : 1,
+          screenResolution:
+            typeof window !== 'undefined'
+              ? `${window.screen.width}x${window.screen.height}`
+              : '',
+        },
+      },
+      null,
+      2
+    );
+  }, [challenge, currentPhase, debugComment, strokes, evaluation]);
 
   // Cambiar de ejercicio por código
   const handleSelectExercise = (exercise: LabExerciseDef) => {
@@ -161,6 +207,8 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
       currentStrokeRef.current = [];
       setIsDrawing(false);
       setEvaluation(null);
+      setShowDebugModal(false);
+      setDebugComment('');
     }
   };
 
@@ -993,15 +1041,11 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
                     <RotateCcw className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    onClick={handleCopyDebugReport}
+                    onClick={() => setShowDebugModal(true)}
                     className="btn-ink-outline p-1 text-xs font-mono font-bold flex items-center justify-center cursor-pointer shadow-[1px_1px_0px_#000000]"
-                    title="Copiar informe técnico"
+                    title="Abrir reporte de depuración y diagnóstico"
                   >
-                    {copiedDebug ? (
-                      <Check className="w-3.5 h-3.5 text-black stroke-[3]" />
-                    ) : (
-                      <AlertTriangle className="w-3.5 h-3.5 text-black stroke-[2.5]" />
-                    )}
+                    <AlertTriangle className="w-3.5 h-3.5 text-black stroke-[2.5]" />
                   </button>
                 </div>
               </div>
@@ -1138,6 +1182,98 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
           </div>
         </div>
       ) : null}
+
+      {/* Modal de Reporte de Depuración del Trazo (Idéntico a Práctica con Comentario, Copiar y Descargar JSON) */}
+      {showDebugModal && evaluation && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 animate-fade-in">
+          <div className="bg-white border-3 border-black p-4 sm:p-5 max-w-lg w-full shadow-[6px_6px_0px_#000000] flex flex-col gap-3 font-sans max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b-2 border-black pb-2">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-black stroke-[2.5]" />
+                <h3 className="font-display font-bold text-sm sm:text-base uppercase tracking-tight">
+                  Reporte de Evaluación del Trazo
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowDebugModal(false)}
+                className="p-1 hover:bg-neutral-100 border border-black cursor-pointer text-black"
+                title="Cerrar modal"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between text-xs font-mono bg-neutral-50 p-2 border border-black">
+              <div>
+                <span className="text-neutral-500">Semilla:</span> <strong>#{challenge.seed}</strong>
+              </div>
+              <div>
+                <span className="text-neutral-500">Reto:</span> <strong>{currentExercise.code}</strong>
+              </div>
+              <div>
+                <span className="text-neutral-500">Nota:</span> <strong>{evaluation.overallScore}%</strong>
+              </div>
+            </div>
+
+            {/* Campo de comentario del usuario */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-mono font-bold text-neutral-700">
+                Comentario / Observación sobre la nota (opcional):
+              </label>
+              <textarea
+                value={debugComment}
+                onChange={(e) => setDebugComment(e.target.value)}
+                placeholder="Escribe aquí tu duda, sugerencia o lo que creas que ha puntuado mal..."
+                className="w-full h-16 p-2 font-sans text-xs bg-white border border-black resize-none focus:outline-none focus:ring-1 focus:ring-black"
+              />
+            </div>
+
+            {/* Vista previa del contenido */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-mono font-bold text-neutral-600">
+                Vista previa del reporte (Markdown / Texto):
+              </label>
+              <textarea
+                readOnly
+                value={getFullReportText()}
+                className="w-full h-28 p-2 font-mono text-[10px] bg-neutral-50 border border-black resize-none selection:bg-black selection:text-white"
+              />
+            </div>
+
+            {/* Acciones */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-neutral-200">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={async () => {
+                    await copyReportToClipboard(getFullReportText());
+                    setCopiedDebug(true);
+                    setTimeout(() => setCopiedDebug(false), 2500);
+                  }}
+                  className="btn-ink px-3 py-1.5 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
+                >
+                  {copiedDebug ? <Check className="w-3.5 h-3.5 text-white stroke-[2.5]" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedDebug ? '¡Copiado!' : 'Copiar Texto'}</span>
+                </button>
+
+                <button
+                  onClick={() => downloadReportJson(getReportJson(), challenge.seed)}
+                  className="btn-ink-outline px-3 py-1.5 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Descargar JSON</span>
+                </button>
+              </div>
+
+              <button
+                onClick={() => setShowDebugModal(false)}
+                className="px-3 py-1.5 text-xs font-mono text-neutral-600 hover:text-black border border-neutral-300 hover:border-black cursor-pointer ml-auto"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
