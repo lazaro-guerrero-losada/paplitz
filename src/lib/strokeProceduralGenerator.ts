@@ -1,4 +1,9 @@
-import { ProceduralStrokeChallenge, StrokeExerciseCategory, PolyFace } from './strokeTypes';
+import {
+  ProceduralStrokeChallenge,
+  WorkbookExerciseDef,
+  ALL_42_EXERCISES,
+  PolyFace,
+} from './strokeTypes';
 
 /**
  * Generador pseudoaleatorio basado en semilla (LCG)
@@ -28,39 +33,61 @@ export class SeededRNG {
 }
 
 /**
- * Genera un reto procedural único según la categoría y una semilla
+ * Genera un reto procedural único según el ejercicio del cuaderno y una semilla
  */
 export function generateStrokeChallenge(
-  category: StrokeExerciseCategory,
+  exerciseOrPage: WorkbookExerciseDef | number,
   seed = Math.floor(Math.random() * 100000),
-  canvasWidth = 640,
-  canvasHeight = 520
+  canvasWidth = 600,
+  canvasHeight = 540
 ): ProceduralStrokeChallenge {
+  const exercise: WorkbookExerciseDef =
+    typeof exerciseOrPage === 'number'
+      ? ALL_42_EXERCISES.find((e) => e.page === exerciseOrPage) || ALL_42_EXERCISES[0]
+      : exerciseOrPage;
+
   const rng = new SeededRNG(seed);
   const cx = canvasWidth / 2;
   const cy = canvasHeight / 2;
 
-  switch (category) {
-    case 'parallel_lines': {
-      // Ángulo aleatorio para romper la memoria muscular de la muñeca
-      const angleDeg = rng.range(40, 140);
-      const angleRad = (angleDeg * Math.PI) / 180;
-      const targetSpacingPx = rng.rangeInt(11, 20);
-      const targetLengthPx = rng.rangeInt(90, 150);
-      const corridorWidth = rng.range(220, 300);
+  const baseChallenge: ProceduralStrokeChallenge = {
+    id: `stroke-${exercise.page}-${seed}`,
+    pageNumber: exercise.page,
+    code: exercise.code,
+    category: exercise.category,
+    title: exercise.title,
+    subtitle: `Pág. ${exercise.page} · ${exercise.block}`,
+    blockTitle: exercise.block,
+    seed,
+    instruction: exercise.instruction,
+    targetMetricsText: exercise.metrics,
+    targetAngleDeg: 90,
+    targetSpacingPx: 14,
+    targetLengthPx: 120,
+    minRequiredStrokes: 6,
+    guideLines: [],
+  };
 
-      // Vector director perpendicular para el carril
+  switch (exercise.category) {
+    case 'parallel_lines': {
+      // Ángulo aleatorio que rompe la memoria muscular
+      const angleDeg = rng.range(35, 145);
+      const angleRad = (angleDeg * Math.PI) / 180;
+      const targetSpacingPx = rng.rangeInt(10, 20);
+      const targetLengthPx = rng.rangeInt(90, 160);
+      const corridorWidth = rng.range(220, 320);
+
       const perpRad = angleRad + Math.PI / 2;
       const halfW = corridorWidth / 2;
       const halfL = targetLengthPx / 2;
 
-      // Línea de cota superior (raíl 1)
+      // Raíl 1
       const r1x1 = cx - Math.cos(perpRad) * halfW - Math.cos(angleRad) * halfL;
       const r1y1 = cy - Math.sin(perpRad) * halfW - Math.sin(angleRad) * halfL;
       const r1x2 = cx + Math.cos(perpRad) * halfW - Math.cos(angleRad) * halfL;
       const r1y2 = cy + Math.sin(perpRad) * halfW - Math.sin(angleRad) * halfL;
 
-      // Línea de cota inferior (raíl 2)
+      // Raíl 2
       const r2x1 = cx - Math.cos(perpRad) * halfW + Math.cos(angleRad) * halfL;
       const r2y1 = cy - Math.sin(perpRad) * halfW + Math.sin(angleRad) * halfL;
       const r2x2 = cx + Math.cos(perpRad) * halfW + Math.cos(angleRad) * halfL;
@@ -69,14 +96,8 @@ export function generateStrokeChallenge(
       const expectedStrokes = Math.round(corridorWidth / targetSpacingPx);
 
       return {
-        id: `parallel-${seed}`,
-        category,
-        title: 'Calistenia: Líneas Paralelas & Espaciado',
-        subtitle: `Ángulo ${Math.round(angleDeg)}° · Paso ${targetSpacingPx}px · Longitud ${targetLengthPx}px`,
-        workbookPage: 1,
-        seed,
-        instruction: `Traza líneas rectas de arriba a abajo entre los dos carriles guía. Mantén una separación constante de ~${targetSpacingPx}px y el mismo ángulo (${Math.round(angleDeg)}°).`,
-        targetMetricsText: `Paralelismo: ±4° | Espaciado: ${targetSpacingPx}px (±15%) | Longitud: ${targetLengthPx}px`,
+        ...baseChallenge,
+        subtitle: `Ángulo ${Math.round(angleDeg)}° · Paso ~${targetSpacingPx}px · Longitud ${targetLengthPx}px`,
         targetAngleDeg: angleDeg,
         targetSpacingPx,
         targetLengthPx,
@@ -88,24 +109,66 @@ export function generateStrokeChallenge(
       };
     }
 
+    case 'contour_lines': {
+      // Cintas o cuñas con contornos curvos delimitadores
+      const w = rng.range(180, 240);
+      const h = rng.range(140, 190);
+      const leftX = cx - w / 2;
+      const rightX = cx + w / 2;
+
+      return {
+        ...baseChallenge,
+        subtitle: `Trama de Contorno · Paso ~14px`,
+        targetSpacingPx: 14,
+        minRequiredStrokes: 8,
+        guideLines: [
+          { x1: leftX, y1: cy - h / 2, x2: rightX, y2: cy - h * 0.4, dashed: false },
+          { x1: leftX, y1: cy + h / 2, x2: rightX, y2: cy + h * 0.4, dashed: false },
+          { x1: leftX, y1: cy - h / 2, x2: leftX, y2: cy + h / 2, dashed: false },
+          { x1: rightX, y1: cy - h * 0.4, x2: rightX, y2: cy + h * 0.4, dashed: false },
+        ],
+      };
+    }
+
+    case 'angles_zigzags': {
+      // Quiebros angulares secos (chevrones o relámpagos)
+      const apexAngle = rng.range(50, 110);
+      const chevronCount = rng.rangeInt(3, 5);
+      const chevronH = 80;
+      const step = 45;
+
+      const guideLines: { x1: number; y1: number; x2: number; y2: number; dashed?: boolean }[] = [];
+      const startX = cx - ((chevronCount - 1) * step) / 2;
+
+      for (let i = 0; i < chevronCount; i++) {
+        const x = startX + i * step;
+        guideLines.push(
+          { x1: x - 25, y1: cy + chevronH / 2, x2: x, y2: cy - chevronH / 2, dashed: true },
+          { x1: x, y1: cy - chevronH / 2, x2: x + 25, y2: cy + chevronH / 2, dashed: true }
+        );
+      }
+
+      return {
+        ...baseChallenge,
+        subtitle: `Vértices en Quiebro · Ángulo de Cúspide ~${Math.round(apexAngle)}°`,
+        targetAngleDeg: apexAngle,
+        minRequiredStrokes: chevronCount * 2,
+        guideLines,
+      };
+    }
+
     case 'curved_s_waves': {
       const amplitude = rng.range(22, 38);
       const wavelength = rng.range(90, 130);
-      const waveLengthTotal = rng.range(240, 320);
+      const waveLengthTotal = rng.range(250, 320);
       const targetSpacingPx = rng.rangeInt(12, 18);
 
       const startX = cx - waveLengthTotal / 2;
       const startY = cy;
 
       return {
-        id: `wave-${seed}`,
-        category,
-        title: 'Control de Curvas: Ondas S Sinusoidales',
-        subtitle: `Amplitud ${Math.round(amplitude)}px · Longitud de onda ${Math.round(wavelength)}px`,
-        workbookPage: 5,
-        seed,
-        instruction: `Dibuja una serie de curvas en S paralelas siguiendo la cadencia de la onda sinusoidal. Cuida la suavidad de inflexión en el centro sin quebrar el trazo.`,
-        targetMetricsText: `Continuidad C² | Inflexión única | Espaciado rítmico: ${targetSpacingPx}px`,
+        ...baseChallenge,
+        subtitle: `Amplitud ${Math.round(amplitude)}px · Onda ${Math.round(wavelength)}px`,
         targetAngleDeg: 0,
         targetSpacingPx,
         targetLengthPx: amplitude * 3,
@@ -124,9 +187,56 @@ export function generateStrokeChallenge(
       };
     }
 
-    case 'cross_hatch_density': {
-      const boxW = rng.rangeInt(180, 220);
-      const boxH = rng.rangeInt(130, 160);
+    case 'radial_focal': {
+      // Radios desde foco común
+      const spokeCount = rng.rangeInt(10, 16);
+      const innerR = 15;
+      const outerR = rng.range(110, 150);
+
+      const guideLines: { x1: number; y1: number; x2: number; y2: number; dashed?: boolean }[] = [];
+      for (let i = 0; i < spokeCount; i += 2) {
+        const a = (i / spokeCount) * Math.PI * 2;
+        guideLines.push({
+          x1: cx + Math.cos(a) * innerR,
+          y1: cy + Math.sin(a) * innerR,
+          x2: cx + Math.cos(a) * outerR,
+          y2: cy + Math.sin(a) * outerR,
+          dashed: true,
+        });
+      }
+
+      return {
+        ...baseChallenge,
+        subtitle: `Convergencia Focal · ${spokeCount} radios alrededor de (${Math.round(cx)}, ${Math.round(cy)})`,
+        minRequiredStrokes: spokeCount,
+        guideLines,
+      };
+    }
+
+    case 'trailing_flicks': {
+      // Espina central con desvanecidos
+      const spineLen = 220;
+      const sAngle = rng.range(20, 60);
+      const sRad = (sAngle * Math.PI) / 180;
+      const p1 = { x: cx - Math.cos(sRad) * (spineLen / 2), y: cy - Math.sin(sRad) * (spineLen / 2) };
+      const p2 = { x: cx + Math.cos(sRad) * (spineLen / 2), y: cy + Math.sin(sRad) * (spineLen / 2) };
+
+      return {
+        ...baseChallenge,
+        subtitle: `Desvanecimiento de Pluma (Flicks) · Espina a ${Math.round(sAngle)}°`,
+        targetAngleDeg: sAngle + 45,
+        targetLengthPx: 60,
+        minRequiredStrokes: 12,
+        guideLines: [{ x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, dashed: false }],
+      };
+    }
+
+    case 'basic_strokes':
+    case 'hatching_params':
+    case 'even_value_strip': {
+      // Marcos de trama y valores tonales
+      const boxW = exercise.category === 'even_value_strip' ? rng.rangeInt(280, 360) : rng.rangeInt(180, 220);
+      const boxH = exercise.category === 'even_value_strip' ? rng.rangeInt(70, 95) : rng.rangeInt(130, 160);
       const targetDensityTones = [20, 35, 55];
       const targetDensityPct = targetDensityTones[rng.rangeInt(0, targetDensityTones.length - 1)];
       const targetAngleDeg = rng.rangeInt(30, 65);
@@ -135,14 +245,8 @@ export function generateStrokeChallenge(
       const by = cy - boxH / 2;
 
       return {
-        id: `hatch-${seed}`,
-        category,
-        title: 'Tramado y Densidad Tonal Óptica',
-        subtitle: `Tono Objetivo: ${targetDensityPct}% (${targetDensityPct < 30 ? 'Mediotono Claro' : targetDensityPct < 50 ? 'Mediotono Medio' : 'Sombra Profunda'})`,
-        workbookPage: 9,
-        seed,
-        instruction: `Rellena el marco rectangular aplicando tramado paralelo o cruzado hasta alcanzar exactamente una densidad visual de ~${targetDensityPct}%. ¡No te pases ni te quedes corto!`,
-        targetMetricsText: `Densidad óptica: ${targetDensityPct}% (±6%) | No desbordar el marco`,
+        ...baseChallenge,
+        subtitle: `Tono Objetivo: ${targetDensityPct}% (${targetDensityPct < 30 ? 'Claro' : targetDensityPct < 50 ? 'Medio' : 'Sombra'})`,
         targetAngleDeg,
         targetSpacingPx: 12,
         targetLengthPx: boxH,
@@ -157,8 +261,9 @@ export function generateStrokeChallenge(
       };
     }
 
-    case 'cross_contour_blob': {
-      // Generar un blob orgánico suave usando armónicos polares
+    case 'cross_contour_blob':
+    case 'compound_forms': {
+      // Blobs armónicos orgánicos con eje rector
       const numPoints = 24;
       const baseR = rng.range(75, 95);
       const a1 = rng.range(0.15, 0.35);
@@ -176,7 +281,6 @@ export function generateStrokeChallenge(
         });
       }
 
-      // Varilla o eje rector 3D a través del centro
       const axisAngle = rng.range(25, 75);
       const axisRad = (axisAngle * Math.PI) / 180;
       const axisLen = baseR * 1.5;
@@ -186,14 +290,8 @@ export function generateStrokeChallenge(
       const ay2 = cy + Math.sin(axisRad) * axisLen;
 
       return {
-        id: `blob-${seed}`,
-        category,
-        title: 'Contornos Cruzados sobre Volumen Orgánico',
-        subtitle: `Silueta Orgánica Procedural · Eje Rector a ${Math.round(axisAngle)}°`,
-        workbookPage: 15,
-        seed,
-        instruction: `Dibuja líneas de contorno transversal (anillos / curvas de nivel) que abracen el volumen del cuerpo orgánico de lado a lado, cruzando el eje central perpendicularmente.`,
-        targetMetricsText: `Ortogonalidad al eje: 90° (±18°) | Trazos de borde a borde perimetral`,
+        ...baseChallenge,
+        subtitle: `Silueta Orgánica · Eje Rector a ${Math.round(axisAngle)}°`,
         targetAngleDeg: axisAngle + 90,
         targetSpacingPx: 16,
         targetLengthPx: baseR * 2,
@@ -202,18 +300,113 @@ export function generateStrokeChallenge(
           splinePoints,
           axisLine: { x1: ax1, y1: ay1, x2: ax2, y2: ay2 },
         },
+        guideLines: [{ x1: ax1, y1: ay1, x2: ax2, y2: ay2, dashed: true }],
+      };
+    }
+
+    case 'direction_gradation':
+    case 'curved_surfaces': {
+      // Cinta curvada con degradado direccional
+      const w = 240;
+      const h = 140;
+      const bx = cx - w / 2;
+      const by = cy - h / 2;
+
+      return {
+        ...baseChallenge,
+        subtitle: `Gradación Direccional Continua`,
+        targetAngleDeg: 45,
+        targetSpacingPx: 10,
+        minRequiredStrokes: 12,
+        guideBounds: { x: bx, y: by, width: w, height: h },
         guideLines: [
-          { x1: ax1, y1: ay1, x2: ax2, y2: ay2, dashed: true },
+          { x1: bx, y1: by, x2: bx + w, y2: by, dashed: false },
+          { x1: bx + w, y1: by, x2: bx + w, y2: by + h, dashed: false },
+          { x1: bx + w, y1: by + h, x2: bx, y2: by + h, dashed: false },
+          { x1: bx, y1: by + h, x2: bx, y2: by, dashed: false },
+          // Flecha de dirección en el centro
+          { x1: cx - 40, y1: cy, x2: cx + 40, y2: cy, dashed: true },
         ],
       };
     }
 
-    case 'polyhedron_shading': {
-      // Prisma triangular o bloque facetado 3D en proyección isométrica/perspectiva
+    case 'revealing_planes':
+    case 'isometric_rhombille': {
+      // Panal isométrico de cubos (Rhombille)
+      const s = 45;
+      const rhombilleFaces: { orientation: 'top' | 'left' | 'right'; vertices: { x: number; y: number }[]; targetAngleDeg: number }[] = [];
+
+      // Un cubo isométrico central
+      const cCenter = { x: cx, y: cy };
+      const cTop = { x: cx, y: cy - s };
+      const cTopR = { x: cx + s * Math.cos(Math.PI / 6), y: cy - s * Math.sin(Math.PI / 6) };
+      const cTopL = { x: cx - s * Math.cos(Math.PI / 6), y: cy - s * Math.sin(Math.PI / 6) };
+      const cBotR = { x: cx + s * Math.cos(Math.PI / 6), y: cy + s * Math.sin(Math.PI / 6) + s * 0.5 };
+      const cBotL = { x: cx - s * Math.cos(Math.PI / 6), y: cy + s * Math.sin(Math.PI / 6) + s * 0.5 };
+      const cBot = { x: cx, y: cy + s };
+
+      rhombilleFaces.push(
+        { orientation: 'top', vertices: [cTop, cTopR, cCenter, cTopL], targetAngleDeg: 0 },
+        { orientation: 'left', vertices: [cTopL, cCenter, cBot, cBotL], targetAngleDeg: 60 },
+        { orientation: 'right', vertices: [cCenter, cTopR, cBotR, cBot], targetAngleDeg: 120 }
+      );
+
+      return {
+        ...baseChallenge,
+        subtitle: `Estructura Isométrica · Trama a 0° (arriba), 60° (izq) y 120° (der)`,
+        minRequiredStrokes: 12,
+        rhombilleFaces,
+      };
+    }
+
+    case 'cylinder_shading': {
+      // Cilindro en perspectiva
+      const cylW = 120;
+      const cylH = 180;
+      const x1 = cx - cylW / 2;
+      const x2 = cx + cylW / 2;
+      const y1 = cy - cylH / 2;
+      const y2 = cy + cylH / 2;
+
+      return {
+        ...baseChallenge,
+        subtitle: `Cilindro · Sombra Núcleo y Luz Reflejada`,
+        targetAngleDeg: 90,
+        minRequiredStrokes: 12,
+        guideLines: [
+          { x1: x1, y1: y1, x2: x2, y2: y1, dashed: false },
+          { x1: x1, y1: y1, x2: x1, y2: y2, dashed: false },
+          { x1: x2, y1: y1, x2: x2, y2: y2, dashed: false },
+          { x1: x1, y1: y2, x2: x2, y2: y2, dashed: false },
+          // Línea central de sombra núcleo
+          { x1: cx + 20, y1: y1, x2: cx + 20, y2: y2, dashed: true },
+        ],
+      };
+    }
+
+    case 'sphere_shading': {
+      // Esfera con arcos geodésicos
+      const r = 90;
+      return {
+        ...baseChallenge,
+        subtitle: `Esfera · Terminador Semilunar y Arcos Geodésicos`,
+        minRequiredStrokes: 14,
+        guideLines: [
+          // Eje de iluminación
+          { x1: cx - r * 1.2, y1: cy - r * 1.2, x2: cx + r * 1.2, y2: cy + r * 1.2, dashed: true },
+        ],
+        guideBounds: { x: cx - r, y: cy - r, width: r * 2, height: r * 2 },
+      };
+    }
+
+    case 'polyhedron_shading':
+    case 'composition_forms':
+    case 'local_value':
+    default: {
+      // Sólido poliédrico 3D con Sol Lambertiano
       const prismW = rng.range(130, 160);
       const prismH = rng.range(110, 140);
 
-      // Vértices 2D proyectados de un prisma biselado
       const vTop = { x: cx, y: cy - prismH * 0.6 };
       const vMidL = { x: cx - prismW * 0.55, y: cy - prismH * 0.05 };
       const vMidR = { x: cx + prismW * 0.55, y: cy - prismH * 0.05 };
@@ -222,17 +415,12 @@ export function generateStrokeChallenge(
       const vBotR = { x: cx + prismW * 0.55, y: cy + prismH * 0.65 };
       const vBottom = { x: cx, y: cy + prismH * 0.85 };
 
-      // Posición del Sol (alrededor del bloque)
       const sunAngleDeg = rng.range(25, 155);
       const sunRad = (sunAngleDeg * Math.PI) / 180;
-      const sunDist = 200;
+      const sunDist = 190;
       const sunX = cx - Math.cos(sunRad) * sunDist;
       const sunY = cy - Math.sin(sunRad) * sunDist;
 
-      // 3 Caras visibles: Tapa superior, Cara izquierda, Cara derecha
-      // Cara 0 (Tapa): vTop, vMidR, vCenter, vMidL
-      // Cara 1 (Izquierda): vMidL, vCenter, vBottom, vBotL
-      // Cara 2 (Derecha): vCenter, vMidR, vBotR, vBottom
       const faces: PolyFace[] = [
         {
           id: 'face-top',
@@ -261,27 +449,14 @@ export function generateStrokeChallenge(
       ];
 
       return {
-        id: `poly-${seed}`,
-        category,
-        title: 'Sombreado 3D Poliédrico a 3 Valores',
-        subtitle: `Foco Solar en (${Math.round(sunX)}, ${Math.round(sunY)}) · Ley de Iluminación Lambertiana`,
-        workbookPage: 25,
-        seed,
-        instruction: `Observa la posición del Sol ☀️. Sombrea las 3 caras del prisma con el valor correcto según su ángulo con la luz: Cara iluminada (0: blanco/sin trama), mediotono (1: trama suave) y sombra (2: trama densa).`,
-        targetMetricsText: `Tapa: Valor ${faces[0].targetValueLevel} | Cara Izq: Valor ${faces[1].targetValueLevel} | Cara Der: Valor ${faces[2].targetValueLevel}`,
-        targetAngleDeg: 45,
-        targetSpacingPx: 12,
-        targetLengthPx: 100,
+        ...baseChallenge,
+        subtitle: `Foco Solar en (${Math.round(sunX)}, ${Math.round(sunY)}) · Ley de Lambert`,
         minRequiredStrokes: 12,
         polySolid: {
           sunPosition: { x: sunX, y: sunY },
           faces,
         },
-        guideLines: [],
       };
     }
-
-    default:
-      throw new Error(`Categoría no implementada: ${category}`);
   }
 }
