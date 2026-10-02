@@ -70,6 +70,13 @@ export interface SingleStrokeConfig {
   spokeCount?: 8 | 12;
 }
 
+export interface SpacingTrackConfig {
+  bandCount: 1 | 2 | 4;
+  spacingMultiplier: 1 | 0.5; // 1 = paso x, 0.5 = paso x/2
+  baseSpacingPx: number;      // ej: 16px
+  baseHeightPx: number;       // ej: 130px
+}
+
 export interface LabExerciseDef {
   id?: string;
   family?: 'calisthenics_single' | 'workbook_page';
@@ -84,6 +91,7 @@ export interface LabExerciseDef {
   instruction: string;
   isSingleStroke?: boolean;
   singleStrokeConfig?: SingleStrokeConfig;
+  spacingTrackConfig?: SpacingTrackConfig;
 }
 
 export type WorkbookExerciseDef = LabExerciseDef;
@@ -170,6 +178,26 @@ export interface ProceduralStrokeChallenge {
     vertices: { x: number; y: number }[];
     targetAngleDeg: number;
   }[];
+
+  // Franjas y Carriles de Espaciado (Consistencia 1.1)
+  spacingTrackParams?: {
+    bands: {
+      id: string;
+      yTop: number;
+      yBottom: number;
+      height: number;
+    }[];
+    samplePattern: {
+      xStart: number;
+      xEnd: number;
+      stepX: number;
+      lines: { x: number; y1: number; y2: number }[];
+    };
+    trackXStart: number;
+    trackXEnd: number;
+    targetSpacingPx: number;
+    subdivisionLabel: string;
+  };
 }
 
 export interface StrokeEvaluation {
@@ -255,6 +283,46 @@ function buildSingleStrokeLevel(
       baseAngleDeg,
       multiLineCount,
       spokeCount,
+    },
+  };
+}
+
+function buildSpacingTrackLevel(
+  id: string,
+  code: string,
+  title: string,
+  block: string,
+  bandCount: 1 | 2 | 4,
+  spacingMultiplier: 1 | 0.5,
+  difficulty: 'Fácil' | 'Media' | 'Difícil' | 'Experto',
+  desc: string,
+  instruction: string,
+  baseSpacingPx = 16,
+  baseHeightPx = 130
+): LabExerciseDef {
+  const stepLabel = spacingMultiplier === 1 ? 'x' : 'x/2';
+  return {
+    id,
+    family: 'calisthenics_single',
+    code,
+    title,
+    block,
+    category: 'parallel_lines',
+    difficulty,
+    metrics: `Espaciado constante (${stepLabel} = ${baseSpacingPx * spacingMultiplier}px), contención en carriles y verticalidad`,
+    desc,
+    instruction,
+    isSingleStroke: true,
+    spacingTrackConfig: {
+      bandCount,
+      spacingMultiplier,
+      baseSpacingPx,
+      baseHeightPx,
+    },
+    singleStrokeConfig: {
+      direction: 'vertical_top_down',
+      variationType: 'fixed',
+      guideType: 'gray_line',
     },
   };
 }
@@ -478,6 +546,14 @@ export const ALL_SINGLE_STROKE_EXERCISES: LabExerciseDef[] = [
   buildSingleStrokeLevel('d12_17', 'C12.17', 'Roseta 12 Radios — Puntos Clave (❂ Sin Guía)', '⚡ Calistenia: D12 (❂ Roseta Fuera-Dentro / 8-12 Radios)', 'radial_inward', 'fixed', 'points_only', 'Difícil', 'Sin guía gris: 12 dianas exteriores convergiendo en el centro.', 'Conecta las 12 dianas perimetrales hacia el centro común.', undefined, undefined, undefined, 12),
   buildSingleStrokeLevel('d12_18', 'C12.18', 'Roseta 12 Radios — Puntos Clave: Variación Total (❂)', '⚡ Calistenia: D12 (❂ Roseta Fuera-Dentro / 8-12 Radios)', 'radial_inward', 'total_random', 'points_only', 'Difícil', 'Reto ciego de 12 radios convergentes con variación total.', 'Clava los 12 impactos en el centro común con máxima regularidad.', undefined, undefined, undefined, 12),
   buildSingleStrokeLevel('d12_19', 'C12.19', 'Maestría D12 — Roseta Rápida (❂ Fuera hacia Adentro)', '⚡ Calistenia: D12 (❂ Roseta Fuera-Dentro / 8-12 Radios)', 'radial_inward', 'total_random', 'points_only', 'Experto', 'Modo infinito rápido: acumula la mayor racha de aciertos en rosetas convergentes (❂).', 'Traza los 12 radios de fuera a dentro a gran velocidad con máxima precisión.', undefined, undefined, undefined, 12),
+
+  // ESPACIADO Y CARRILES (CONSISTENCIA 1.1 — RITMO Y ESPACIADO x, x/2)
+  buildSpacingTrackLevel('sp_01', 'E1.1', 'Carril Único — Espaciado Base (x)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 1, 1, 'Fácil', 'Una franja de altura y. Observa el patrón de muestra a la izquierda y dibuja líneas verticales hacia la derecha manteniendo el espaciado x entre los carriles.', 'Dibuja líneas verticales de arriba a abajo entre las dos guías horizontales manteniendo la separación x del patrón.'),
+  buildSpacingTrackLevel('sp_02', 'E1.2', 'Carril Único — Espaciado Fino (x/2)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 1, 0.5, 'Media', 'Una franja de altura y con el doble de densidad. Imita la muestra reduciendo el espaciado a x/2 con cadencia regular.', 'Dibuja líneas verticales con la mitad de espaciado (x/2) manteniendo el paralelismo y los límites.'),
+  buildSpacingTrackLevel('sp_03', 'E2.1', 'Doble Carril — Espaciado Base (x)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 2, 1, 'Media', 'Dos franjas horizontales de altura y/2 separadas por un margen blanco. Completa ambas bandas con espaciado x constante.', 'Llena las dos franjas horizontales con trazos verticales de altura y/2 al paso x de la muestra.'),
+  buildSpacingTrackLevel('sp_04', 'E2.2', 'Doble Carril — Espaciado Fino (x/2)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 2, 0.5, 'Difícil', 'Dos franjas de altura y/2 con densidad x/2. Requiere gran control de muñeca y detención precisa en cada carril.', 'Dibuja líneas verticales densas (x/2) en ambas franjas respetando el margen intermedio.'),
+  buildSpacingTrackLevel('sp_05', 'E3.1', 'Cuádruple Carril — Espaciado Base (x)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 4, 1, 'Difícil', 'Cuatro franjas horizontales de altura y/4. Trazos verticales cortos y rápidos con ritmo continuo al paso x.', 'Dibuja trazos verticales cortos en las 4 franjas manteniendo el mismo espaciado x en todas.'),
+  buildSpacingTrackLevel('sp_06', 'E3.2', 'Cuádruple Carril — Espaciado Fino (x/2)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 4, 0.5, 'Experto', 'Cuatro franjas de altura y/4 con espaciado fino x/2. Máxima concentración rítmica y motriz sobre micro-franjas.', 'Completa las 4 franjas con trazos cortos ultradensos (x/2) sin desbordar los carriles.'),
 
   // CURVAS Y ARCOS (C & S)
   buildSingleStrokeLevel('cc_01', 'CC.01', 'Arco en C Fijo (Guía Gris)', '⚡ Calistenia: Trazos Curvos & Arcos (C & S)', 'curve_c', 'fixed', 'gray_line', 'Fácil', 'Curva suave en arco de parábola con guía gris visible.', 'Sigue la trayectoria curvada desde ① hasta ②.', 'subtle'),

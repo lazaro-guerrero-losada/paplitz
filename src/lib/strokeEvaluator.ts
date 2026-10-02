@@ -976,6 +976,48 @@ export function buildStrokeDebugReport(
     ].filter(Boolean).join('\n');
   }
 
+  if (challenge.spacingTrackParams) {
+    const sp = challenge.spacingTrackParams;
+    return [
+      `=== REPORTE DE DEPURACIÓN DE CARRILES Y ESPACIADO (PAPLITZ LAB) ===`,
+      `Fecha: ${new Date().toISOString()}`,
+      `Reto: [${challenge.code}] ${challenge.title} (Semilla: #${challenge.seed})`,
+      `Subtítulo: ${challenge.subtitle}`,
+      ``,
+      `--- OBJETIVO ---`,
+      `Bandas: ${sp.bands.length} (Altura: ${sp.bands[0].height}px)`,
+      `Paso Objetivo: ${sp.targetSpacingPx}px (${sp.subdivisionLabel})`,
+      `Carril X: de ${sp.trackXStart}px a ${sp.trackXEnd}px`,
+      ``,
+      `--- TRAZOS DEL USUARIO ---`,
+      `Trazos detectados en carril: ${evaluation.detectedStats.strokeCount}`,
+      `Espaciado Medio Medido: ${evaluation.detectedStats.measuredAvgSpacingPx}px (Objetivo: ${sp.targetSpacingPx}px)`,
+      `Varianza / Dispersión: ±${evaluation.detectedStats.spacingVariance}px`,
+      ``,
+      `--- RESULTADO DE EVALUACIÓN ---`,
+      `Nota Global: ${evaluation.overallScore}% (Superado: ${evaluation.passed ? 'SÍ' : 'NO'})`,
+      evaluation.currentPhase ? `Fase Activa: Fase ${evaluation.currentPhase} (Fase Superada: ${evaluation.phasePassed ? 'SÍ' : 'NO'})` : '',
+      `Espaciado y Ritmo: ${evaluation.metrics.spacingScore}%`,
+      `Contención en Carriles: ${evaluation.metrics.boundaryScore}%`,
+      `Rectitud: ${evaluation.metrics.straightnessScore}%`,
+      `Verticalidad: ${evaluation.metrics.parallelismScore}%`,
+      `Cobertura de Franjas: ${evaluation.metrics.tonalDensityScore}%`,
+      ``,
+      evaluation.kinematics
+        ? [
+            `--- CINEMÁTICA Y BIOMECÁNICA ---`,
+            `Duración: ${evaluation.kinematics.durationMs}ms`,
+            `Velocidad Media: ${evaluation.kinematics.avgSpeedPxPerSec} px/s (Pico: ${evaluation.kinematics.peakSpeedPxPerSec} px/s)`,
+            `Índice de Fluidez: ${evaluation.kinematics.fluencyScore}%`,
+            `Diagnóstico Velocidad: ${evaluation.kinematics.speedDiagnosisLabel}`,
+          ].join('\n')
+        : '',
+      ``,
+      `Diagnóstico: ${evaluation.feedbackTitle} - ${evaluation.feedbackMessage}`,
+      `================================================`,
+    ].filter(Boolean).join('\n');
+  }
+
   const s0 = strokes[0];
   const pts = s0?.points || [];
   const uStart = pts[0] || { x: 0, y: 0 };
@@ -1033,12 +1075,358 @@ export function buildStrokeDebugReport(
 }
 
 /**
+ * Evalúa el reto de Carriles y Espaciado Rítmico (Consistencia 1.1)
+ */
+export function evaluateSpacingTrackSubmission(
+  strokes: RawStroke[],
+  challenge: ProceduralStrokeChallenge
+): StrokeEvaluation {
+  const params = challenge.spacingTrackParams!;
+  const bands = params.bands;
+  const targetSpacing = params.targetSpacingPx;
+  const trackXStart = params.trackXStart;
+
+  if (strokes.length === 0) {
+    return {
+      overallScore: 0,
+      passed: false,
+      metrics: {
+        parallelismScore: 0,
+        spacingScore: 0,
+        straightnessScore: 0,
+        tonalDensityScore: 0,
+        boundaryScore: 0,
+      },
+      detectedStats: {
+        strokeCount: 0,
+        measuredAvgSpacingPx: 0,
+        spacingVariance: 0,
+        measuredAvgAngleDeg: 0,
+        measuredOpticalDensityPct: 0,
+      },
+      feedbackTitle: '¡Lienzo Vacío!',
+      feedbackMessage: 'No has dibujado líneas en el carril. Observa la muestra a la izquierda y dibuja líneas verticales hacia la derecha.',
+      tipMessage: 'Mantén un pulso constante y busca que el espacio entre trazos sea idéntico al del patrón de muestra.',
+      avatarMood: 'surprised',
+      solutionOverlay: {
+        points: [],
+        multiLines: challenge.ghostSolutionStrokes || [],
+        color: '#000000',
+        label: 'Patrón Objetivo',
+      },
+    };
+  }
+
+  // 1. Filtrar trazos válidos (en el área del carril de dibujo)
+  const trackStrokes: { stroke: RawStroke; avgX: number; avgY: number; topY: number; botY: number; len: number }[] = [];
+  for (const s of strokes) {
+    if (s.points.length < 2) continue;
+    let sumX = 0;
+    let sumY = 0;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const p of s.points) {
+      sumX += p.x;
+      sumY += p.y;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+    const avgX = sumX / s.points.length;
+    const avgY = sumY / s.points.length;
+    // Permitir trazos que estén dentro o muy cerca de la zona del carril (x >= trackXStart - 15)
+    if (avgX >= trackXStart - 15) {
+      const p1 = s.points[0];
+      const pEnd = s.points[s.points.length - 1];
+      trackStrokes.push({
+        stroke: s,
+        avgX,
+        avgY,
+        topY: minY,
+        botY: maxY,
+        len: Math.hypot(pEnd.x - p1.x, pEnd.y - p1.y),
+      });
+    }
+  }
+
+  if (trackStrokes.length === 0) {
+    return {
+      overallScore: 10,
+      passed: false,
+      metrics: {
+        parallelismScore: 20,
+        spacingScore: 10,
+        straightnessScore: 20,
+        tonalDensityScore: 10,
+        boundaryScore: 10,
+      },
+      detectedStats: {
+        strokeCount: strokes.length,
+        measuredAvgSpacingPx: 0,
+        spacingVariance: 0,
+        measuredAvgAngleDeg: 0,
+        measuredOpticalDensityPct: 0,
+      },
+      feedbackTitle: '¡Trazos fuera de los carriles!',
+      feedbackMessage: 'Has dibujado en la zona de la muestra o fuera del carril derecho. Dibuja entre las líneas horizontales guía.',
+      tipMessage: 'Comienza a la derecha de la muestra, entre las guías horizontales.',
+      avatarMood: 'curious',
+      solutionOverlay: {
+        points: [],
+        multiLines: challenge.ghostSolutionStrokes || [],
+        color: '#000000',
+        label: 'Patrón Objetivo',
+      },
+    };
+  }
+
+  // 2. Asignar trazos a cada franja/carril según cercanía en Y
+  const bandStrokesMap = new Map<string, typeof trackStrokes>();
+  for (const b of bands) {
+    bandStrokesMap.set(b.id, []);
+  }
+
+  for (const ts of trackStrokes) {
+    let closestBand = bands[0];
+    let minDiff = Infinity;
+    for (const b of bands) {
+      const bandMid = (b.yTop + b.yBottom) / 2;
+      const diff = Math.abs(ts.avgY - bandMid);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closestBand = b;
+      }
+    }
+    bandStrokesMap.get(closestBand.id)!.push(ts);
+  }
+
+  // 3. Evaluar cada franja
+  let totalSpacingScore = 0;
+  let totalBoundaryScore = 0;
+  let totalStraightnessScore = 0;
+  let totalParallelismScore = 0;
+
+  const allSpacings: number[] = [];
+  let evaluatedBandsCount = 0;
+
+  for (const b of bands) {
+    const bStrokes = bandStrokesMap.get(b.id)!;
+    if (bStrokes.length < 2) {
+      // Franja sin suficientes trazos
+      continue;
+    }
+    evaluatedBandsCount++;
+
+    // Ordenar de izquierda a derecha
+    bStrokes.sort((a, b) => a.avgX - b.avgX);
+
+    // Calcular espaciados interlineales
+    const spacings: number[] = [];
+    for (let i = 0; i < bStrokes.length - 1; i++) {
+      const dx = bStrokes[i + 1].avgX - bStrokes[i].avgX;
+      spacings.push(dx);
+      allSpacings.push(dx);
+    }
+
+    const meanDx = spacings.reduce((a, b) => a + b, 0) / spacings.length;
+    let varDx = 0;
+    for (const d of spacings) {
+      varDx += (d - meanDx) * (d - meanDx);
+    }
+    const stdDx = Math.sqrt(varDx / spacings.length);
+
+    // Puntuación de espaciado: fidelidad al paso objetivo (targetSpacing) + regularidad interna
+    const accuracyVsTarget = Math.max(0, 100 - Math.abs(meanDx - targetSpacing) * 7.5);
+    const regularity = Math.max(0, 100 - stdDx * 12);
+    const bandSpacingScore = accuracyVsTarget * 0.45 + regularity * 0.55;
+    totalSpacingScore += bandSpacingScore;
+
+    // Contención en carriles (altura y bordes superior/inferior)
+    let bandBoundarySum = 0;
+    for (const s of bStrokes) {
+      const topErr = Math.abs(s.topY - b.yTop);
+      const botErr = Math.abs(s.botY - b.yBottom);
+      // Tolerancia de 6px
+      const strokeBoundary = Math.max(0, 100 - (Math.max(0, topErr - 4) + Math.max(0, botErr - 4)) * 4);
+      bandBoundarySum += strokeBoundary;
+    }
+    totalBoundaryScore += bandBoundarySum / bStrokes.length;
+
+    // Rectitud y verticalidad de los trazos de esta banda
+    let bandStraightSum = 0;
+    let bandAngleSum = 0;
+    for (const s of bStrokes) {
+      bandStraightSum += evaluateStrokeStraightness(s.stroke);
+      const ang = getStrokeAngleDeg(s.stroke);
+      const angleDev = Math.abs(ang - 90);
+      bandAngleSum += Math.max(0, 100 - angleDev * 3.5);
+    }
+    totalStraightnessScore += bandStraightSum / bStrokes.length;
+    totalParallelismScore += bandAngleSum / bStrokes.length;
+  }
+
+  // Si alguna banda quedó completamente sin dibujar en retos multi-banda
+  const missingBands = bands.length - evaluatedBandsCount;
+  const coverageRatio = evaluatedBandsCount / bands.length;
+
+  const avgSpacingScore = evaluatedBandsCount > 0 ? (totalSpacingScore / evaluatedBandsCount) * coverageRatio : 0;
+  const avgBoundaryScore = evaluatedBandsCount > 0 ? (totalBoundaryScore / evaluatedBandsCount) * coverageRatio : 0;
+  const avgStraightnessScore = evaluatedBandsCount > 0 ? totalStraightnessScore / evaluatedBandsCount : 0;
+  const avgParallelismScore = evaluatedBandsCount > 0 ? totalParallelismScore / evaluatedBandsCount : 0;
+
+  const measuredAvgSpacingPx = allSpacings.length > 0 ? Math.round((allSpacings.reduce((a, b) => a + b, 0) / allSpacings.length) * 10) / 10 : 0;
+  let allVar = 0;
+  if (allSpacings.length > 0) {
+    for (const d of allSpacings) allVar += (d - measuredAvgSpacingPx) * (d - measuredAvgSpacingPx);
+  }
+  const measuredSpacingVariance = allSpacings.length > 0 ? Math.round(Math.sqrt(allVar / allSpacings.length) * 10) / 10 : 0;
+
+  // Penalización por pocos trazos
+  const strokeCountPenalty = trackStrokes.length < challenge.minRequiredStrokes
+    ? Math.min(30, (challenge.minRequiredStrokes - trackStrokes.length) * 5)
+    : 0;
+
+  // Cinemática en los trazos dibujados: evaluamos cada trazo y promediamos
+  const activePhase = challenge.activePhase || 1;
+  const kinematicsList = trackStrokes.map((ts) =>
+    analyzeStrokeKinematics(ts.stroke, 'vertical_top_down', activePhase, challenge.targetLengthPx || 120)
+  );
+
+  const avgSpeed = Math.round(
+    kinematicsList.reduce((acc, k) => acc + k.avgSpeedPxPerSec, 0) / (kinematicsList.length || 1)
+  );
+  const avgFluency = Math.round(
+    kinematicsList.reduce((acc, k) => acc + k.fluencyScore, 0) / (kinematicsList.length || 1)
+  );
+  const avgDuration = Math.round(
+    kinematicsList.reduce((acc, k) => acc + k.durationMs, 0) / (kinematicsList.length || 1)
+  );
+  const allPhasePassed = kinematicsList.length > 0 && kinematicsList.every((k) => k.phasePassed);
+
+  const kinematics = kinematicsList[0]
+    ? {
+        ...kinematicsList[0],
+        durationMs: avgDuration,
+        avgSpeedPxPerSec: avgSpeed,
+        fluencyScore: avgFluency,
+        phasePassed: allPhasePassed,
+      }
+    : undefined;
+
+  // Ponderación base de geometría
+  let geometricScore =
+    avgSpacingScore * 0.40 +
+    avgBoundaryScore * 0.25 +
+    avgStraightnessScore * 0.20 +
+    avgParallelismScore * 0.15 -
+    strokeCountPenalty;
+
+  geometricScore = Math.max(0, Math.min(100, Math.round(geometricScore)));
+
+  // Ponderación por Fase
+  let overallScore = geometricScore;
+  let phasePassed = false;
+
+  if (activePhase === 1) {
+    // Fase 1: Precisión Pura
+    overallScore = geometricScore;
+    phasePassed = overallScore >= 75;
+  } else if (activePhase === 2) {
+    // Fase 2: Fluidez (80% geom, 20% fluidez)
+    const fluency = kinematics?.fluencyScore || 80;
+    overallScore = Math.round(geometricScore * 0.80 + fluency * 0.20);
+    phasePassed = overallScore >= 75 && fluency >= 70;
+  } else {
+    // Fase 3: Velocidad (70% geom, 30% velocidad)
+    const speedPassed = kinematics?.phasePassed ?? true;
+    const speedScore = speedPassed ? 100 : 50;
+    overallScore = Math.round(geometricScore * 0.70 + speedScore * 0.30);
+    phasePassed = overallScore >= 75 && speedPassed;
+  }
+
+  const passed = overallScore >= 75;
+
+  // Solución overlay con las líneas ideales
+  const solutionOverlay = {
+    points: [],
+    multiLines: challenge.ghostSolutionStrokes || [],
+    color: '#000000',
+    label: `Paso Objetivo: ${targetSpacing}px`,
+  };
+
+  let feedbackTitle = '¡Ritmo y Espaciado Logrado!';
+  let feedbackMessage = `Has conseguido un paso medio de ${measuredAvgSpacingPx}px (objetivo: ${targetSpacing}px) con una regularidad de ±${measuredSpacingVariance}px.`;
+  let tipMessage = 'Mantén la mirada un paso por delante de la mano para anticipar la separación uniforme.';
+  let avatarMood: AvatarMood = 'wink';
+
+  if (missingBands > 0) {
+    feedbackTitle = 'Franjas Incompletas';
+    feedbackMessage = `Has dibujado en ${evaluatedBandsCount} de las ${bands.length} franjas requeridas. Completa todas las franjas.`;
+    tipMessage = 'Recorre cada carril horizontal de izquierda a derecha antes de calificar.';
+    avatarMood = 'curious';
+  } else if (overallScore >= 90) {
+    feedbackTitle = '¡Consistencia Magistral! 🌟';
+    feedbackMessage = `Ritmo milimétrico: espaciado de ${measuredAvgSpacingPx}px (desviación solo ±${measuredSpacingVariance}px) y ajuste perfecto entre los carriles horizontales.`;
+    tipMessage = 'Excelente memoria muscular. Intenta mantener este ritmo aumentando la fluidez o con el paso fino x/2.';
+    avatarMood = 'success-stars';
+  } else if (overallScore >= 75) {
+    feedbackTitle = '¡Nivel Superado! ✅';
+    feedbackMessage = `Buen control de espaciado (${overallScore}%). El patrón se mantiene regular a lo largo del carril.`;
+    tipMessage = 'Cuida que las líneas no se queden cortas ni rebasen las dos líneas horizontales.';
+    avatarMood = 'wink';
+  } else if (overallScore >= 50) {
+    feedbackTitle = 'Regularidad Inestable ⚠️';
+    feedbackMessage = `El espaciado varió (media ${measuredAvgSpacingPx}px vs objetivo ${targetSpacing}px, ±${measuredSpacingVariance}px).`;
+    tipMessage = 'No aceleres ni frenes entre trazos; mantén una cadencia rítmica como un metrónomo.';
+    avatarMood = 'curious';
+  } else {
+    feedbackTitle = 'Falta de Consistencia 💨';
+    feedbackMessage = trackStrokes.length < challenge.minRequiredStrokes
+      ? `Has trazado muy pocas líneas (${trackStrokes.length} de al menos ${challenge.minRequiredStrokes}). Llena el carril de izquierda a derecha.`
+      : `La distancia entre líneas se desvió demasiado del patrón de muestra.`;
+    tipMessage = 'Fíjate continuamente en la muestra a la izquierda para calibrar la distancia entre cada trazo.';
+    avatarMood = 'fail-spiral';
+  }
+
+  return {
+    overallScore,
+    passed,
+    metrics: {
+      parallelismScore: Math.round(avgParallelismScore),
+      spacingScore: Math.round(avgSpacingScore),
+      straightnessScore: Math.round(avgStraightnessScore),
+      tonalDensityScore: Math.round(coverageRatio * 100),
+      boundaryScore: Math.round(avgBoundaryScore),
+    },
+    detectedStats: {
+      strokeCount: trackStrokes.length,
+      measuredAvgSpacingPx,
+      spacingVariance: measuredSpacingVariance,
+      measuredAvgAngleDeg: 90,
+      measuredOpticalDensityPct: 0,
+    },
+    feedbackTitle,
+    feedbackMessage,
+    tipMessage,
+    solutionOverlay,
+    avatarMood,
+    kinematics,
+    currentPhase: activePhase,
+    phasePassed,
+  };
+}
+
+/**
  * Validador principal para evaluar cualquier reto del laboratorio
  */
 export function evaluateStrokeSubmission(
   strokes: RawStroke[],
   challenge: ProceduralStrokeChallenge
 ): StrokeEvaluation {
+  // Si es un reto de carriles y espaciado (Consistencia 1.1)
+  if (challenge.spacingTrackParams) {
+    return evaluateSpacingTrackSubmission(strokes, challenge);
+  }
+
   // Si es un reto multi-línea (2 o 3 líneas dispersas)
   if (
     (challenge.multiLineCount && challenge.multiLineCount > 1) ||

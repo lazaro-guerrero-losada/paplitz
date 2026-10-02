@@ -488,6 +488,146 @@ export function generateRadialRosetteChallenge(
 }
 
 /**
+ * Genera un reto de Carriles y Espaciado Rítmico (Ejercicio 1.1 Workbook: Consistencia en franjas x, x/2)
+ */
+export function generateSpacingTrackChallenge(
+  exercise: LabExerciseDef,
+  seed: number,
+  canvasWidth = 600,
+  canvasHeight = 540
+): ProceduralStrokeChallenge {
+  const cfg = exercise.spacingTrackConfig || {
+    bandCount: 1,
+    spacingMultiplier: 1,
+    baseSpacingPx: 16,
+    baseHeightPx: 130,
+  };
+
+  const targetSpacingPx = cfg.baseSpacingPx * cfg.spacingMultiplier;
+  const subdivLabel = cfg.spacingMultiplier === 1 ? 'Paso x' : 'Paso x/2';
+  const cy = canvasHeight / 2;
+
+  // 1. Configuración de franjas según bandCount
+  const bands: { id: string; yTop: number; yBottom: number; height: number }[] = [];
+  if (cfg.bandCount === 1) {
+    const h = cfg.baseHeightPx;
+    bands.push({
+      id: 'band-1',
+      yTop: cy - h / 2,
+      yBottom: cy + h / 2,
+      height: h,
+    });
+  } else if (cfg.bandCount === 2) {
+    const h = 60;
+    const gap = 24;
+    const totalSpan = 2 * h + gap;
+    const startY = cy - totalSpan / 2;
+    bands.push({
+      id: 'band-1',
+      yTop: startY,
+      yBottom: startY + h,
+      height: h,
+    });
+    bands.push({
+      id: 'band-2',
+      yTop: startY + h + gap,
+      yBottom: startY + 2 * h + gap,
+      height: h,
+    });
+  } else {
+    // 4 bandas
+    const h = 30;
+    const gap = 16;
+    const totalSpan = 4 * h + 3 * gap;
+    const startY = cy - totalSpan / 2;
+    for (let i = 0; i < 4; i++) {
+      const yTop = startY + i * (h + gap);
+      bands.push({
+        id: `band-${i + 1}`,
+        yTop,
+        yBottom: yTop + h,
+        height: h,
+      });
+    }
+  }
+
+  // 2. Patrón de muestra (izquierda)
+  const sampleXStart = 35;
+  const sampleWidth = 96; // ~96px de ancho de muestra
+  const sampleXEnd = sampleXStart + sampleWidth;
+  const sampleLines: { x: number; y1: number; y2: number }[] = [];
+
+  for (let x = sampleXStart; x <= sampleXEnd + 0.1; x += targetSpacingPx) {
+    for (const band of bands) {
+      sampleLines.push({
+        x: Math.round(x * 10) / 10,
+        y1: band.yTop,
+        y2: band.yBottom,
+      });
+    }
+  }
+
+  // 3. Carril de dibujo (derecha)
+  const trackXStart = 155;
+  const trackXEnd = canvasWidth - 25; // 575px
+
+  const guideLines: { x1: number; y1: number; x2: number; y2: number; dashed?: boolean }[] = [];
+  for (const band of bands) {
+    guideLines.push({ x1: trackXStart, y1: band.yTop, x2: trackXEnd, y2: band.yTop, dashed: false });
+    guideLines.push({ x1: trackXStart, y1: band.yBottom, x2: trackXEnd, y2: band.yBottom, dashed: false });
+  }
+
+  // 4. Solución fantasma
+  const ghostSolutionStrokes: { points: { x: number; y: number }[] }[] = [];
+  for (const band of bands) {
+    for (let x = trackXStart + targetSpacingPx; x <= trackXEnd - 6; x += targetSpacingPx) {
+      ghostSolutionStrokes.push({
+        points: [
+          { x: Math.round(x * 10) / 10, y: band.yTop },
+          { x: Math.round(x * 10) / 10, y: band.yBottom },
+        ],
+      });
+    }
+  }
+
+  const minRequiredStrokes = Math.max(3, 3 * cfg.bandCount);
+
+  return {
+    id: `track-${exercise.code}-${seed}`,
+    pageNumber: exercise.page || 1,
+    code: exercise.code,
+    category: 'parallel_lines',
+    title: exercise.title,
+    subtitle: `${cfg.bandCount} Franja${cfg.bandCount > 1 ? 's' : ''} (Alt: ${bands[0].height}px) · ${subdivLabel} (${targetSpacingPx}px)`,
+    blockTitle: exercise.block,
+    seed,
+    instruction: exercise.instruction,
+    targetMetricsText: exercise.metrics,
+    targetAngleDeg: 90,
+    targetSpacingPx,
+    targetLengthPx: bands[0].height,
+    minRequiredStrokes,
+    directionKey: 'vertical_top_down',
+    guideMode: 'gray_line',
+    guideLines,
+    ghostSolutionStrokes,
+    spacingTrackParams: {
+      bands,
+      samplePattern: {
+        xStart: sampleXStart,
+        xEnd: sampleXEnd,
+        stepX: targetSpacingPx,
+        lines: sampleLines,
+      },
+      trackXStart,
+      trackXEnd,
+      targetSpacingPx,
+      subdivisionLabel: subdivLabel,
+    },
+  };
+}
+
+/**
  * Genera un reto de Calistenia Dinámica de Trazo Único (Línea o Curva)
  */
 export function generateSingleStrokeChallenge(
@@ -496,6 +636,11 @@ export function generateSingleStrokeChallenge(
   canvasWidth = 600,
   canvasHeight = 540
 ): ProceduralStrokeChallenge {
+  // Si es un reto de espaciado en carriles (Consistencia 1.1)
+  if (exercise.spacingTrackConfig) {
+    return generateSpacingTrackChallenge(exercise, seed, canvasWidth, canvasHeight);
+  }
+
   const cfg = exercise.singleStrokeConfig || {
     direction: 'bottom_up_left_right',
     variationType: 'fixed',
@@ -862,6 +1007,7 @@ export function generateStrokeChallenge(
   // Si es un ejercicio de trazo único de calistenia, generamos reto de trazo único
   if (
     exercise.isSingleStroke ||
+    exercise.spacingTrackConfig ||
     exercise.family === 'calisthenics_single' ||
     exercise.category === 'single_stroke_line' ||
     exercise.category === 'single_stroke_curve'

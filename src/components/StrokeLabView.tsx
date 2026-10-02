@@ -55,6 +55,7 @@ const BLOCKS_LIST = [
   '⚡ Calistenia: D10 (↖ Fuga Suave ~15°-20° / Der-Izq)',
   '⚡ Calistenia: D11 (☼ Roseta Dentro-Fuera / 8-12 Radios)',
   '⚡ Calistenia: D12 (❂ Roseta Fuera-Dentro / 8-12 Radios)',
+  '⚡ Calistenia: Espaciado & Carriles (Ritmo)',
   '⚡ Calistenia: Trazos Curvos & Arcos (C & S)',
   'Bloque 1: Consistencia & Calistenia',
   'Bloque 2: Trazos Fundamentales & Trama',
@@ -467,8 +468,109 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
       ctx.setLineDash([]);
     }
 
+    // E2. Carriles de Espaciado y Muestra (Consistencia 1.1 — Ejercicios E1.1 a E3.2)
+    if (challenge.spacingTrackParams) {
+      const sp = challenge.spacingTrackParams;
+      const { bands, samplePattern, trackXStart, trackXEnd, targetSpacingPx, subdivisionLabel } = sp;
+
+      ctx.save();
+
+      // 1. ZONA DE MUESTRA (Izquierda) — PERMANENTEMENTE VISIBLE
+      const sampleTop = Math.min(...bands.map(b => b.yTop)) - 22;
+      const sampleBot = Math.max(...bands.map(b => b.yBottom)) + 12;
+      const sampleBoxW = (samplePattern.xEnd - samplePattern.xStart) + 16;
+      const sampleBoxX = samplePattern.xStart - 8;
+
+      // Fondo sutil del bloque de muestra
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.03)';
+      ctx.fillRect(sampleBoxX, sampleTop, sampleBoxW, sampleBot - sampleTop);
+      ctx.strokeStyle = '#CCCCCC';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([]);
+      ctx.strokeRect(sampleBoxX, sampleTop, sampleBoxW, sampleBot - sampleTop);
+
+      // Etiqueta superior de muestra
+      ctx.fillStyle = '#000000';
+      ctx.font = 'bold 10px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText(`MUESTRA (${subdivisionLabel})`, sampleBoxX + sampleBoxW / 2, sampleTop + 5);
+
+      // Rieles de delimitación de la muestra
+      for (const b of bands) {
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(samplePattern.xStart - 4, b.yTop);
+        ctx.lineTo(samplePattern.xEnd + 4, b.yTop);
+        ctx.moveTo(samplePattern.xStart - 4, b.yBottom);
+        ctx.lineTo(samplePattern.xEnd + 4, b.yBottom);
+        ctx.stroke();
+      }
+
+      // Trazos verticales entintados de muestra (referencia idéntica a libro de ejercicios)
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 2.4;
+      ctx.lineCap = 'round';
+      ctx.setLineDash([]);
+      for (const sLine of samplePattern.lines) {
+        ctx.beginPath();
+        ctx.moveTo(sLine.x, sLine.y1);
+        ctx.lineTo(sLine.x, sLine.y2);
+        ctx.stroke();
+      }
+
+      // 2. CARRILES GUÍA DE DIBUJO (Derecha) — SIEMPRE VISIBLES PARA DIBUJAR DENTRO
+      for (let i = 0; i < bands.length; i++) {
+        const b = bands[i];
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([]);
+
+        // Riel superior (altura = 0)
+        ctx.beginPath();
+        ctx.moveTo(trackXStart, b.yTop);
+        ctx.lineTo(trackXEnd, b.yTop);
+        ctx.stroke();
+
+        // Riel inferior (altura = y)
+        ctx.beginPath();
+        ctx.moveTo(trackXStart, b.yBottom);
+        ctx.lineTo(trackXEnd, b.yBottom);
+        ctx.stroke();
+
+        // Ticks de inicio vertical
+        ctx.beginPath();
+        ctx.moveTo(trackXStart, b.yTop - 4);
+        ctx.lineTo(trackXStart, b.yTop + 4);
+        ctx.moveTo(trackXStart, b.yBottom - 4);
+        ctx.lineTo(trackXStart, b.yBottom + 4);
+        ctx.stroke();
+
+        // Etiqueta de franja si son 2 o 4 bandas
+        if (bands.length > 1) {
+          ctx.fillStyle = '#666666';
+          ctx.font = 'bold 9px monospace';
+          ctx.textAlign = 'right';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(`F${i + 1}`, trackXStart - 6, (b.yTop + b.yBottom) / 2);
+        }
+      }
+
+      // Indicador de guía textual
+      const firstB = bands[0];
+      ctx.fillStyle = '#666666';
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(`→ Dibuja hacia la derecha con el mismo espaciado (${targetSpacingPx}px)`, trackXStart, firstB.yTop - 6);
+
+      ctx.restore();
+    }
+
     // F. Líneas de cota y carriles guía
-    if (showSolution && challenge.guideLines) {
+    if (!challenge.spacingTrackParams && showSolution && challenge.guideLines) {
       for (const line of challenge.guideLines) {
         ctx.strokeStyle = line.dashed ? '#888888' : '#cccccc';
         ctx.lineWidth = 1.5;
@@ -613,6 +715,17 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         ctx.setLineDash([5, 4]);
+
+        if (challenge.spacingTrackParams) {
+          ctx.beginPath();
+          ctx.moveTo(sPts[0].x, sPts[0].y);
+          for (let i = 1; i < sPts.length; i++) {
+            ctx.lineTo(sPts[i].x, sPts[i].y);
+          }
+          ctx.stroke();
+          ctx.restore();
+          continue;
+        }
 
         const lastP = sPts[sPts.length - 1];
         const prevP = sPts[Math.max(0, sPts.length - 4)];
@@ -977,7 +1090,7 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
           </div>
 
           {/* 2. Fases Didácticas en 1 sola fila horizontal con botón de información */}
-          {challenge.isSingleStrokeAutoEval && (
+          {(challenge.isSingleStrokeAutoEval || challenge.spacingTrackParams) && (
             <div className="border-t border-black pt-2">
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-1">
@@ -1133,7 +1246,7 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
 
                 {/* Botones de acción post-evaluación en 1 sola fila */}
                 <div className="flex items-center gap-1">
-                  {challenge.isSingleStrokeAutoEval ? (
+                  {(challenge.isSingleStrokeAutoEval || challenge.spacingTrackParams) ? (
                     evaluation.phasePassed && currentPhase < 3 ? (
                       <button
                         onClick={() => handlePhaseSelect((currentPhase + 1) as 1 | 2 | 3)}
