@@ -146,13 +146,9 @@ export function generateMultiLineChallenge(
 
   if (lineCount === 2) {
     if (isHorizontal) {
-      const a1 = Math.round(rng.range(-8, -2));
-      const a2 = Math.round(rng.range(2, 8));
-      angles = rng.nextFloat() > 0.5 ? [a1, a2] : [a2, a1];
+      angles = [0, 0];
     } else if (isVertical) {
-      const a1 = Math.round(rng.range(82, 87));
-      const a2 = Math.round(rng.range(93, 98));
-      angles = rng.nextFloat() > 0.5 ? [a1, a2] : [a2, a1];
+      angles = [90, 90];
     } else if (isShallow) {
       const a1 = Math.round(rng.range(13, 17));
       const a2 = Math.round(rng.range(19, 23));
@@ -168,15 +164,9 @@ export function generateMultiLineChallenge(
     }
   } else {
     if (isHorizontal) {
-      const a1 = Math.round(rng.range(-8, -3));
-      const a2 = Math.round(rng.range(-1, 2));
-      const a3 = Math.round(rng.range(3, 8));
-      angles = shuffleWithRNG([a1, a2, a3], rng);
+      angles = [0, 0, 0];
     } else if (isVertical) {
-      const a1 = Math.round(rng.range(82, 86));
-      const a2 = Math.round(rng.range(88, 92));
-      const a3 = Math.round(rng.range(94, 98));
-      angles = shuffleWithRNG([a1, a2, a3], rng);
+      angles = [90, 90, 90];
     } else if (isShallow) {
       const a1 = Math.round(rng.range(12, 15));
       const a2 = Math.round(rng.range(17, 20));
@@ -230,21 +220,21 @@ export function generateMultiLineChallenge(
       pStart = { x: cx + dx, y: cy + dy };
       pEnd = { x: cx - dx, y: cy - dy };
     } else if (cfg.direction === 'horizontal_left_right') {
-      // → D5: Izquierda -> Derecha
-      pStart = { x: cx - dx, y: cy - dy };
-      pEnd = { x: cx + dx, y: cy + dy };
+      // → D5: Izquierda -> Derecha (completamente horizontal)
+      pStart = { x: cx - dx, y: cy };
+      pEnd = { x: cx + dx, y: cy };
     } else if (cfg.direction === 'horizontal_right_left') {
-      // ← D6: Derecha -> Izquierda
-      pStart = { x: cx + dx, y: cy - dy };
-      pEnd = { x: cx - dx, y: cy + dy };
+      // ← D6: Derecha -> Izquierda (completamente horizontal)
+      pStart = { x: cx + dx, y: cy };
+      pEnd = { x: cx - dx, y: cy };
     } else if (cfg.direction === 'vertical_bottom_up') {
-      // ↑ D7: Abajo -> Arriba
-      pStart = { x: cx - dx, y: cy + dy };
-      pEnd = { x: cx + dx, y: cy - dy };
+      // ↑ D7: Abajo -> Arriba (completamente vertical)
+      pStart = { x: cx, y: cy + dy };
+      pEnd = { x: cx, y: cy - dy };
     } else if (cfg.direction === 'vertical_top_down') {
-      // ↓ D8: Arriba -> Abajo
-      pStart = { x: cx - dx, y: cy - dy };
-      pEnd = { x: cx + dx, y: cy + dy };
+      // ↓ D8: Arriba -> Abajo (completamente vertical)
+      pStart = { x: cx, y: cy - dy };
+      pEnd = { x: cx, y: cy + dy };
     } else if (cfg.direction === 'shallow_up_left_right') {
       // ↗ D9: Fuga Suave Izquierda -> Derecha (ascendente)
       pStart = { x: cx - dx, y: cy + dy };
@@ -474,84 +464,48 @@ export function generateSingleStrokeChallenge(
     pEnd = { x: cx - dx, y: cy - dy };   // Arriba-Izquierda
 
   } else if (cfg.direction === 'horizontal_left_right') {
-    // → D5: Horizontal de Izquierda a Derecha
+    // → D5: Horizontal de Izquierda a Derecha (estrictamente horizontal, 0°)
     // Inicio (1) = Izquierda (x menor)
     // Fin (2) = Derecha (x mayor)
     dirArrow = '→';
     dirLabel = 'Horizontal, Izquierda a Derecha (→)';
     angleDeg = 0;
-    if (
-      cfg.variationType === 'rotation' ||
-      cfg.variationType === 'rotation_length' ||
-      cfg.variationType === 'total_random'
-    ) {
-      angleDeg = rng.range(-12, 12);
-    }
-    const thetaRad = (angleDeg * Math.PI) / 180;
-    const dx = halfL * Math.cos(thetaRad);
-    const dy = halfL * Math.sin(thetaRad);
-    pStart = { x: cx - dx, y: cy - dy }; // Izquierda
-    pEnd = { x: cx + dx, y: cy + dy };   // Derecha
+    const dx = halfL;
+    pStart = { x: cx - dx, y: cy }; // Izquierda
+    pEnd = { x: cx + dx, y: cy };   // Derecha
 
   } else if (cfg.direction === 'horizontal_right_left') {
-    // ← D6: Horizontal de Derecha a Izquierda
+    // ← D6: Horizontal de Derecha a Izquierda (estrictamente horizontal, 0°)
     // Inicio (1) = Derecha (x mayor)
     // Fin (2) = Izquierda (x menor)
     dirArrow = '←';
     dirLabel = 'Horizontal, Derecha a Izquierda (←)';
     angleDeg = 0;
-    if (
-      cfg.variationType === 'rotation' ||
-      cfg.variationType === 'rotation_length' ||
-      cfg.variationType === 'total_random'
-    ) {
-      angleDeg = rng.range(-12, 12);
-    }
-    const thetaRad = (angleDeg * Math.PI) / 180;
-    const dx = halfL * Math.cos(thetaRad);
-    const dy = halfL * Math.sin(thetaRad);
-    pStart = { x: cx + dx, y: cy - dy }; // Derecha
-    pEnd = { x: cx - dx, y: cy + dy };   // Izquierda
+    const dx = halfL;
+    pStart = { x: cx + dx, y: cy }; // Derecha
+    pEnd = { x: cx - dx, y: cy };   // Izquierda
 
   } else if (cfg.direction === 'vertical_bottom_up') {
-    // ↑ D7: Vertical de Abajo a Arriba
+    // ↑ D7: Vertical de Abajo a Arriba (estrictamente vertical, 90°)
     // Inicio (1) = Abajo (y mayor en canvas)
     // Fin (2) = Arriba (y menor en canvas)
     dirArrow = '↑';
     dirLabel = 'Vertical, Abajo a Arriba (↑)';
     angleDeg = 90;
-    if (
-      cfg.variationType === 'rotation' ||
-      cfg.variationType === 'rotation_length' ||
-      cfg.variationType === 'total_random'
-    ) {
-      angleDeg = rng.range(78, 102);
-    }
-    const thetaRad = (angleDeg * Math.PI) / 180;
-    const dx = halfL * Math.cos(thetaRad);
-    const dy = halfL * Math.sin(thetaRad);
-    pStart = { x: cx - dx, y: cy + dy }; // Abajo
-    pEnd = { x: cx + dx, y: cy - dy };   // Arriba
+    const dy = halfL;
+    pStart = { x: cx, y: cy + dy }; // Abajo
+    pEnd = { x: cx, y: cy - dy };   // Arriba
 
   } else if (cfg.direction === 'vertical_top_down') {
-    // ↓ D8: Vertical de Arriba a Abajo
+    // ↓ D8: Vertical de Arriba a Abajo (estrictamente vertical, 90°)
     // Inicio (1) = Arriba (y menor en canvas)
     // Fin (2) = Abajo (y mayor en canvas)
     dirArrow = '↓';
     dirLabel = 'Vertical, Arriba a Abajo (↓)';
     angleDeg = 90;
-    if (
-      cfg.variationType === 'rotation' ||
-      cfg.variationType === 'rotation_length' ||
-      cfg.variationType === 'total_random'
-    ) {
-      angleDeg = rng.range(78, 102);
-    }
-    const thetaRad = (angleDeg * Math.PI) / 180;
-    const dx = halfL * Math.cos(thetaRad);
-    const dy = halfL * Math.sin(thetaRad);
-    pStart = { x: cx - dx, y: cy - dy }; // Arriba
-    pEnd = { x: cx + dx, y: cy + dy };   // Abajo
+    const dy = halfL;
+    pStart = { x: cx, y: cy - dy }; // Arriba
+    pEnd = { x: cx, y: cy + dy };   // Abajo
 
   } else if (cfg.direction === 'shallow_up_left_right') {
     // ↗ D9: Fuga Suave ~15°-20° Abajo a Arriba, Izquierda a Derecha
