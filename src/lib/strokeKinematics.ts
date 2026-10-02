@@ -273,6 +273,18 @@ export function getDirectionDisplayLabel(dir: StrokeDirection | string): string 
       return 'D3 (↘ Descendente Der)';
     case 'bottom_up_right_left':
       return 'D4 (↖ Ascendente Izq)';
+    case 'horizontal_left_right':
+      return 'D5 (→ Horizontal Der)';
+    case 'horizontal_right_left':
+      return 'D6 (← Horizontal Izq)';
+    case 'vertical_bottom_up':
+      return 'D7 (↑ Vertical Arriba)';
+    case 'vertical_top_down':
+      return 'D8 (↓ Vertical Abajo)';
+    case 'shallow_up_left_right':
+      return 'D9 (↗ Fuga Suave Der)';
+    case 'shallow_up_right_left':
+      return 'D10 (↖ Fuga Suave Izq)';
     case 'curve_c':
       return 'Curva Arco C';
     case 'curve_s':
@@ -291,12 +303,24 @@ export function getBiomechanicalComparison(profile: UserSpeedProfile): string | 
   const d2 = dirs['top_down_right_left']?.avgSpeedPxPerSec;
   const d3 = dirs['top_down_left_right']?.avgSpeedPxPerSec;
   const d4 = dirs['bottom_up_right_left']?.avgSpeedPxPerSec;
+  const d5 = dirs['horizontal_left_right']?.avgSpeedPxPerSec;
+  const d6 = dirs['horizontal_right_left']?.avgSpeedPxPerSec;
+  const d7 = dirs['vertical_bottom_up']?.avgSpeedPxPerSec;
+  const d8 = dirs['vertical_top_down']?.avgSpeedPxPerSec;
+  const d9 = dirs['shallow_up_left_right']?.avgSpeedPxPerSec;
+  const d10 = dirs['shallow_up_right_left']?.avgSpeedPxPerSec;
 
   const entries: { name: string; speed: number }[] = [];
   if (d1) entries.push({ name: '↗ D1 (Ascendente Der)', speed: d1 });
   if (d2) entries.push({ name: '↙ D2 (Descendente Izq)', speed: d2 });
   if (d3) entries.push({ name: '↘ D3 (Descendente Der)', speed: d3 });
   if (d4) entries.push({ name: '↖ D4 (Ascendente Izq)', speed: d4 });
+  if (d5) entries.push({ name: '→ D5 (Horizontal Der)', speed: d5 });
+  if (d6) entries.push({ name: '← D6 (Horizontal Izq)', speed: d6 });
+  if (d7) entries.push({ name: '↑ D7 (Vertical Arriba)', speed: d7 });
+  if (d8) entries.push({ name: '↓ D8 (Vertical Abajo)', speed: d8 });
+  if (d9) entries.push({ name: '↗ D9 (Fuga Suave Der)', speed: d9 });
+  if (d10) entries.push({ name: '↖ D10 (Fuga Suave Izq)', speed: d10 });
 
   if (entries.length < 2) return null;
 
