@@ -190,6 +190,7 @@ export interface StrokeEvaluation {
   feedbackMessage: string;
   tipMessage: string;
   isSingleStroke?: boolean;
+  isReversed?: boolean;
   streak?: number;
   directionWarning?: string;
   solutionOverlay?: {

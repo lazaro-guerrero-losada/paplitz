@@ -338,7 +338,7 @@ export function evaluateSingleStrokeSubmission(
 
   let angleDiff = Math.abs(userAngleDeg - targetVectorAngleDeg);
   if (angleDiff > 180) angleDiff = 360 - angleDiff;
-  const parallelismScore = Math.round(Math.max(0, 100 - angleDiff * 3.2));
+  let parallelismScore = Math.round(Math.max(0, 100 - angleDiff * 3.2));
 
   // 3. Verificación de dirección biomecánica (¿trazó de ① hacia ②, o al revés?)
   const distStartTo1 = Math.hypot(userStart.x - targetStart.x, userStart.y - targetStart.y);
@@ -357,7 +357,7 @@ export function evaluateSingleStrokeSubmission(
   const endErr = isReversed ? distEndTo1 : distEndTo2;
   const avgEndpointErr = (startErr + endErr) / 2;
   // Margen de gracia de 6px; después penalización firme
-  const boundaryScore = Math.round(
+  let boundaryScore = Math.round(
     Math.max(0, 100 - Math.max(0, avgEndpointErr - 6) * 2.4)
   );
 
@@ -400,8 +400,11 @@ export function evaluateSingleStrokeSubmission(
   let directionWarning: string | undefined;
 
   if (isReversed) {
-    overallScore = Math.min(overallScore, 35);
-    directionWarning = '⚠️ DIRECCIÓN INVERTIDA: Has trazado de ② hacia ①. Debes iniciar en ① y proyectar hacia ②.';
+    overallScore = 0;
+    boundaryScore = 0;
+    straightnessScore = 0;
+    parallelismScore = 0;
+    directionWarning = '⚠️ DIRECCIÓN INVERTIDA: Has trazado en sentido contrario (de ② hacia ①). Debes iniciar en ① y proyectar hacia ②.';
   }
 
   // Criterios estrictos de aprobación (evitar falsos positivos)
@@ -498,6 +501,7 @@ export function evaluateSingleStrokeSubmission(
     overallScore,
     passed,
     isSingleStroke: true,
+    isReversed,
     directionWarning,
     currentPhase: activePhase,
     phasePassed,
@@ -677,7 +681,7 @@ export function evaluateMultiLineSubmission(
 
     let overallLine = Math.round(boundaryScore * 0.40 + straightnessScore * 0.35 + angleScore * 0.25);
     if (isReversed) {
-      overallLine = Math.min(overallLine, 35);
+      overallLine = 0;
       directionWarnings.push(
         `L${target.order} (pts ${target.startKeyPointOrder}→${target.endKeyPointOrder}) fue trazada en sentido inverso.`
       );
@@ -734,7 +738,7 @@ export function evaluateMultiLineSubmission(
 
   const hasAnyReversed = lineResults.some((r) => r.isReversed);
   if (hasAnyReversed) {
-    overallScore = Math.min(overallScore, 40);
+    overallScore = 0;
   }
 
   // Criterios estrictos de aprobación
@@ -843,6 +847,7 @@ export function evaluateMultiLineSubmission(
     overallScore,
     passed,
     isSingleStroke: true,
+    isReversed: hasAnyReversed,
     directionWarning,
     currentPhase: activePhase,
     phasePassed,

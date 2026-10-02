@@ -105,6 +105,7 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
   // Calistenia dinámica: Racha de aciertos y estado de copia de reporte
   const [streak, setStreak] = useState<number>(0);
   const [copiedDebug, setCopiedDebug] = useState<boolean>(false);
+  const [dismissedDirectionWarning, setDismissedDirectionWarning] = useState<boolean>(false);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -125,6 +126,7 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
     currentStrokeRef.current = [];
     setIsDrawing(false);
     setEvaluation(null);
+    setDismissedDirectionWarning(false);
     setShowUserStrokes(true);
     setShowSolution(true);
     setShowDebugModal(false);
@@ -139,6 +141,7 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
     currentStrokeRef.current = [];
     setIsDrawing(false);
     setEvaluation(null);
+    setDismissedDirectionWarning(false);
     setShowUserStrokes(true);
     setShowSolution(true);
     setShowDebugModal(false);
@@ -151,6 +154,7 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
     currentStrokeRef.current = [];
     setIsDrawing(false);
     setEvaluation(null);
+    setDismissedDirectionWarning(false);
     setShowUserStrokes(true);
     setShowSolution(true);
     setShowDebugModal(false);
@@ -222,6 +226,7 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
       currentStrokeRef.current = [];
       setIsDrawing(false);
       setEvaluation(null);
+      setDismissedDirectionWarning(false);
       setShowDebugModal(false);
       setDebugComment('');
     }
@@ -626,6 +631,7 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
     // Si había una evaluación activa y el usuario vuelve a tocar, limpiar para nuevo intento
     if (evaluation !== null && challenge.isSingleStrokeAutoEval) {
       setEvaluation(null);
+      setDismissedDirectionWarning(false);
       setStrokes([]);
     }
 
@@ -676,6 +682,7 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
           currentStrokeRef.current = [];
           const result = evaluateStrokeSubmission(newStrokes, challenge);
           setEvaluation(result);
+          setDismissedDirectionWarning(false);
           if (result.passed) {
             setStreak((prev) => prev + 1);
             if (onAwardXP) onAwardXP(15 * requiredStrokes);
@@ -695,12 +702,14 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
     if (strokes.length === 0) return;
     setStrokes((prev) => prev.slice(0, -1));
     setEvaluation(null);
+    setDismissedDirectionWarning(false);
   };
 
   const handleClear = () => {
     setStrokes([]);
     currentStrokeRef.current = [];
     setEvaluation(null);
+    setDismissedDirectionWarning(false);
   };
 
   const handleEvaluate = () => {
@@ -1059,12 +1068,18 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
                     </span>
                     <span
                       className={`text-[10px] font-mono px-1.5 py-0.5 font-black uppercase tracking-wider ${
-                        evaluation.phasePassed
+                        evaluation.isReversed
+                          ? 'bg-black text-white'
+                          : evaluation.phasePassed
                           ? 'bg-black text-white'
                           : 'bg-white text-black border border-black'
                       }`}
                     >
-                      {evaluation.phasePassed ? 'Superado ✓' : 'Ajustar'}
+                      {evaluation.isReversed
+                        ? 'Dirección ⚠️'
+                        : evaluation.phasePassed
+                        ? 'Superado ✓'
+                        : 'Ajustar'}
                     </span>
                   </div>
                   {evaluation.kinematics && (
@@ -1162,6 +1177,43 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
               onPointerUp={handlePointerUp}
               onPointerCancel={handlePointerUp}
             />
+
+            {/* Pop-up sobre el lienzo al trazar en dirección invertida */}
+            {evaluation?.isReversed && !dismissedDirectionWarning && (
+              <div className="absolute top-3 inset-x-3 sm:top-4 sm:inset-x-6 z-20 bg-white border-3 border-black p-3 sm:p-4 shadow-[4px_4px_0px_#000000] animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="flex items-start justify-between gap-2.5">
+                  <div className="flex items-start gap-2.5 min-w-0">
+                    <div className="p-1.5 bg-black text-white shrink-0 mt-0.5 shadow-[1px_1px_0px_#000000]">
+                      <RotateCcw className="w-4 h-4 stroke-[2.5]" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <h4 className="font-display font-black text-xs sm:text-sm uppercase tracking-wider text-black">
+                          Dirección Invertida (0%)
+                        </h4>
+                        <span className="bg-black text-white px-1.5 py-0.2 font-mono text-[9px] font-bold uppercase">
+                          Sentido Contrario
+                        </span>
+                      </div>
+                      <p className="font-sans text-xs text-neutral-800 leading-snug">
+                        {evaluation.directionWarning ||
+                          'Has trazado en sentido contrario (de ② hacia ①). Inicia siempre en el punto ① y proyecta el trazo hacia ②.'}
+                      </p>
+                      <p className="font-mono text-[10px] text-neutral-500 mt-1.5">
+                        Toca el lienzo para un nuevo trazo o pulsa Siguiente para continuar.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setDismissedDirectionWarning(true)}
+                    className="p-1 text-black hover:bg-neutral-100 border border-black cursor-pointer shrink-0 transition-colors shadow-[1px_1px_0px_#000000]"
+                    title="Cerrar aviso"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </main>
