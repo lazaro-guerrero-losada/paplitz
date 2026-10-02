@@ -568,20 +568,9 @@ export function evaluateMultiLineSubmission(
     };
   }
 
-  // 1. Emparejamiento óptimo (Matching Bipartito) entre trazos del usuario y líneas diana
+  // 1. Emparejamiento óptimo entre trazos del usuario y líneas diana
   const numTargets = targetLines.length;
   const numUserStrokes = strokes.length;
-
-  const permutations: number[][] = [];
-  if (numTargets === 2) {
-    permutations.push([0, 1], [1, 0]);
-  } else {
-    permutations.push(
-      [0, 1, 2], [0, 2, 1],
-      [1, 0, 2], [1, 2, 0],
-      [2, 0, 1], [2, 1, 0]
-    );
-  }
 
   function strokeDistanceCost(uStroke: RawStroke, target: typeof targetLines[0]): number {
     const pts = uStroke.points;
@@ -596,18 +585,57 @@ export function evaluateMultiLineSubmission(
     return Math.min(dFwd, dRev);
   }
 
-  let bestPermutation = permutations[0] || [0];
-  let minTotalCost = Infinity;
+  let assignment: number[] = [];
 
-  for (const perm of permutations) {
-    let currentCost = 0;
-    for (let uIdx = 0; uIdx < Math.min(numUserStrokes, numTargets); uIdx++) {
-      const tIdx = perm[uIdx];
-      currentCost += strokeDistanceCost(strokes[uIdx], targetLines[tIdx]);
+  if (numTargets <= 3) {
+    const permutations: number[][] = [];
+    if (numTargets === 2) {
+      permutations.push([0, 1], [1, 0]);
+    } else {
+      permutations.push(
+        [0, 1, 2], [0, 2, 1],
+        [1, 0, 2], [1, 2, 0],
+        [2, 0, 1], [2, 1, 0]
+      );
     }
-    if (currentCost < minTotalCost) {
-      minTotalCost = currentCost;
-      bestPermutation = perm;
+
+    let bestPermutation = permutations[0] || [0];
+    let minTotalCost = Infinity;
+
+    for (const perm of permutations) {
+      let currentCost = 0;
+      for (let uIdx = 0; uIdx < Math.min(numUserStrokes, numTargets); uIdx++) {
+        const tIdx = perm[uIdx];
+        currentCost += strokeDistanceCost(strokes[uIdx], targetLines[tIdx]);
+      }
+      if (currentCost < minTotalCost) {
+        minTotalCost = currentCost;
+        bestPermutation = perm;
+      }
+    }
+    assignment = bestPermutation;
+  } else {
+    // Para rosetas o retos con > 3 líneas (8 o 12 radios):
+    // Matching voraz por distancia mínima
+    const pairs: { uIdx: number; tIdx: number; cost: number }[] = [];
+    for (let u = 0; u < numUserStrokes; u++) {
+      for (let t = 0; t < numTargets; t++) {
+        pairs.push({ uIdx: u, tIdx: t, cost: strokeDistanceCost(strokes[u], targetLines[t]) });
+      }
+    }
+    pairs.sort((a, b) => a.cost - b.cost);
+
+    const usedU = new Set<number>();
+    const usedT = new Set<number>();
+    assignment = new Array(numUserStrokes).fill(-1);
+
+    for (const pair of pairs) {
+      if (!usedU.has(pair.uIdx) && !usedT.has(pair.tIdx)) {
+        usedU.add(pair.uIdx);
+        usedT.add(pair.tIdx);
+        assignment[pair.uIdx] = pair.tIdx;
+        if (usedU.size === Math.min(numUserStrokes, numTargets)) break;
+      }
     }
   }
 
@@ -630,8 +658,9 @@ export function evaluateMultiLineSubmission(
   const lineResults: LineResult[] = [];
   const directionWarnings: string[] = [];
 
-  for (let uIdx = 0; uIdx < Math.min(numUserStrokes, numTargets); uIdx++) {
-    const tIdx = bestPermutation[uIdx];
+  for (let uIdx = 0; uIdx < numUserStrokes; uIdx++) {
+    const tIdx = assignment[uIdx];
+    if (tIdx === undefined || tIdx === -1) continue;
     const target = targetLines[tIdx];
     const uStroke = strokes[uIdx];
     const pts = uStroke.points;
@@ -727,6 +756,12 @@ export function evaluateMultiLineSubmission(
       feedbackTitle: `Falta${missing > 1 ? 'n' : ''} ${missing} línea${missing > 1 ? 's' : ''}`,
       feedbackMessage: `Has dibujado ${lineResults.length} de ${numTargets} líneas. Dibuja las restantes.`,
       tipMessage: 'Dibuja todas las líneas marcadas con sus puntos antes de evaluar.',
+      solutionOverlay: {
+        points: targetLines[0]?.idealPath || [],
+        multiLines: targetLines.map((t) => ({ points: t.idealPath })),
+        color: '#000000',
+        label: `Solución (${numTargets} Radios)`,
+      },
     };
   }
 

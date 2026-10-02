@@ -53,6 +53,8 @@ const BLOCKS_LIST = [
   '⚡ Calistenia: D8 (↓ Vertical / Arriba-Abajo)',
   '⚡ Calistenia: D9 (↗ Fuga Suave ~15°-20° / Izq-Der)',
   '⚡ Calistenia: D10 (↖ Fuga Suave ~15°-20° / Der-Izq)',
+  '⚡ Calistenia: D11 (☼ Roseta Dentro-Fuera / 8-12 Radios)',
+  '⚡ Calistenia: D12 (❂ Roseta Fuera-Dentro / 8-12 Radios)',
   '⚡ Calistenia: Trazos Curvos & Arcos (C & S)',
   'Bloque 1: Consistencia & Calistenia',
   'Bloque 2: Trazos Fundamentales & Trama',
@@ -468,7 +470,7 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
     // F. Líneas de cota y carriles guía
     if (showSolution && challenge.guideLines) {
       for (const line of challenge.guideLines) {
-        ctx.strokeStyle = line.dashed ? '#888888' : '#000000';
+        ctx.strokeStyle = line.dashed ? '#888888' : '#cccccc';
         ctx.lineWidth = 1.5;
         if (line.dashed) ctx.setLineDash([5, 5]);
         else ctx.setLineDash([]);
@@ -514,12 +516,36 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
         ctx.arc(kp.x, kp.y, 3.5, 0, Math.PI * 2);
         ctx.fill();
 
-        // Número pequeño centrado inmediatamente encima (1, 2, 3...)
+        // Número pequeño
         ctx.fillStyle = '#000000';
         ctx.font = 'bold 10px monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
-        ctx.fillText(String(kp.order), kp.x, kp.y - 6);
+
+        const labelText = kp.label || String(kp.order);
+        let labelX = kp.x;
+        let labelY = kp.y - 6;
+
+        // Si es un punto de roseta perimetral, proyectar el número hacia el exterior de la roseta
+        if (
+          (challenge.category === 'radial_focal' ||
+            challenge.directionKey === 'radial_outward' ||
+            challenge.directionKey === 'radial_inward') &&
+          challenge.keyPoints &&
+          challenge.keyPoints.length > 2
+        ) {
+          const centerKp = challenge.keyPoints[0];
+          const dx = kp.x - centerKp.x;
+          const dy = kp.y - centerKp.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist > 15) {
+            labelX = kp.x + (dx / dist) * 12;
+            labelY = kp.y + (dy / dist) * 12;
+            ctx.textBaseline = 'middle';
+          }
+        }
+
+        ctx.fillText(labelText, labelX, labelY);
         ctx.restore();
       }
     }
@@ -570,6 +596,15 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
           ? [evaluation.solutionOverlay.points]
           : [];
 
+      // Detectar si múltiples radios convergen al mismo centro común (como en D12)
+      const isCommonCenterEnd =
+        linesToDraw.length > 3 &&
+        linesToDraw.every((l) => {
+          const lastPt = l[l.length - 1];
+          const firstLastPt = linesToDraw[0][linesToDraw[0].length - 1];
+          return Math.hypot(lastPt.x - firstLastPt.x, lastPt.y - firstLastPt.y) < 8;
+        });
+
       for (const sPts of linesToDraw) {
         if (sPts.length < 2) continue;
         ctx.save();
@@ -579,22 +614,28 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
         ctx.lineJoin = 'round';
         ctx.setLineDash([5, 4]);
 
+        const lastP = sPts[sPts.length - 1];
+        const prevP = sPts[Math.max(0, sPts.length - 4)];
+        const theta = Math.atan2(lastP.y - prevP.y, lastP.x - prevP.x);
+
+        const arrowTip = isCommonCenterEnd
+          ? { x: lastP.x - 8 * Math.cos(theta), y: lastP.y - 8 * Math.sin(theta) }
+          : lastP;
+
         ctx.beginPath();
         ctx.moveTo(sPts[0].x, sPts[0].y);
         for (let i = 1; i < sPts.length; i++) {
-          ctx.lineTo(sPts[i].x, sPts[i].y);
+          const pt = i === sPts.length - 1 && isCommonCenterEnd ? arrowTip : sPts[i];
+          ctx.lineTo(pt.x, pt.y);
         }
         ctx.stroke();
 
         // Flecha de solución en el extremo de llegada
-        const lastP = sPts[sPts.length - 1];
-        const prevP = sPts[Math.max(0, sPts.length - 4)];
-        const theta = Math.atan2(lastP.y - prevP.y, lastP.x - prevP.x);
         ctx.fillStyle = '#000000';
         ctx.beginPath();
-        ctx.moveTo(lastP.x, lastP.y);
-        ctx.lineTo(lastP.x - 12 * Math.cos(theta - 0.4), lastP.y - 12 * Math.sin(theta - 0.4));
-        ctx.lineTo(lastP.x - 12 * Math.cos(theta + 0.4), lastP.y - 12 * Math.sin(theta + 0.4));
+        ctx.moveTo(arrowTip.x, arrowTip.y);
+        ctx.lineTo(arrowTip.x - 11 * Math.cos(theta - 0.38), arrowTip.y - 11 * Math.sin(theta - 0.38));
+        ctx.lineTo(arrowTip.x - 11 * Math.cos(theta + 0.38), arrowTip.y - 11 * Math.sin(theta + 0.38));
         ctx.closePath();
         ctx.fill();
         ctx.restore();
@@ -1137,7 +1178,7 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
                 </div>
               </div>
             ) : (
-              !challenge.isSingleStrokeAutoEval && (
+              strokes.length > 0 && (
                 <button
                   onClick={handleEvaluate}
                   disabled={strokes.length === 0}

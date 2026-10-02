@@ -329,6 +329,165 @@ export function generateMultiLineChallenge(
 }
 
 /**
+ * Genera un reto de Calistenia de Roseta Radial (D11: Dentro hacia Afuera / D12: Fuera hacia Adentro / 8 y 12 Radios)
+ */
+export function generateRadialRosetteChallenge(
+  exercise: LabExerciseDef,
+  seed: number,
+  canvasWidth = 600,
+  canvasHeight = 540
+): ProceduralStrokeChallenge {
+  const rng = new SeededRNG(seed);
+  const cfg = exercise.singleStrokeConfig || {
+    direction: 'radial_outward',
+    variationType: 'fixed',
+    guideType: 'gray_line',
+    spokeCount: 8,
+  };
+
+  const isOutward = cfg.direction !== 'radial_inward';
+  const spokeCount = cfg.spokeCount || (cfg.multiLineCount as number) || 8;
+  const dirArrow = isOutward ? '☼' : '❂';
+  const dirLabel = isOutward
+    ? 'Dentro hacia Afuera (Centro → Perímetro)'
+    : 'Fuera hacia Adentro (Perímetro → Centro)';
+
+  // 1. Centro (cx, cy)
+  let cx = canvasWidth / 2;
+  let cy = canvasHeight / 2;
+
+  const hasPosVar =
+    cfg.variationType === 'position' ||
+    cfg.variationType === 'position_length' ||
+    cfg.variationType === 'total_random';
+  if (hasPosVar) {
+    cx = Math.round(rng.range(210, 390));
+    cy = Math.round(rng.range(190, 350));
+  }
+
+  // 2. Radio / Longitud de los radios
+  let radius = 160;
+  const hasLenVar =
+    cfg.variationType === 'length' ||
+    cfg.variationType === 'rotation_length' ||
+    cfg.variationType === 'position_length' ||
+    cfg.variationType === 'total_random';
+  if (hasLenVar) {
+    const maxSafeR = Math.min(cx - 40, canvasWidth - 40 - cx, cy - 40, canvasHeight - 40 - cy);
+    const minR = 110;
+    const maxR = Math.max(minR + 10, Math.min(195, maxSafeR));
+    radius = Math.round(rng.range(minR, maxR));
+  }
+
+  // 3. Rotación angular de la roseta
+  let baseAngleDeg = 0;
+  const hasRotVar =
+    cfg.variationType === 'rotation' ||
+    cfg.variationType === 'rotation_length' ||
+    cfg.variationType === 'total_random';
+  if (hasRotVar) {
+    const stepDeg = 360 / spokeCount;
+    baseAngleDeg = Math.round(rng.range(4, stepDeg - 4));
+  }
+
+  // 4. Generación de radios, dianas y guías
+  const targetLines: TargetLineDef[] = [];
+  const guideLines: { x1: number; y1: number; x2: number; y2: number; dashed?: boolean }[] = [];
+  const ghostSolutionStrokes: { points: { x: number; y: number }[] }[] = [];
+  const keyPoints: KeyPoint[] = [];
+
+  // Punto central común
+  const centerOrder = isOutward ? 1 : spokeCount + 1;
+  const centerLabel = isOutward ? '1' : '🎯';
+  keyPoints.push({
+    x: cx,
+    y: cy,
+    order: centerOrder,
+    label: centerLabel,
+    type: isOutward ? 'start' : 'end',
+  });
+
+  const stepRad = (Math.PI * 2) / spokeCount;
+  const baseAngleRad = (baseAngleDeg * Math.PI) / 180;
+
+  for (let i = 0; i < spokeCount; i++) {
+    const angleRad = baseAngleRad + i * stepRad;
+    let angleDeg = Math.round(((angleRad * 180) / Math.PI) % 360);
+    if (angleDeg < 0) angleDeg += 360;
+
+    const px = Math.round(cx + Math.cos(angleRad) * radius);
+    const py = Math.round(cy + Math.sin(angleRad) * radius);
+
+    const outerOrder = isOutward ? i + 2 : i + 1;
+    keyPoints.push({
+      x: px,
+      y: py,
+      order: outerOrder,
+      label: String(outerOrder),
+      type: isOutward ? 'end' : 'start',
+    });
+
+    const startPt = isOutward ? { x: cx, y: cy } : { x: px, y: py };
+    const endPt = isOutward ? { x: px, y: py } : { x: cx, y: cy };
+
+    const STEPS = 30;
+    const idealPath: { x: number; y: number }[] = [];
+    for (let s = 0; s <= STEPS; s++) {
+      const t = s / STEPS;
+      idealPath.push({
+        x: Math.round(startPt.x + (endPt.x - startPt.x) * t),
+        y: Math.round(startPt.y + (endPt.y - startPt.y) * t),
+      });
+    }
+
+    targetLines.push({
+      id: `spoke-${i + 1}`,
+      start: startPt,
+      end: endPt,
+      idealPath,
+      angleDeg,
+      lengthPx: radius,
+      order: i + 1,
+      startKeyPointOrder: isOutward ? 1 : outerOrder,
+      endKeyPointOrder: isOutward ? outerOrder : centerOrder,
+    });
+
+    ghostSolutionStrokes.push({ points: idealPath });
+
+    if (cfg.guideType === 'gray_line') {
+      guideLines.push({ x1: startPt.x, y1: startPt.y, x2: endPt.x, y2: endPt.y, dashed: false });
+    }
+  }
+
+  return {
+    id: `radial-${exercise.code}-${seed}`,
+    pageNumber: exercise.page || 0,
+    code: exercise.code,
+    category: 'radial_focal',
+    title: exercise.title,
+    subtitle: `${dirArrow} Roseta ${spokeCount} Radios (${dirLabel}) · R: ${radius}px · θ₀: ${baseAngleDeg}°`,
+    blockTitle: exercise.block,
+    seed,
+    instruction: exercise.instruction,
+    targetMetricsText: exercise.metrics,
+    targetAngleDeg: baseAngleDeg,
+    targetSpacingPx: 0,
+    targetLengthPx: radius,
+    minRequiredStrokes: spokeCount,
+    multiLineCount: spokeCount,
+    targetLines,
+    isSingleStrokeAutoEval: true,
+    directionKey: cfg.direction,
+    guideMode: cfg.guideType,
+    keyPoints,
+    ghostSolutionStrokes,
+    idealPath: targetLines[0]?.idealPath || [],
+    expectedDirectionAngleDeg: baseAngleDeg,
+    guideLines,
+  };
+}
+
+/**
  * Genera un reto de Calistenia Dinámica de Trazo Único (Línea o Curva)
  */
 export function generateSingleStrokeChallenge(
@@ -343,9 +502,14 @@ export function generateSingleStrokeChallenge(
     guideType: 'gray_line',
   };
 
+  // Si es un reto de roseta radial (D11 o D12)
+  if (cfg.direction === 'radial_outward' || cfg.direction === 'radial_inward') {
+    return generateRadialRosetteChallenge(exercise, seed, canvasWidth, canvasHeight);
+  }
+
   // Si el ejercicio está configurado para multi-líneas (2 o 3 líneas dispersas)
   if (cfg.multiLineCount && cfg.multiLineCount > 1) {
-    return generateMultiLineChallenge(exercise, seed, canvasWidth, canvasHeight, cfg.multiLineCount);
+    return generateMultiLineChallenge(exercise, seed, canvasWidth, canvasHeight, cfg.multiLineCount as 2 | 3);
   }
 
   const rng = new SeededRNG(seed);
@@ -895,40 +1059,25 @@ export function generateStrokeChallenge(
     }
 
     case 'radial_focal': {
-      const spokeCount = rng.rangeInt(10, 16);
-      const innerR = 15;
-      const outerR = rng.range(110, 150);
-
-      const guideLines: { x1: number; y1: number; x2: number; y2: number; dashed?: boolean }[] = [];
-      const ghostSolutionStrokes: { points: { x: number; y: number }[] }[] = [];
-
-      for (let i = 0; i < spokeCount; i++) {
-        const a = (i / spokeCount) * Math.PI * 2;
-        if (i % 2 === 0) {
-          guideLines.push({
-            x1: cx + Math.cos(a) * innerR,
-            y1: cy + Math.sin(a) * innerR,
-            x2: cx + Math.cos(a) * outerR,
-            y2: cy + Math.sin(a) * outerR,
-            dashed: true,
-          });
-        }
-        ghostSolutionStrokes.push({
-          points: [
-            { x: cx + Math.cos(a) * innerR, y: cy + Math.sin(a) * innerR },
-            { x: cx + Math.cos(a) * outerR, y: cy + Math.sin(a) * outerR },
-          ],
-        });
-      }
-
-      return {
-        ...baseChallenge,
-        subtitle: `Foco Radial · ${spokeCount} Radios Confluyentes`,
-        targetAngleDeg: 0,
-        minRequiredStrokes: spokeCount,
-        guideLines,
-        ghostSolutionStrokes,
+      const radialEx: LabExerciseDef = {
+        code: typeof exerciseOrPage === 'number' ? '1.6' : exerciseOrPage.code,
+        page: 6,
+        title: 'Pen Control — Radial & Organic Strokes',
+        block: 'Bloque 1: Consistencia & Calistenia',
+        category: 'radial_focal',
+        difficulty: 'Difícil',
+        metrics: 'Confluencia focal al centro, paso angular y rectitud',
+        desc: 'Estrella de radios divergentes desde el núcleo central común.',
+        instruction: 'Conecta o proyecta los trazos hacia el núcleo central con ritmo regular.',
+        isSingleStroke: true,
+        singleStrokeConfig: {
+          direction: 'radial_outward',
+          variationType: 'fixed',
+          guideType: 'gray_line',
+          spokeCount: 8,
+        },
       };
+      return generateRadialRosetteChallenge(radialEx, seed, canvasWidth, canvasHeight);
     }
 
     case 'trailing_flicks': {

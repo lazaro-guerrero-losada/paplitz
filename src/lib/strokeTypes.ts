@@ -34,6 +34,8 @@ export type StrokeDirection =
   | 'vertical_top_down'      // ↓ D8: Vertical de Arriba a Abajo (~90°)
   | 'shallow_up_left_right'  // ↗ D9: Fuga suave ~15°-20° Abajo a Arriba, Izquierda a Derecha
   | 'shallow_up_right_left'  // ↖ D10: Fuga suave ~15°-20° Abajo a Arriba, Derecha a Izquierda
+  | 'radial_outward'         // ☼ D11: Roseta Radial de Dentro hacia Afuera
+  | 'radial_inward'          // ❂ D12: Roseta Radial de Fuera hacia Adentro
   | 'curve_c'                // Arco C
   | 'curve_s';               // Onda S
 
@@ -64,7 +66,8 @@ export interface SingleStrokeConfig {
   curvature?: 'subtle' | 'medium' | 'pronounced';
   baseAngleDeg?: number;
   baseLengthPx?: number;
-  multiLineCount?: 2 | 3;
+  multiLineCount?: number;
+  spokeCount?: 8 | 12;
 }
 
 export interface LabExerciseDef {
@@ -218,17 +221,25 @@ function buildSingleStrokeLevel(
   instruction: string,
   curvature?: 'subtle' | 'medium' | 'pronounced',
   baseAngleDeg?: number,
-  multiLineCount?: 2 | 3
+  multiLineCount?: number,
+  spokeCount?: 8 | 12
 ): LabExerciseDef {
+  const isRadial = direction === 'radial_outward' || direction === 'radial_inward';
   return {
     id,
     family: 'calisthenics_single',
     code,
     title,
     block,
-    category: direction === 'curve_c' || direction === 'curve_s' ? 'single_stroke_curve' : 'single_stroke_line',
+    category: isRadial
+      ? 'radial_focal'
+      : direction === 'curve_c' || direction === 'curve_s'
+      ? 'single_stroke_curve'
+      : 'single_stroke_line',
     difficulty,
-    metrics: multiLineCount
+    metrics: isRadial
+      ? `Confluencia radial (${spokeCount || 8} radios), puntería en dianas y rectitud`
+      : multiLineCount
       ? `Coordinación multi-trazo (${multiLineCount} líneas), precisión en dianas y rectitud`
       : guideType === 'gray_line'
       ? 'Seguimiento de guía, rectitud y dirección'
@@ -243,12 +254,13 @@ function buildSingleStrokeLevel(
       curvature,
       baseAngleDeg,
       multiLineCount,
+      spokeCount,
     },
   };
 }
 
 /**
- * 174 Ejercicios de Calistenia Dinámica de Trazo Único (Auto-evaluación instantánea)
+ * 212 Ejercicios de Calistenia Dinámica de Trazo Único y Rosetas (Auto-evaluación instantánea)
  */
 export const ALL_SINGLE_STROKE_EXERCISES: LabExerciseDef[] = [
   // DIRECCIÓN 1: Abajo a Arriba, Izquierda a Derecha (↗)
@@ -425,6 +437,48 @@ export const ALL_SINGLE_STROKE_EXERCISES: LabExerciseDef[] = [
   buildSingleStrokeLevel('d10_16', 'C10.16', '2 Líneas Dispersas (↖ Fuga Suave)', '⚡ Calistenia: D10 (↖ Fuga Suave ~15°-20° / Der-Izq)', 'shallow_up_right_left', 'multi_line', 'points_only', 'Difícil', 'Dos líneas en fuga suave hacia la izquierda en sectores distintos.', 'Traza las 2 líneas en cualquier orden: de ① a ② y de ③ a ④.', undefined, 18, 2),
   buildSingleStrokeLevel('d10_17', 'C10.17', '3 Líneas Dispersas (↖ Fuga Suave)', '⚡ Calistenia: D10 (↖ Fuga Suave ~15°-20° / Der-Izq)', 'shallow_up_right_left', 'multi_line', 'points_only', 'Experto', 'Tres líneas en fuga suave hacia la izquierda con diferentes ubicaciones y pendientes.', 'Traza las 3 líneas en cualquier orden: de ① a ②, de ③ a ④ y de ⑤ a ⑥.', undefined, 18, 3),
 
+  // DIRECCIÓN 11: Roseta Radial de Dentro hacia Afuera (☼ Centro → Perímetro / 8 y 12 Radios)
+  buildSingleStrokeLevel('d11_01', 'C11.01', 'Roseta 8 Radios Fija (☼ Guía Gris)', '⚡ Calistenia: D11 (☼ Roseta Dentro-Fuera / 8-12 Radios)', 'radial_outward', 'fixed', 'gray_line', 'Fácil', 'Roseta básica de 8 líneas desde el centro hacia afuera (cada 45°). Posición central fija con guía gris.', 'Traza los 8 radios desde el centro hacia cada diana exterior (de dentro hacia afuera).', undefined, undefined, undefined, 8),
+  buildSingleStrokeLevel('d11_02', 'C11.02', 'Roseta 8 Radios — Longitud Variable (☼ Guía Gris)', '⚡ Calistenia: D11 (☼ Roseta Dentro-Fuera / 8-12 Radios)', 'radial_outward', 'length', 'gray_line', 'Fácil', '8 radios con radio/escala variable en cada intento sobre guía gris.', 'Adapta el alcance del brazo desde el centro hacia las dianas exteriores.', undefined, undefined, undefined, 8),
+  buildSingleStrokeLevel('d11_03', 'C11.03', 'Roseta 8 Radios — Rotación Variable (☼ Guía Gris)', '⚡ Calistenia: D11 (☼ Roseta Dentro-Fuera / 8-12 Radios)', 'radial_outward', 'rotation', 'gray_line', 'Fácil', 'Roseta de 8 radios girada en un ángulo arbitrario en cada repetición.', 'Acomoda la orientación motora de los 8 trazos según el ángulo de giro.', undefined, undefined, undefined, 8),
+  buildSingleStrokeLevel('d11_04', 'C11.04', 'Roseta 8 Radios — Rotación & Longitud (☼ Guía Gris)', '⚡ Calistenia: D11 (☼ Roseta Dentro-Fuera / 8-12 Radios)', 'radial_outward', 'rotation_length', 'gray_line', 'Media', 'Radio y rotación combinados sobre guía gris continua.', 'Proyecta los 8 radios con longitud y orientación cambiantes.', undefined, undefined, undefined, 8),
+  buildSingleStrokeLevel('d11_05', 'C11.05', 'Roseta 8 Radios — Posición Variable (☼ Guía Gris)', '⚡ Calistenia: D11 (☼ Roseta Dentro-Fuera / 8-12 Radios)', 'radial_outward', 'position', 'gray_line', 'Media', 'El centro de la roseta aparece desplazado en distintas zonas del lienzo.', 'Ubica el centro donde aparezca y dispara los 8 radios hacia afuera.', undefined, undefined, undefined, 8),
+  buildSingleStrokeLevel('d11_06', 'C11.06', 'Roseta 8 Radios — Posición & Longitud (☼ Guía Gris)', '⚡ Calistenia: D11 (☼ Roseta Dentro-Fuera / 8-12 Radios)', 'radial_outward', 'position_length', 'gray_line', 'Media', 'Centro y longitud variables simultáneamente sobre guía gris.', 'Frena con precisión en el perímetro de cada diana exterior.', undefined, undefined, undefined, 8),
+  buildSingleStrokeLevel('d11_07', 'C11.07', 'Roseta 8 Radios — Variación Total (☼ Guía Gris)', '⚡ Calistenia: D11 (☼ Roseta Dentro-Fuera / 8-12 Radios)', 'radial_outward', 'total_random', 'gray_line', 'Media', 'Posición, radio y rotación variables sobre guía gris.', 'Dominio de proyección radial en cualquier punto del espacio.', undefined, undefined, undefined, 8),
+  buildSingleStrokeLevel('d11_08', 'C11.08', 'Roseta 8 Radios — Puntos Clave Fijos (☼ Sin Guía)', '⚡ Calistenia: D11 (☼ Roseta Dentro-Fuera / 8-12 Radios)', 'radial_outward', 'fixed', 'points_only', 'Media', 'Se retira la guía gris: conecta mentalmente el centro ① con las 8 dianas exteriores.', 'Traza los 8 radios en abanico desde ① hacia las dianas exteriores sin titubear.', undefined, undefined, undefined, 8),
+  buildSingleStrokeLevel('d11_09', 'C11.09', 'Roseta 8 Radios — Puntos Clave: Longitud (☼)', '⚡ Calistenia: D11 (☼ Roseta Dentro-Fuera / 8-12 Radios)', 'radial_outward', 'length', 'points_only', 'Media', 'Solo puntos diana con radio variable sin líneas guía.', 'Calcula la frenada perimetral en cada uno de los 8 puntos.', undefined, undefined, undefined, 8),
+  buildSingleStrokeLevel('d11_10', 'C11.10', 'Roseta 8 Radios — Puntos Clave: Rotación (☼)', '⚡ Calistenia: D11 (☼ Roseta Dentro-Fuera / 8-12 Radios)', 'radial_outward', 'rotation', 'points_only', 'Media', 'Solo puntos con la constelación de 8 dianas rotada.', 'Alinea el vector desde el centro ① hacia cada diana exterior.', undefined, undefined, undefined, 8),
+  buildSingleStrokeLevel('d11_11', 'C11.11', 'Roseta 8 Radios — Puntos Clave: Posición & Longitud (☼)', '⚡ Calistenia: D11 (☼ Roseta Dentro-Fuera / 8-12 Radios)', 'radial_outward', 'position_length', 'points_only', 'Difícil', 'Centro flotando en distintas zonas con escala cambiante.', 'Sincroniza la postura antes de lanzar los 8 radios.', undefined, undefined, undefined, 8),
+  buildSingleStrokeLevel('d11_12', 'C11.12', 'Roseta 8 Radios — Puntos Clave: Variación Total (☼)', '⚡ Calistenia: D11 (☼ Roseta Dentro-Fuera / 8-12 Radios)', 'radial_outward', 'total_random', 'points_only', 'Difícil', 'Desafío ciego completo de 8 radios sin líneas intermedias.', 'Conecta el centro con los 8 puntos exteriores con máxima precisión.', undefined, undefined, undefined, 8),
+  buildSingleStrokeLevel('d11_13', 'C11.13', 'Roseta 12 Radios Fija (☼ Guía Gris)', '⚡ Calistenia: D11 (☼ Roseta Dentro-Fuera / 8-12 Radios)', 'radial_outward', 'fixed', 'gray_line', 'Media', 'Aumento de densidad a 12 radios regulares (cada 30°). Posición central con guía gris.', 'Traza los 12 radios desde el centro hacia afuera distribuidos uniformemente.', undefined, undefined, undefined, 12),
+  buildSingleStrokeLevel('d11_14', 'C11.14', 'Roseta 12 Radios — Longitud Variable (☼ Guía Gris)', '⚡ Calistenia: D11 (☼ Roseta Dentro-Fuera / 8-12 Radios)', 'radial_outward', 'length', 'gray_line', 'Media', '12 radios con escala y alcance variables sobre guía gris.', 'Modula el alcance motor de los 12 trazos radiales.', undefined, undefined, undefined, 12),
+  buildSingleStrokeLevel('d11_15', 'C11.15', 'Roseta 12 Radios — Rotación Variable (☼ Guía Gris)', '⚡ Calistenia: D11 (☼ Roseta Dentro-Fuera / 8-12 Radios)', 'radial_outward', 'rotation', 'gray_line', 'Media', 'Roseta densa de 12 radios girada en cualquier orientación.', 'Mantén la regularidad angular en los 12 sectores.', undefined, undefined, undefined, 12),
+  buildSingleStrokeLevel('d11_16', 'C11.16', 'Roseta 12 Radios — Posición Variable (☼ Guía Gris)', '⚡ Calistenia: D11 (☼ Roseta Dentro-Fuera / 8-12 Radios)', 'radial_outward', 'position', 'gray_line', 'Media', 'Roseta de 12 radios ubicada en distintos puntos del lienzo.', 'Dispara los 12 radios desde el nuevo núcleo central.', undefined, undefined, undefined, 12),
+  buildSingleStrokeLevel('d11_17', 'C11.17', 'Roseta 12 Radios — Puntos Clave (☼ Sin Guía)', '⚡ Calistenia: D11 (☼ Roseta Dentro-Fuera / 8-12 Radios)', 'radial_outward', 'fixed', 'points_only', 'Difícil', 'Sin guía gris: 12 dianas perimetrales y centro común.', 'Conecta el centro ① con las 12 dianas perimetrales sin ayuda visual.', undefined, undefined, undefined, 12),
+  buildSingleStrokeLevel('d11_18', 'C11.18', 'Roseta 12 Radios — Puntos Clave: Variación Total (☼)', '⚡ Calistenia: D11 (☼ Roseta Dentro-Fuera / 8-12 Radios)', 'radial_outward', 'total_random', 'points_only', 'Difícil', 'Reto ciego de 12 radios con posición, escala y rotación aleatorias.', 'Clava los 12 radios con consistencia milimétrica.', undefined, undefined, undefined, 12),
+  buildSingleStrokeLevel('d11_19', 'C11.19', 'Maestría D11 — Roseta Rápida (☼ Dentro hacia Afuera)', '⚡ Calistenia: D11 (☼ Roseta Dentro-Fuera / 8-12 Radios)', 'radial_outward', 'total_random', 'points_only', 'Experto', 'Modo continuo rápido: acumula la mayor racha de aciertos en rosetas divergentes (☼).', 'Traza los 12 radios a alta velocidad sin perder la confluencia en el centro.', undefined, undefined, undefined, 12),
+
+  // DIRECCIÓN 12: Roseta Radial de Fuera hacia Adentro (❂ Perímetro → Centro / 8 y 12 Radios)
+  buildSingleStrokeLevel('d12_01', 'C12.01', 'Roseta 8 Radios Fija (❂ Guía Gris)', '⚡ Calistenia: D12 (❂ Roseta Fuera-Dentro / 8-12 Radios)', 'radial_inward', 'fixed', 'gray_line', 'Fácil', 'Roseta de 8 líneas convergentes desde el exterior hacia el centro común (de fuera hacia adentro).', 'Traza desde cada diana perimetral hacia el centro común (de fuera hacia adentro).', undefined, undefined, undefined, 8),
+  buildSingleStrokeLevel('d12_02', 'C12.02', 'Roseta 8 Radios — Longitud Variable (❂ Guía Gris)', '⚡ Calistenia: D12 (❂ Roseta Fuera-Dentro / 8-12 Radios)', 'radial_inward', 'length', 'gray_line', 'Fácil', '8 radios convergentes con radio/escala variable en cada repetición sobre guía gris.', 'Adapta la recogida del brazo desde el perímetro hacia el centro.', undefined, undefined, undefined, 8),
+  buildSingleStrokeLevel('d12_03', 'C12.03', 'Roseta 8 Radios — Rotación Variable (❂ Guía Gris)', '⚡ Calistenia: D12 (❂ Roseta Fuera-Dentro / 8-12 Radios)', 'radial_inward', 'rotation', 'gray_line', 'Fácil', 'Roseta convergente girada en ángulo variable sobre guía gris.', 'Orienta cada trazo desde la periferia hacia el núcleo común.', undefined, undefined, undefined, 8),
+  buildSingleStrokeLevel('d12_04', 'C12.04', 'Roseta 8 Radios — Rotación & Longitud (❂ Guía Gris)', '⚡ Calistenia: D12 (❂ Roseta Fuera-Dentro / 8-12 Radios)', 'radial_inward', 'rotation_length', 'gray_line', 'Media', 'Radio y rotación cambiantes hacia el centro.', 'Modula la fuerza de recogida convergiendo en el punto central.', undefined, undefined, undefined, 8),
+  buildSingleStrokeLevel('d12_05', 'C12.05', 'Roseta 8 Radios — Posición Variable (❂ Guía Gris)', '⚡ Calistenia: D12 (❂ Roseta Fuera-Dentro / 8-12 Radios)', 'radial_inward', 'position', 'gray_line', 'Media', 'Núcleo central ubicado en distintos sectores del lienzo.', 'Apunta los 8 trazos hacia el centro donde se encuentre.', undefined, undefined, undefined, 8),
+  buildSingleStrokeLevel('d12_06', 'C12.06', 'Roseta 8 Radios — Posición & Longitud (❂ Guía Gris)', '⚡ Calistenia: D12 (❂ Roseta Fuera-Dentro / 8-12 Radios)', 'radial_inward', 'position_length', 'gray_line', 'Media', 'Cambio simultáneo de escala y posición en convergencia.', 'Frena en seco exactamente en el centro.', undefined, undefined, undefined, 8),
+  buildSingleStrokeLevel('d12_07', 'C12.07', 'Roseta 8 Radios — Variación Total (❂ Guía Gris)', '⚡ Calistenia: D12 (❂ Roseta Fuera-Dentro / 8-12 Radios)', 'radial_inward', 'total_random', 'gray_line', 'Media', 'Variación total convergente sobre guía gris continua.', 'Control motor pleno convergiendo desde cualquier ángulo.', undefined, undefined, undefined, 8),
+  buildSingleStrokeLevel('d12_08', 'C12.08', 'Roseta 8 Radios — Puntos Clave Fijos (❂ Sin Guía)', '⚡ Calistenia: D12 (❂ Roseta Fuera-Dentro / 8-12 Radios)', 'radial_inward', 'fixed', 'points_only', 'Media', 'Se retira la guía gris: conecta las 8 dianas exteriores hacia el centro común.', 'Lanza cada trazo desde su diana exterior hacia el centro sin dudar.', undefined, undefined, undefined, 8),
+  buildSingleStrokeLevel('d12_09', 'C12.09', 'Roseta 8 Radios — Puntos Clave: Longitud (❂)', '⚡ Calistenia: D12 (❂ Roseta Fuera-Dentro / 8-12 Radios)', 'radial_inward', 'length', 'points_only', 'Media', 'Distancia variable de los puntos exteriores hacia el centro.', 'Ajusta la inercia para no pasarte de largo del punto central.', undefined, undefined, undefined, 8),
+  buildSingleStrokeLevel('d12_10', 'C12.10', 'Roseta 8 Radios — Puntos Clave: Rotación (❂)', '⚡ Calistenia: D12 (❂ Roseta Fuera-Dentro / 8-12 Radios)', 'radial_inward', 'rotation', 'points_only', 'Media', 'Puntos exteriores rotados en el plano sin guía.', 'Calcula la trayectoria hacia el centro para cada posición perimetral.', undefined, undefined, undefined, 8),
+  buildSingleStrokeLevel('d12_11', 'C12.11', 'Roseta 8 Radios — Puntos Clave: Posición & Longitud (❂)', '⚡ Calistenia: D12 (❂ Roseta Fuera-Dentro / 8-12 Radios)', 'radial_inward', 'position_length', 'points_only', 'Difícil', 'Salto continuo de núcleo y escala en convergencia.', 'Adapta el pivote de la mano según el cuadrante exterior.', undefined, undefined, undefined, 8),
+  buildSingleStrokeLevel('d12_12', 'C12.12', 'Roseta 8 Radios — Puntos Clave: Variación Total (❂)', '⚡ Calistenia: D12 (❂ Roseta Fuera-Dentro / 8-12 Radios)', 'radial_inward', 'total_random', 'points_only', 'Difícil', 'Reto ciego de 8 radios convergentes sin apoyo visual.', 'Precisión absoluta convergiendo en el núcleo común.', undefined, undefined, undefined, 8),
+  buildSingleStrokeLevel('d12_13', 'C12.13', 'Roseta 12 Radios Fija (❂ Guía Gris)', '⚡ Calistenia: D12 (❂ Roseta Fuera-Dentro / 8-12 Radios)', 'radial_inward', 'fixed', 'gray_line', 'Media', 'Densidad de 12 radios convergiendo al centro (cada 30°). Posición fija con guía gris.', 'Traza los 12 radios perimetrales hacia el centro con cadencia uniforme.', undefined, undefined, undefined, 12),
+  buildSingleStrokeLevel('d12_14', 'C12.14', 'Roseta 12 Radios — Longitud Variable (❂ Guía Gris)', '⚡ Calistenia: D12 (❂ Roseta Fuera-Dentro / 8-12 Radios)', 'radial_inward', 'length', 'gray_line', 'Media', '12 radios convergentes con escala variable sobre guía gris.', 'Calibra la frenada de los 12 trazos en el núcleo central.', undefined, undefined, undefined, 12),
+  buildSingleStrokeLevel('d12_15', 'C12.15', 'Roseta 12 Radios — Rotación Variable (❂ Guía Gris)', '⚡ Calistenia: D12 (❂ Roseta Fuera-Dentro / 8-12 Radios)', 'radial_inward', 'rotation', 'gray_line', 'Media', 'Roseta convergente de 12 radios girada en ángulo arbitrario.', 'Conserva la separación angular uniforme convergiendo al centro.', undefined, undefined, undefined, 12),
+  buildSingleStrokeLevel('d12_16', 'C12.16', 'Roseta 12 Radios — Posición Variable (❂ Guía Gris)', '⚡ Calistenia: D12 (❂ Roseta Fuera-Dentro / 8-12 Radios)', 'radial_inward', 'position', 'gray_line', 'Media', 'Roseta densa de 12 radios convergentes en cualquier cuadrante.', 'Focaliza la puntería en el centro desplazado.', undefined, undefined, undefined, 12),
+  buildSingleStrokeLevel('d12_17', 'C12.17', 'Roseta 12 Radios — Puntos Clave (❂ Sin Guía)', '⚡ Calistenia: D12 (❂ Roseta Fuera-Dentro / 8-12 Radios)', 'radial_inward', 'fixed', 'points_only', 'Difícil', 'Sin guía gris: 12 dianas exteriores convergiendo en el centro.', 'Conecta las 12 dianas perimetrales hacia el centro común.', undefined, undefined, undefined, 12),
+  buildSingleStrokeLevel('d12_18', 'C12.18', 'Roseta 12 Radios — Puntos Clave: Variación Total (❂)', '⚡ Calistenia: D12 (❂ Roseta Fuera-Dentro / 8-12 Radios)', 'radial_inward', 'total_random', 'points_only', 'Difícil', 'Reto ciego de 12 radios convergentes con variación total.', 'Clava los 12 impactos en el centro común con máxima regularidad.', undefined, undefined, undefined, 12),
+  buildSingleStrokeLevel('d12_19', 'C12.19', 'Maestría D12 — Roseta Rápida (❂ Fuera hacia Adentro)', '⚡ Calistenia: D12 (❂ Roseta Fuera-Dentro / 8-12 Radios)', 'radial_inward', 'total_random', 'points_only', 'Experto', 'Modo infinito rápido: acumula la mayor racha de aciertos en rosetas convergentes (❂).', 'Traza los 12 radios de fuera a dentro a gran velocidad con máxima precisión.', undefined, undefined, undefined, 12),
+
   // CURVAS Y ARCOS (C & S)
   buildSingleStrokeLevel('cc_01', 'CC.01', 'Arco en C Fijo (Guía Gris)', '⚡ Calistenia: Trazos Curvos & Arcos (C & S)', 'curve_c', 'fixed', 'gray_line', 'Fácil', 'Curva suave en arco de parábola con guía gris visible.', 'Sigue la trayectoria curvada desde ① hasta ②.', 'subtle'),
   buildSingleStrokeLevel('cc_02', 'CC.02', 'Arco en C — Longitud Variable (Guía Gris)', '⚡ Calistenia: Trazos Curvos & Arcos (C & S)', 'curve_c', 'length', 'gray_line', 'Fácil', 'Arco con cuerda y longitud variable en cada repetición.', 'Adapta el barrido circular de la muñeca.', 'subtle'),
@@ -498,7 +552,7 @@ export const ALL_42_EXERCISES: WorkbookExerciseDef[] = [
 ];
 
 /**
- * Catálogo Maestro Completo: 174 Calistenias Dinámicas + 42 Páginas del Cuaderno (216 Ejercicios)
+ * Catálogo Maestro Completo: 212 Calistenias Dinámicas + 42 Páginas del Cuaderno (254 Ejercicios)
  */
 export const ALL_LAB_EXERCISES: LabExerciseDef[] = [
   ...ALL_SINGLE_STROKE_EXERCISES,

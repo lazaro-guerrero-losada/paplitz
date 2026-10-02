@@ -285,6 +285,10 @@ export function getDirectionDisplayLabel(dir: StrokeDirection | string): string 
       return 'D9 (↗ Fuga Suave Der)';
     case 'shallow_up_right_left':
       return 'D10 (↖ Fuga Suave Izq)';
+    case 'radial_outward':
+      return 'D11 (☼ Roseta Dentro-Fuera)';
+    case 'radial_inward':
+      return 'D12 (❂ Roseta Fuera-Dentro)';
     case 'curve_c':
       return 'Curva Arco C';
     case 'curve_s':
@@ -309,6 +313,8 @@ export function getBiomechanicalComparison(profile: UserSpeedProfile): string | 
   const d8 = dirs['vertical_top_down']?.avgSpeedPxPerSec;
   const d9 = dirs['shallow_up_left_right']?.avgSpeedPxPerSec;
   const d10 = dirs['shallow_up_right_left']?.avgSpeedPxPerSec;
+  const d11 = dirs['radial_outward']?.avgSpeedPxPerSec;
+  const d12 = dirs['radial_inward']?.avgSpeedPxPerSec;
 
   const entries: { name: string; speed: number }[] = [];
   if (d1) entries.push({ name: '↗ D1 (Ascendente Der)', speed: d1 });
@@ -321,6 +327,8 @@ export function getBiomechanicalComparison(profile: UserSpeedProfile): string | 
   if (d8) entries.push({ name: '↓ D8 (Vertical Abajo)', speed: d8 });
   if (d9) entries.push({ name: '↗ D9 (Fuga Suave Der)', speed: d9 });
   if (d10) entries.push({ name: '↖ D10 (Fuga Suave Izq)', speed: d10 });
+  if (d11) entries.push({ name: '☼ D11 (Roseta Dentro-Fuera)', speed: d11 });
+  if (d12) entries.push({ name: '❂ D12 (Roseta Fuera-Dentro)', speed: d12 });
 
   if (entries.length < 2) return null;
 
