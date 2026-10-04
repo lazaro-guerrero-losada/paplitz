@@ -77,7 +77,7 @@ export interface SpacingTrackConfig {
   baseHeightPx: number;       // ej: 130px
   angleDeg?: number;          // 90 (vertical) o ~75 (diagonal)
   direction?: StrokeDirection;
-  kinkType?: 'none' | 'triangle_left' | 'triangle_right' | 'chevron_left' | 'v_concentric' | 'v_inverted';
+  kinkType?: 'none' | 'triangle_left' | 'triangle_right' | 'chevron_left' | 'v_concentric' | 'v_inverted' | 'zigzag_wave';
   hasBlocksWithGaps?: boolean;
 }
 
@@ -214,7 +214,7 @@ export interface ProceduralStrokeChallenge {
     angleDeg?: number;
     direction?: StrokeDirection;
     dxOffset?: number;
-    kinkType?: 'none' | 'triangle_left' | 'triangle_right' | 'chevron_left' | 'v_concentric' | 'v_inverted';
+    kinkType?: 'none' | 'triangle_left' | 'triangle_right' | 'chevron_left' | 'v_concentric' | 'v_inverted' | 'zigzag_wave';
     blocks?: SpacingTrackBlock[];
   };
 }
@@ -320,7 +320,7 @@ function buildSpacingTrackLevel(
   baseHeightPx = 130,
   direction: StrokeDirection = 'vertical_top_down',
   angleDeg = 90,
-  kinkType: 'none' | 'triangle_left' | 'triangle_right' | 'chevron_left' | 'v_concentric' | 'v_inverted' = 'none',
+  kinkType: 'none' | 'triangle_left' | 'triangle_right' | 'chevron_left' | 'v_concentric' | 'v_inverted' | 'zigzag_wave' = 'none',
   hasBlocksWithGaps = false
 ): LabExerciseDef {
   const stepLabel = spacingMultiplier === 1 ? 'x' : 'x/2';
@@ -329,7 +329,10 @@ function buildSpacingTrackLevel(
   const isChevron = kinkType === 'chevron_left';
   const isV = kinkType === 'v_concentric';
   const isVInverted = kinkType === 'v_inverted';
-  const metrics = isVInverted
+  const isZigzagWave = kinkType === 'zigzag_wave';
+  const metrics = isZigzagWave
+    ? `Espaciado constante (${stepLabel} = ${baseSpacingPx * spacingMultiplier}px), contención en carriles y zigzag en onda ◄►◄`
+    : isVInverted
     ? `Espaciado constante (${stepLabel} = ${baseSpacingPx * spacingMultiplier}px), contención en carriles y vértices en V invertida ∧`
     : isV
     ? `Espaciado constante (${stepLabel} = ${baseSpacingPx * spacingMultiplier}px), contención en carriles y vértices en V ∨`
@@ -608,6 +611,7 @@ export const ALL_SINGLE_STROKE_EXERCISES: LabExerciseDef[] = [
   buildSpacingTrackLevel('sp_13', 'E6.1', 'Carril Quiebre en Chevron ◄ (Bloques & Pausas · x/2)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 1, 0.5, 'Difícil', 'Líneas en ángulo chevron con quiebre hacia la izquierda (◄). Bloques de ancho y separados por pausas. Rellena cada bloque entre la línea de inicio y final.', 'Dibuja líneas en chevron hacia la izquierda (◄) al paso fino x/2 rellenando cada bloque entre la línea de inicio y final.', 16, 130, 'vertical_top_down', 90, 'chevron_left', true),
   buildSpacingTrackLevel('sp_14', 'E7.1', 'Carril Vértices en V ∨ (Bloques & Pausas · x/2)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 1, 0.5, 'Difícil', 'Vértices en V anidados hacia el centro. Bloques de ancho y separados por pausas. La V exterior está pre-dibujada (INICIO); traza las V interiores hacia el núcleo con paso x/2.', 'Dibuja trazos continuos en V hacia el centro a paso fino x/2 rellenando cada bloque desde la V exterior.', 16, 130, 'top_down_left_right', 64, 'v_concentric', true),
   buildSpacingTrackLevel('sp_15', 'E7.2', 'Carril Vértices en V Invertida ∧ (Bloques & Pausas · x/2)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 1, 0.5, 'Difícil', 'Vértices en pico/tienda anidados hacia el centro. Bloques de ancho y separados por pausas. La V invertida exterior está pre-dibujada (INICIO); traza las V invertidas interiores hacia el núcleo con paso x/2.', 'Dibuja trazos continuos en V invertida (∧) hacia el centro a paso fino x/2 rellenando cada bloque desde la V exterior.', 16, 130, 'bottom_up_left_right', 64, 'v_inverted', true),
+  buildSpacingTrackLevel('sp_16', 'E8.1', 'Carril Zigzag en Onda ◄►◄ (Bloques & Pausas · x/2)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 1, 0.5, 'Difícil', 'Líneas paralelas continuas con triple quiebre alternado en onda (◄►◄). Bloques de ancho y separados por pausas. Rellena cada bloque entre la línea de inicio y final.', 'Dibuja líneas continuas con quiebre alternado en onda (◄►◄) al paso fino x/2 rellenando cada bloque entre la línea de inicio y final.', 16, 130, 'vertical_top_down', 90, 'zigzag_wave', true),
 
   // CURVAS Y ARCOS (C & S)
   buildSingleStrokeLevel('cc_01', 'CC.01', 'Arco en C Fijo (Guía Gris)', '⚡ Calistenia: Trazos Curvos & Arcos (C & S)', 'curve_c', 'fixed', 'gray_line', 'Fácil', 'Curva suave en arco de parábola con guía gris visible.', 'Sigue la trayectoria curvada desde ① hasta ②.', 'subtle'),
@@ -682,7 +686,7 @@ export const ALL_42_EXERCISES: WorkbookExerciseDef[] = [
 ];
 
 /**
- * Catálogo Maestro Completo: 227 Calistenias Dinámicas + 42 Páginas del Cuaderno (269 Ejercicios)
+ * Catálogo Maestro Completo: 228 Calistenias Dinámicas + 42 Páginas del Cuaderno (270 Ejercicios)
  */
 export const ALL_LAB_EXERCISES: LabExerciseDef[] = [
   ...ALL_SINGLE_STROKE_EXERCISES,

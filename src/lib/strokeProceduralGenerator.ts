@@ -525,10 +525,20 @@ export function generateKinkStrokePoints(
   x: number,
   yTop: number,
   yBottom: number,
-  kinkType: 'triangle_left' | 'triangle_right' | 'chevron_left' | 'v_concentric' | 'v_inverted' = 'triangle_left',
+  kinkType: 'triangle_left' | 'triangle_right' | 'chevron_left' | 'v_concentric' | 'v_inverted' | 'zigzag_wave' = 'triangle_left',
   apexOffset?: number
 ): { x: number; y: number }[] {
   const h = yBottom - yTop;
+  if (kinkType === 'zigzag_wave') {
+    const defl = apexOffset ?? 16;
+    return [
+      { x: Math.round(x * 10) / 10, y: Math.round(yTop * 10) / 10 },
+      { x: Math.round((x - defl) * 10) / 10, y: Math.round((yTop + h * 0.25) * 10) / 10 },
+      { x: Math.round(x * 10) / 10, y: Math.round((yTop + h * 0.50) * 10) / 10 },
+      { x: Math.round((x - defl) * 10) / 10, y: Math.round((yTop + h * 0.75) * 10) / 10 },
+      { x: Math.round(x * 10) / 10, y: Math.round(yBottom * 10) / 10 },
+    ];
+  }
   if (kinkType === 'v_concentric') {
     const hw = apexOffset ?? 64;
     return generateVStrokePoints(x, hw, yTop, yBottom);
@@ -634,10 +644,11 @@ export function generateSpacingTrackChallenge(
   const isChevron = kinkType === 'chevron_left';
   const isV = kinkType === 'v_concentric';
   const isVInverted = kinkType === 'v_inverted';
+  const isZigzagWave = kinkType === 'zigzag_wave';
 
   // 2. Patrón de muestra (izquierda)
-  const sampleXStart = (isV || isVInverted) ? 24 : isChevron ? 44 : isDiagonal || isKink ? 28 : 35;
-  const sampleWidth = (isV || isVInverted) ? 100 : isChevron ? 72 : isDiagonal || isKink ? 80 : 96;
+  const sampleXStart = (isV || isVInverted) ? 24 : (isChevron || isZigzagWave) ? 44 : isDiagonal || isKink ? 28 : 35;
+  const sampleWidth = (isV || isVInverted) ? 100 : (isChevron || isZigzagWave) ? 72 : isDiagonal || isKink ? 80 : 96;
   const sampleXEnd = sampleXStart + sampleWidth;
   const sampleLines: { x1?: number; y1: number; x2?: number; y2: number; points?: { x: number; y: number }[]; hasArrow?: boolean }[] = [];
 
@@ -679,7 +690,7 @@ export function generateSpacingTrackChallenge(
         });
       }
     } else {
-      const stepStart = isChevron ? sampleXStart + 4 : sampleXStart + 8;
+      const stepStart = (isChevron || isZigzagWave) ? sampleXStart + 4 : sampleXStart + 8;
       for (let x = stepStart; x <= sampleXEnd; x += targetSpacingPx) {
         sampleLines.push({
           points: generateKinkStrokePoints(Math.round(x), bands[0].yTop, bands[0].yBottom, kinkType as any),
@@ -817,15 +828,15 @@ export function generateSpacingTrackChallenge(
           targetInteriorLineCount: 7,
         },
       ];
-    } else if (isChevron) {
+    } else if (isChevron || isZigzagWave) {
       blocks = [
         {
           id: 'b1',
           xStart: 188,
           xEnd: 316,
           width: 128,
-          startLinePoints: generateKinkStrokePoints(188, b.yTop, b.yBottom, 'chevron_left'),
-          finalLinePoints: generateKinkStrokePoints(316, b.yTop, b.yBottom, 'chevron_left'),
+          startLinePoints: generateKinkStrokePoints(188, b.yTop, b.yBottom, kinkType as any),
+          finalLinePoints: generateKinkStrokePoints(316, b.yTop, b.yBottom, kinkType as any),
           targetInteriorLineCount: 15,
         },
         {
@@ -833,8 +844,8 @@ export function generateSpacingTrackChallenge(
           xStart: 364,
           xEnd: 492,
           width: 128,
-          startLinePoints: generateKinkStrokePoints(364, b.yTop, b.yBottom, 'chevron_left'),
-          finalLinePoints: generateKinkStrokePoints(492, b.yTop, b.yBottom, 'chevron_left'),
+          startLinePoints: generateKinkStrokePoints(364, b.yTop, b.yBottom, kinkType as any),
+          finalLinePoints: generateKinkStrokePoints(492, b.yTop, b.yBottom, kinkType as any),
           targetInteriorLineCount: 15,
         },
       ];
@@ -916,17 +927,17 @@ export function generateSpacingTrackChallenge(
           ],
         });
       }
-    } else if (isChevron) {
+    } else if (isChevron || isZigzagWave) {
       // Bloque 1 (entre 188 y 316)
       for (let x = 188 + targetSpacingPx; x < 316 - 0.1; x += targetSpacingPx) {
         ghostSolutionStrokes.push({
-          points: generateKinkStrokePoints(Math.round(x), b.yTop, b.yBottom, 'chevron_left'),
+          points: generateKinkStrokePoints(Math.round(x), b.yTop, b.yBottom, kinkType as any),
         });
       }
       // Bloque 2 (entre 364 y 492)
       for (let x = 364 + targetSpacingPx; x < 492 - 0.1; x += targetSpacingPx) {
         ghostSolutionStrokes.push({
-          points: generateKinkStrokePoints(Math.round(x), b.yTop, b.yBottom, 'chevron_left'),
+          points: generateKinkStrokePoints(Math.round(x), b.yTop, b.yBottom, kinkType as any),
         });
       }
     } else {
@@ -1006,6 +1017,9 @@ export function generateSpacingTrackChallenge(
     } else if (kinkType === 'chevron_left') {
       sym = '◄';
       kinkName = 'Quiebre en Chevron';
+    } else if (kinkType === 'zigzag_wave') {
+      sym = '◄►◄';
+      kinkName = 'Zigzag en Onda';
     } else if (kinkType === 'v_concentric') {
       sym = '∨';
       kinkName = 'Vértices en V';
@@ -1035,7 +1049,7 @@ export function generateSpacingTrackChallenge(
     targetMetricsText: exercise.metrics,
     targetAngleDeg: angleDeg,
     targetSpacingPx,
-    targetLengthPx: isKink ? ((isV || isVInverted) ? 145 : isChevron ? 140 : 141) : Math.hypot(dxOffset, bands[0].height),
+    targetLengthPx: isKink ? ((isV || isVInverted) ? 145 : isZigzagWave ? 145 : isChevron ? 140 : 141) : Math.hypot(dxOffset, bands[0].height),
     minRequiredStrokes,
     directionKey: direction,
     guideMode: 'gray_line',

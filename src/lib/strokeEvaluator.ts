@@ -1125,9 +1125,16 @@ function getStrokeSlopeAngle(stroke: RawStroke): { angleFromHorizontalDeg: numbe
  * - El quiebre debe producirse en la mitad inferior: yRel aprox 0.50 a 0.82, vértice en yRel ≈ 0.67
  * - Desviación horizontal del vértice respecto al eje de la línea: target 16px (negativo para izq, positivo para der)
  */
-function evaluateKinkFidelity(
+/**
+ * Evalúa la fidelidad del patrón Zigzag en Onda (◄►◄) (E8.1):
+ * - Trazo continuo de arriba a abajo entre rieles con 3 quiebres alternados:
+ *   1. Vértice 1 a ~1/4 de altura: pico hacia la izquierda (◄, deflexión objetivo 16px)
+ *   2. Vértice 2 a ~1/2 de altura: hendidura hacia la derecha retornando a la vertical nominal
+ *   3. Vértice 3 a ~3/4 de altura: pico hacia la izquierda (◄, deflexión objetivo 16px)
+ *   4. Retorno al riel inferior en la misma vertical de inicio
+ */
+function evaluateZigzagWaveFidelity(
   stroke: RawStroke,
-  kinkType: 'triangle_left' | 'triangle_right' | 'chevron_left',
   yTop: number,
   yBottom: number
 ): {
@@ -1137,6 +1144,149 @@ function evaluateKinkFidelity(
   apexDeflection: number;
   apexYRel: number;
 } {
+  if (stroke.points.length < 5) {
+    return { score: 10, hasKink: false, isCorrectDirection: false, apexDeflection: 0, apexYRel: 0 };
+  }
+
+  const h = yBottom - yTop;
+  const pStart = stroke.points[0];
+  const pEnd = stroke.points[stroke.points.length - 1];
+  const refX = (pStart.x + pEnd.x) / 2;
+
+  // Segmentar puntos en 3 zonas verticales para detectar los 2 picos izquierdos y la hendidura central
+  const zone1Points = stroke.points.filter((p) => p.y >= yTop + h * 0.08 && p.y <= yTop + h * 0.42);
+  const zone2Points = stroke.points.filter((p) => p.y >= yTop + h * 0.35 && p.y <= yTop + h * 0.65);
+  const zone3Points = stroke.points.filter((p) => p.y >= yTop + h * 0.58 && p.y <= yTop + h * 0.92);
+
+  if (zone1Points.length === 0 || zone3Points.length === 0) {
+    return { score: 15, hasKink: false, isCorrectDirection: false, apexDeflection: 0, apexYRel: 0 };
+  }
+
+  // Pico 1 (zona 1): punto más a la izquierda (mínimo X)
+  let p1Peak = zone1Points[0];
+  let p1MinX = Infinity;
+  let p1MaxX = -Infinity;
+  for (const p of zone1Points) {
+    if (p.x < p1MinX) {
+      p1MinX = p.x;
+      p1Peak = p;
+    }
+    if (p.x > p1MaxX) {
+      p1MaxX = p.x;
+    }
+  }
+  const p1LeftDeflection = refX - p1MinX;
+  const p1RightDeflection = p1MaxX - refX;
+
+  // Hendidura central (zona 2): punto más a la derecha (máximo X)
+  let pCenterMaxX = -Infinity;
+  if (zone2Points.length > 0) {
+    for (const p of zone2Points) {
+      if (p.x > pCenterMaxX) pCenterMaxX = p.x;
+    }
+  } else {
+    pCenterMaxX = refX;
+  }
+
+  // Pico 2 (zona 3): punto más a la izquierda (mínimo X)
+  let p2Peak = zone3Points[0];
+  let p2MinX = Infinity;
+  let p2MaxX = -Infinity;
+  for (const p of zone3Points) {
+    if (p.x < p2MinX) {
+      p2MinX = p.x;
+      p2Peak = p;
+    }
+    if (p.x > p2MaxX) {
+      p2MaxX = p.x;
+    }
+  }
+  const p2LeftDeflection = refX - p2MinX;
+  const p2RightDeflection = p2MaxX - refX;
+
+  // Condiciones de presencia del zigzag:
+  // - Ambos picos se desvían al menos 6px hacia la izquierda
+  // - La hendidura central retorna hacia la derecha respecto a los picos al menos 3px
+  const hasKink = p1LeftDeflection >= 6.0 && p2LeftDeflection >= 6.0 && (pCenterMaxX - Math.max(p1MinX, p2MinX) >= 3.0 || pCenterMaxX - ((p1MinX + p2MinX) / 2) >= 4.0);
+
+  // Dirección correcta: los picos se desvían a la izquierda (◄), no a la derecha (►)
+  const isCorrectDirection = hasKink && p1LeftDeflection >= p1RightDeflection && p2LeftDeflection >= p2RightDeflection;
+
+  if (!hasKink) {
+    return {
+      score: 15,
+      hasKink: false,
+      isCorrectDirection: false,
+      apexDeflection: Math.max(0, (p1LeftDeflection + p2LeftDeflection) / 2),
+      apexYRel: 0.5,
+    };
+  }
+
+  if (!isCorrectDirection) {
+    return {
+      score: 25,
+      hasKink: true,
+      isCorrectDirection: false,
+      apexDeflection: (p1LeftDeflection + p2LeftDeflection) / 2,
+      apexYRel: 0.5,
+    };
+  }
+
+  // Puntuación:
+  // 1. Deflexión de Pico 1 vs 16px objetivo
+  const p1DeflDiff = Math.abs(p1LeftDeflection - 16);
+  const p1Score = Math.max(0, 100 - p1DeflDiff * 5.0);
+
+  // 2. Deflexión de Pico 2 vs 16px objetivo
+  const p2DeflDiff = Math.abs(p2LeftDeflection - 16);
+  const p2Score = Math.max(0, 100 - p2DeflDiff * 5.0);
+
+  // 3. Hendidura central cerca de refX (dx ≈ 0)
+  const centerDiff = Math.abs(pCenterMaxX - refX);
+  const centerScore = Math.max(0, 100 - centerDiff * 6.0);
+
+  // 4. Ubicación vertical de los picos (p1 ≈ 0.25h, p2 ≈ 0.75h)
+  const p1YRel = (p1Peak.y - yTop) / h;
+  const p2YRel = (p2Peak.y - yTop) / h;
+  const yScore = Math.max(0, 100 - (Math.abs(p1YRel - 0.25) + Math.abs(p2YRel - 0.75)) * 140);
+
+  // 5. Alineación vertical de los extremos (|pEnd.x - pStart.x| cercano a 0)
+  const returnDiff = Math.abs(pEnd.x - pStart.x);
+  const returnScore = Math.max(0, 100 - returnDiff * 5.0);
+
+  const score = Math.round(
+    p1Score * 0.25 +
+    p2Score * 0.25 +
+    centerScore * 0.20 +
+    yScore * 0.15 +
+    returnScore * 0.15
+  );
+
+  return {
+    score: Math.min(100, Math.max(0, score)),
+    hasKink: true,
+    isCorrectDirection: true,
+    apexDeflection: (p1LeftDeflection + p2LeftDeflection) / 2,
+    apexYRel: 0.5,
+  };
+}
+
+function evaluateKinkFidelity(
+  stroke: RawStroke,
+  kinkType: 'triangle_left' | 'triangle_right' | 'chevron_left' | 'zigzag_wave',
+  yTop: number,
+  yBottom: number
+): {
+  score: number;
+  hasKink: boolean;
+  isCorrectDirection: boolean;
+  apexDeflection: number;
+  apexYRel: number;
+} {
+  if (kinkType === 'zigzag_wave') {
+    return evaluateZigzagWaveFidelity(stroke, yTop, yBottom);
+  }
+
   if (stroke.points.length < 3) {
     return { score: 10, hasKink: false, isCorrectDirection: false, apexDeflection: 0, apexYRel: 0 };
   }
@@ -2255,7 +2405,7 @@ export function evaluateSpacingTrackSubmission(
       let blockKinkSum = 0;
       let blockAngleSum = 0;
       for (const s of bStrokes) {
-        const kinkEval = evaluateKinkFidelity(s.stroke, kinkType as 'triangle_left' | 'triangle_right' | 'chevron_left', singleBand.yTop, singleBand.yBottom);
+        const kinkEval = evaluateKinkFidelity(s.stroke, kinkType as 'triangle_left' | 'triangle_right' | 'chevron_left' | 'zigzag_wave', singleBand.yTop, singleBand.yBottom);
         blockKinkSum += kinkEval.score;
         if (!kinkEval.hasKink) missingKinkCount++;
         if (kinkEval.hasKink && !kinkEval.isCorrectDirection) wrongDirKinkCount++;
@@ -2356,18 +2506,26 @@ export function evaluateSpacingTrackSubmission(
       points: [],
       multiLines: challenge.ghostSolutionStrokes || [],
       color: '#000000',
-      label: kinkType === 'chevron_left'
+      label: kinkType === 'zigzag_wave'
+        ? `Paso Objetivo: ${targetSpacing}px con Zigzag en Onda ◄►◄`
+        : kinkType === 'chevron_left'
         ? `Paso Objetivo: ${targetSpacing}px con Quiebre en Chevron ◄`
         : `Paso Objetivo: ${targetSpacing}px con Quiebre`,
     };
 
-    let feedbackTitle = kinkType === 'chevron_left'
+    let feedbackTitle = kinkType === 'zigzag_wave'
+      ? '¡Zigzag en Onda y Espaciado Logrados!'
+      : kinkType === 'chevron_left'
       ? '¡Quiebres en Chevron y Espaciado Logrados!'
       : '¡Quiebres y Espaciado Logrados!';
-    let feedbackMessage = kinkType === 'chevron_left'
+    let feedbackMessage = kinkType === 'zigzag_wave'
+      ? `Has conseguido un paso medio de ${measuredAvgSpacingPx}px (objetivo: ${targetSpacing}px) con buena reproducción del patrón zigzag en onda ◄►◄.`
+      : kinkType === 'chevron_left'
       ? `Has conseguido un paso medio de ${measuredAvgSpacingPx}px (objetivo: ${targetSpacing}px) con buena reproducción del patrón chevron ◄.`
       : `Has conseguido un paso medio de ${measuredAvgSpacingPx}px (objetivo: ${targetSpacing}px) con buena reproducción del quiebre triangular.`;
-    let tipMessage = kinkType === 'chevron_left'
+    let tipMessage = kinkType === 'zigzag_wave'
+      ? 'Mantén los vértices del zigzag alineados a 1/4, 1/2 y 3/4 de la altura de la franja.'
+      : kinkType === 'chevron_left'
       ? 'Mantén los vértices del chevron alineados al centro de la franja.'
       : 'Mantén la altura del vértice alineada visualmente en todos los trazos.';
     let avatarMood: AvatarMood = 'wink';
@@ -2383,7 +2541,11 @@ export function evaluateSpacingTrackSubmission(
       tipMessage = 'Traza de arriba a abajo (↓): empieza en el carril superior y desciende hacia el inferior realizando el quiebre.';
       avatarMood = 'fail-spiral';
     } else if (isMissingKinks) {
-      if (kinkType === 'chevron_left') {
+      if (kinkType === 'zigzag_wave') {
+        feedbackTitle = '¡Falta el Zigzag en Onda! ◄►◄';
+        feedbackMessage = 'Has trazado líneas verticales rectas. Este ejercicio requiere realizar el patrón en zigzag continuo (◄►◄) con quiebres alternados, idéntico a las líneas de INICIO y FIN.';
+        tipMessage = 'Baja quebrando hacia la izquierda a 1/4 de altura, regresa al centro a la mitad, quiebra a la izquierda a 3/4 y vuelve al riel inferior.';
+      } else if (kinkType === 'chevron_left') {
         feedbackTitle = '¡Falta el Quiebre en Chevron! ◄';
         feedbackMessage = 'Has trazado líneas verticales rectas. Este ejercicio requiere realizar el quiebre en chevron (ángulo <) hacia la izquierda en el centro del trazo, idéntico a las líneas de INICIO y FIN.';
         tipMessage = 'Traza en diagonal hacia la izquierda hasta el centro (~26px) y regresa en diagonal hacia la derecha hasta el carril inferior.';
@@ -2397,7 +2559,11 @@ export function evaluateSpacingTrackSubmission(
       passed = false;
       phasePassed = false;
     } else if (isWrongDirKinks) {
-      if (kinkType === 'chevron_left') {
+      if (kinkType === 'zigzag_wave') {
+        feedbackTitle = '¡Zigzag en Sentido Opuesto!';
+        feedbackMessage = 'Has orientado los picos hacia la derecha. Los picos del zigzag en onda deben apuntar hacia la izquierda (◄►◄).';
+        tipMessage = 'Compara con el patrón de muestra a la izquierda antes de trazar.';
+      } else if (kinkType === 'chevron_left') {
         feedbackTitle = '¡Chevron en Sentido Opuesto!';
         feedbackMessage = 'Has dirigido el vértice hacia la derecha. El quiebre en chevron debe apuntar hacia la izquierda (◄).';
         tipMessage = 'Compara con el patrón de muestra a la izquierda antes de trazar.';
