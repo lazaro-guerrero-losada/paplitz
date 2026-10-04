@@ -498,7 +498,9 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
 
       // Etiqueta superior de muestra
       let sampleLabel = `MUESTRA (${subdivisionLabel})`;
-      if (sp.kinkType === 'triangle_left') {
+      if (sp.kinkType === 'v_concentric') {
+        sampleLabel = `MUESTRA VÉRTICES EN V ∨ (x/2 = ${targetSpacingPx}px)`;
+      } else if (sp.kinkType === 'triangle_left') {
         sampleLabel = `MUESTRA ◄ (x/2 = ${targetSpacingPx}px)`;
       } else if (sp.kinkType === 'triangle_right') {
         sampleLabel = `MUESTRA ► (x/2 = ${targetSpacingPx}px)`;
@@ -704,13 +706,15 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
           }
           ctx.stroke();
 
-          // 2. Línea Final del bloque (Final Line) pre-dibujada sólida
-          ctx.beginPath();
-          ctx.moveTo(blk.finalLinePoints[0].x, blk.finalLinePoints[0].y);
-          for (let pIdx = 1; pIdx < blk.finalLinePoints.length; pIdx++) {
-            ctx.lineTo(blk.finalLinePoints[pIdx].x, blk.finalLinePoints[pIdx].y);
+          // 2. Línea Final del bloque (Final Line) pre-dibujada sólida (salvo en V concéntrica que converge al centro)
+          if (sp.kinkType !== 'v_concentric') {
+            ctx.beginPath();
+            ctx.moveTo(blk.finalLinePoints[0].x, blk.finalLinePoints[0].y);
+            for (let pIdx = 1; pIdx < blk.finalLinePoints.length; pIdx++) {
+              ctx.lineTo(blk.finalLinePoints[pIdx].x, blk.finalLinePoints[pIdx].y);
+            }
+            ctx.stroke();
           }
-          ctx.stroke();
 
           // Indicadores textuales de inicio y fin
           ctx.fillStyle = '#000000';
@@ -718,7 +722,9 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
           ctx.textAlign = 'center';
           ctx.textBaseline = 'bottom';
           ctx.fillText('INICIO', blk.xStart, b.yTop - 4);
-          ctx.fillText('FIN', blk.xEnd, b.yTop - 4);
+          if (sp.kinkType !== 'v_concentric') {
+            ctx.fillText('FIN', blk.xEnd, b.yTop - 4);
+          }
 
           // Ticks verticales adicionales en inicio y fin
           ctx.strokeStyle = '#000000';
@@ -726,8 +732,10 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
           ctx.beginPath();
           ctx.moveTo(blk.xStart, b.yTop - 3);
           ctx.lineTo(blk.xStart, b.yTop + 3);
-          ctx.moveTo(blk.xEnd, b.yTop - 3);
-          ctx.lineTo(blk.xEnd, b.yTop + 3);
+          if (sp.kinkType !== 'v_concentric') {
+            ctx.moveTo(blk.xEnd, b.yTop - 3);
+            ctx.lineTo(blk.xEnd, b.yTop + 3);
+          }
           ctx.stroke();
 
           // Título de Bloque
