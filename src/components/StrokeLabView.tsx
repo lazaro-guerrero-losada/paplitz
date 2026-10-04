@@ -697,12 +697,6 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
           ctx.font = 'bold 9px monospace';
           ctx.fillText(`BLOQUE ${bIdx + 1}`, (blk.xStart + blk.xEnd) / 2, b.yTop - 13);
 
-          // Indicador inferior: Rellenar en el medio
-          ctx.fillStyle = '#666666';
-          ctx.font = '8px monospace';
-          ctx.textBaseline = 'top';
-          ctx.fillText(`↔ Rellenar (${targetSpacingPx}px)`, (blk.xStart + blk.xEnd) / 2, b.yBottom + 6);
-
           // Indicador de Pausa en el gap
           if (bIdx < sp.blocks.length - 1) {
             const nextBlk = sp.blocks[bIdx + 1];
@@ -713,36 +707,6 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
             ctx.fillText('(PAUSA)', gapMid, (b.yTop + b.yBottom) / 2);
           }
         }
-      }
-
-      // Indicador de guía textual arriba del carril (solo en ejercicios estándar E1-E4, omitido en E5.1/E5.2)
-      if (!sp.kinkType || sp.kinkType === 'none') {
-        const firstB = bands[0];
-        ctx.fillStyle = '#666666';
-        ctx.font = '9px monospace';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'bottom';
-        let promptText = `→ Dibuja hacia la derecha con el mismo espaciado (${targetSpacingPx}px)`;
-        if (sp.direction) {
-          switch (sp.direction) {
-            case 'bottom_up_left_right':
-              promptText = `↗ Traza de abajo a arriba hacia la derecha al paso ${subdivisionLabel} (${targetSpacingPx}px)`;
-              break;
-            case 'top_down_right_left':
-              promptText = `↙ Traza de arriba a abajo hacia la izquierda al paso ${subdivisionLabel} (${targetSpacingPx}px)`;
-              break;
-            case 'top_down_left_right':
-              promptText = `↘ Traza de arriba a abajo hacia la derecha al paso ${subdivisionLabel} (${targetSpacingPx}px)`;
-              break;
-            case 'bottom_up_right_left':
-              promptText = `↖ Traza de abajo a arriba hacia la izquierda al paso ${subdivisionLabel} (${targetSpacingPx}px)`;
-              break;
-            default:
-              promptText = `↓ Traza de arriba a abajo al paso ${subdivisionLabel} (${targetSpacingPx}px)`;
-              break;
-          }
-        }
-        ctx.fillText(promptText, trackXStart, firstB.yTop - 6);
       }
 
       ctx.restore();
