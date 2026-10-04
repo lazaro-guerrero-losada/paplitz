@@ -6,6 +6,7 @@ import {
   PolyFace,
   KeyPoint,
   TargetLineDef,
+  SpacingTrackBlock,
 } from './strokeTypes';
 
 /**
@@ -488,6 +489,27 @@ export function generateRadialRosetteChallenge(
 }
 
 /**
+ * Genera la polilínea de un trazo vertical con quiebre triangular (◄ o ►)
+ */
+export function generateKinkStrokePoints(
+  x: number,
+  yTop: number,
+  yBottom: number,
+  kinkType: 'triangle_left' | 'triangle_right' = 'triangle_left',
+  apexOffset = 16
+): { x: number; y: number }[] {
+  const h = yBottom - yTop;
+  const dx = kinkType === 'triangle_left' ? -apexOffset : apexOffset;
+  return [
+    { x: Math.round(x * 10) / 10, y: yTop },
+    { x: Math.round(x * 10) / 10, y: Math.round(yTop + h * 0.50) },
+    { x: Math.round((x + dx) * 10) / 10, y: Math.round(yTop + h * 0.67) },
+    { x: Math.round(x * 10) / 10, y: Math.round(yTop + h * 0.82) },
+    { x: Math.round(x * 10) / 10, y: yBottom },
+  ];
+}
+
+/**
  * Genera un reto de Carriles y Espaciado Rítmico (Ejercicio 1.1 Workbook: Consistencia en franjas x, x/2)
  */
 export function generateSpacingTrackChallenge(
@@ -560,38 +582,50 @@ export function generateSpacingTrackChallenge(
   const bandHeight = bands[0].height;
   const radAngle = (angleDeg * Math.PI) / 180;
   const dxOffset = isDiagonal ? Math.round(bandHeight / Math.tan(radAngle)) : 0;
+  const isKink = cfg.kinkType && cfg.kinkType !== 'none';
+  const kinkType = cfg.kinkType || 'none';
 
   // 2. Patrón de muestra (izquierda)
-  const sampleXStart = isDiagonal ? 28 : 35;
-  const sampleWidth = isDiagonal ? 80 : 96;
+  const sampleXStart = isDiagonal || isKink ? 28 : 35;
+  const sampleWidth = isDiagonal || isKink ? 80 : 96;
   const sampleXEnd = sampleXStart + sampleWidth;
-  const sampleLines: { x1: number; y1: number; x2: number; y2: number }[] = [];
+  const sampleLines: { x1?: number; y1: number; x2?: number; y2: number; points?: { x: number; y: number }[] }[] = [];
 
-  for (let x = sampleXStart; x <= sampleXEnd + 0.1; x += targetSpacingPx) {
-    for (const band of bands) {
-      if (!isDiagonal) {
-        sampleLines.push({
-          x1: Math.round(x * 10) / 10,
-          y1: band.yTop,
-          x2: Math.round(x * 10) / 10,
-          y2: band.yBottom,
-        });
-      } else if (direction === 'bottom_up_left_right' || direction === 'top_down_right_left') {
-        // Inclinación / (↗ o ↙)
-        sampleLines.push({
-          x1: Math.round(x * 10) / 10,
-          y1: band.yBottom,
-          x2: Math.round((x + dxOffset) * 10) / 10,
-          y2: band.yTop,
-        });
-      } else {
-        // Inclinación \ (↘ o ↖)
-        sampleLines.push({
-          x1: Math.round(x * 10) / 10,
-          y1: band.yTop,
-          x2: Math.round((x + dxOffset) * 10) / 10,
-          y2: band.yBottom,
-        });
+  if (isKink) {
+    for (let x = sampleXStart + 8; x <= sampleXEnd; x += targetSpacingPx) {
+      sampleLines.push({
+        points: generateKinkStrokePoints(Math.round(x), bands[0].yTop, bands[0].yBottom, kinkType as any),
+        y1: bands[0].yTop,
+        y2: bands[0].yBottom,
+      });
+    }
+  } else {
+    for (let x = sampleXStart; x <= sampleXEnd + 0.1; x += targetSpacingPx) {
+      for (const band of bands) {
+        if (!isDiagonal) {
+          sampleLines.push({
+            x1: Math.round(x * 10) / 10,
+            y1: band.yTop,
+            x2: Math.round(x * 10) / 10,
+            y2: band.yBottom,
+          });
+        } else if (direction === 'bottom_up_left_right' || direction === 'top_down_right_left') {
+          // Inclinación / (↗ o ↙)
+          sampleLines.push({
+            x1: Math.round(x * 10) / 10,
+            y1: band.yBottom,
+            x2: Math.round((x + dxOffset) * 10) / 10,
+            y2: band.yTop,
+          });
+        } else {
+          // Inclinación \ (↘ o ↖)
+          sampleLines.push({
+            x1: Math.round(x * 10) / 10,
+            y1: band.yTop,
+            x2: Math.round((x + dxOffset) * 10) / 10,
+            y2: band.yBottom,
+          });
+        }
       }
     }
   }
@@ -606,50 +640,92 @@ export function generateSpacingTrackChallenge(
     guideLines.push({ x1: trackXStart, y1: band.yBottom, x2: trackXEnd, y2: band.yBottom, dashed: false });
   }
 
+  // Bloques con pausas (gaps) para ejercicios con bloques (ancho y)
+  let blocks: SpacingTrackBlock[] | undefined = undefined;
+  if (isKink) {
+    const b = bands[0];
+    blocks = [
+      {
+        id: 'b1',
+        xStart: 168,
+        xEnd: 296,
+        width: 128,
+        startLinePoints: generateKinkStrokePoints(168, b.yTop, b.yBottom, kinkType as any),
+        finalLinePoints: generateKinkStrokePoints(296, b.yTop, b.yBottom, kinkType as any),
+        targetInteriorLineCount: 15,
+      },
+      {
+        id: 'b2',
+        xStart: 344,
+        xEnd: 472,
+        width: 128,
+        startLinePoints: generateKinkStrokePoints(344, b.yTop, b.yBottom, kinkType as any),
+        finalLinePoints: generateKinkStrokePoints(472, b.yTop, b.yBottom, kinkType as any),
+        targetInteriorLineCount: 15,
+      },
+    ];
+  }
+
   // 4. Solución fantasma
   const ghostSolutionStrokes: { points: { x: number; y: number }[] }[] = [];
-  for (const band of bands) {
-    const maxX = trackXEnd - (isDiagonal ? dxOffset + 6 : 6);
-    for (let x = trackXStart + targetSpacingPx; x <= maxX; x += targetSpacingPx) {
-      if (!isDiagonal) {
-        ghostSolutionStrokes.push({
-          points: [
-            { x: Math.round(x * 10) / 10, y: band.yTop },
-            { x: Math.round(x * 10) / 10, y: band.yBottom },
-          ],
-        });
-      } else if (direction === 'bottom_up_left_right') {
-        // ↗ D1: de abajo hacia arriba
-        ghostSolutionStrokes.push({
-          points: [
-            { x: Math.round(x * 10) / 10, y: band.yBottom },
-            { x: Math.round((x + dxOffset) * 10) / 10, y: band.yTop },
-          ],
-        });
-      } else if (direction === 'top_down_right_left') {
-        // ↙ D2: de arriba hacia abajo
-        ghostSolutionStrokes.push({
-          points: [
-            { x: Math.round((x + dxOffset) * 10) / 10, y: band.yTop },
-            { x: Math.round(x * 10) / 10, y: band.yBottom },
-          ],
-        });
-      } else if (direction === 'top_down_left_right') {
-        // ↘ D3: de arriba hacia abajo
-        ghostSolutionStrokes.push({
-          points: [
-            { x: Math.round(x * 10) / 10, y: band.yTop },
-            { x: Math.round((x + dxOffset) * 10) / 10, y: band.yBottom },
-          ],
-        });
-      } else {
-        // ↖ D4: de abajo hacia arriba
-        ghostSolutionStrokes.push({
-          points: [
-            { x: Math.round((x + dxOffset) * 10) / 10, y: band.yBottom },
-            { x: Math.round(x * 10) / 10, y: band.yTop },
-          ],
-        });
+  if (isKink) {
+    const b = bands[0];
+    // Bloque 1 (entre 168 y 296)
+    for (let x = 168 + targetSpacingPx; x < 296 - 0.1; x += targetSpacingPx) {
+      ghostSolutionStrokes.push({
+        points: generateKinkStrokePoints(Math.round(x), b.yTop, b.yBottom, kinkType as any),
+      });
+    }
+    // Bloque 2 (entre 344 y 472)
+    for (let x = 344 + targetSpacingPx; x < 472 - 0.1; x += targetSpacingPx) {
+      ghostSolutionStrokes.push({
+        points: generateKinkStrokePoints(Math.round(x), b.yTop, b.yBottom, kinkType as any),
+      });
+    }
+  } else {
+    for (const band of bands) {
+      const maxX = trackXEnd - (isDiagonal ? dxOffset + 6 : 6);
+      for (let x = trackXStart + targetSpacingPx; x <= maxX; x += targetSpacingPx) {
+        if (!isDiagonal) {
+          ghostSolutionStrokes.push({
+            points: [
+              { x: Math.round(x * 10) / 10, y: band.yTop },
+              { x: Math.round(x * 10) / 10, y: band.yBottom },
+            ],
+          });
+        } else if (direction === 'bottom_up_left_right') {
+          // ↗ D1: de abajo hacia arriba
+          ghostSolutionStrokes.push({
+            points: [
+              { x: Math.round(x * 10) / 10, y: band.yBottom },
+              { x: Math.round((x + dxOffset) * 10) / 10, y: band.yTop },
+            ],
+          });
+        } else if (direction === 'top_down_right_left') {
+          // ↙ D2: de arriba hacia abajo
+          ghostSolutionStrokes.push({
+            points: [
+              { x: Math.round((x + dxOffset) * 10) / 10, y: band.yTop },
+              { x: Math.round(x * 10) / 10, y: band.yBottom },
+            ],
+          });
+        } else if (direction === 'top_down_left_right') {
+          // ↘ D3: de arriba hacia abajo
+          ghostSolutionStrokes.push({
+            points: [
+              { x: Math.round(x * 10) / 10, y: band.yTop },
+              { x: Math.round((x + dxOffset) * 10) / 10, y: band.yBottom },
+            ],
+          });
+        } else {
+          // ↖ D4: de abajo hacia arriba
+          ghostSolutionStrokes.push({
+            points: [
+              { x: Math.round((x + dxOffset) * 10) / 10, y: band.yBottom },
+              { x: Math.round(x * 10) / 10, y: band.yTop },
+            ],
+          });
+        }
       }
     }
   }
@@ -660,11 +736,17 @@ export function generateSpacingTrackChallenge(
   else if (direction === 'top_down_left_right') dirArrow = '↘';
   else if (direction === 'bottom_up_right_left') dirArrow = '↖';
 
-  const subtitle = isDiagonal
-    ? `${subdivLabel} (${targetSpacingPx}px) · Diagonal ~${angleDeg}° (${dirArrow})`
-    : `${cfg.bandCount} Franja${cfg.bandCount > 1 ? 's' : ''} (Alt: ${bands[0].height}px) · ${subdivLabel} (${targetSpacingPx}px)`;
+  let subtitle = '';
+  if (isKink) {
+    const sym = kinkType === 'triangle_left' ? '◄' : '►';
+    subtitle = `2 Bloques (Ancho y) · Paso ${subdivLabel} (${targetSpacingPx}px) · Quiebre Triangular (${sym})`;
+  } else if (isDiagonal) {
+    subtitle = `${subdivLabel} (${targetSpacingPx}px) · Diagonal ~${angleDeg}° (${dirArrow})`;
+  } else {
+    subtitle = `${cfg.bandCount} Franja${cfg.bandCount > 1 ? 's' : ''} (Alt: ${bands[0].height}px) · ${subdivLabel} (${targetSpacingPx}px)`;
+  }
 
-  const minRequiredStrokes = Math.max(3, 3 * cfg.bandCount);
+  const minRequiredStrokes = isKink ? 10 : Math.max(3, 3 * cfg.bandCount);
 
   return {
     id: `track-${exercise.code}-${seed}`,
@@ -679,7 +761,7 @@ export function generateSpacingTrackChallenge(
     targetMetricsText: exercise.metrics,
     targetAngleDeg: angleDeg,
     targetSpacingPx,
-    targetLengthPx: Math.hypot(dxOffset, bands[0].height),
+    targetLengthPx: isKink ? 141 : Math.hypot(dxOffset, bands[0].height),
     minRequiredStrokes,
     directionKey: direction,
     guideMode: 'gray_line',
@@ -700,6 +782,8 @@ export function generateSpacingTrackChallenge(
       angleDeg,
       direction,
       dxOffset,
+      kinkType: cfg.kinkType,
+      blocks,
     },
   };
 }

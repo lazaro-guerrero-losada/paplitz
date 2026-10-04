@@ -1120,6 +1120,111 @@ function getStrokeSlopeAngle(stroke: RawStroke): { angleFromHorizontalDeg: numbe
 }
 
 /**
+ * Evalúa la fidelidad del quiebre triangular (knee/corner) en trazos de E5.1 (izq) y E5.2 (der)
+ * - Altura nominal h = yBottom - yTop (aprox 130px)
+ * - El quiebre debe producirse en la mitad inferior: yRel aprox 0.50 a 0.82, vértice en yRel ≈ 0.67
+ * - Desviación horizontal del vértice respecto al eje de la línea: target 16px (negativo para izq, positivo para der)
+ */
+function evaluateKinkFidelity(
+  stroke: RawStroke,
+  kinkType: 'triangle_left' | 'triangle_right',
+  yTop: number,
+  yBottom: number
+): {
+  score: number;
+  hasKink: boolean;
+  isCorrectDirection: boolean;
+  apexDeflection: number;
+  apexYRel: number;
+} {
+  if (stroke.points.length < 4) {
+    return { score: 10, hasKink: false, isCorrectDirection: false, apexDeflection: 0, apexYRel: 0 };
+  }
+
+  const h = yBottom - yTop;
+  const pStart = stroke.points[0];
+  const pEnd = stroke.points[stroke.points.length - 1];
+
+  // Eje de referencia X: promedio de X en el tercio superior
+  const topPoints = stroke.points.filter((p) => p.y <= yTop + h * 0.45);
+  const refX = topPoints.length > 0
+    ? topPoints.reduce((acc, p) => acc + p.x, 0) / topPoints.length
+    : (pStart.x + pEnd.x) / 2;
+
+  // Buscar el punto con mayor desviación horizontal
+  let maxTargetDeflection = 0;
+  let maxOppositeDeflection = 0;
+  let apexPoint = stroke.points[0];
+
+  const sign = kinkType === 'triangle_left' ? -1 : 1;
+
+  for (const p of stroke.points) {
+    const dx = p.x - refX; // positivo hacia la derecha, negativo hacia la izquierda
+    const directedDx = dx * sign; // positivo si es en la dirección esperada del quiebre
+    if (directedDx > maxTargetDeflection) {
+      maxTargetDeflection = directedDx;
+      apexPoint = p;
+    }
+    if (-directedDx > maxOppositeDeflection) {
+      maxOppositeDeflection = -directedDx;
+    }
+  }
+
+  const hasKink = maxTargetDeflection >= 5.0;
+  const isCorrectDirection = maxTargetDeflection >= maxOppositeDeflection && hasKink;
+
+  if (!hasKink) {
+    // Es una línea recta vertical o con variación mínima
+    return {
+      score: 15,
+      hasKink: false,
+      isCorrectDirection: false,
+      apexDeflection: maxTargetDeflection,
+      apexYRel: 0,
+    };
+  }
+
+  if (!isCorrectDirection) {
+    // Quiebre en la dirección contraria (p. ej. a la derecha cuando debía ser a la izquierda)
+    return {
+      score: 25,
+      hasKink: true,
+      isCorrectDirection: false,
+      apexDeflection: maxTargetDeflection,
+      apexYRel: 0,
+    };
+  }
+
+  // Medir qué tan cerca está la desviación del objetivo (16px)
+  const deflectionDiff = Math.abs(maxTargetDeflection - 16);
+  const deflectionScore = Math.max(0, 100 - deflectionDiff * 5);
+
+  // Medir la altura vertical del vértice: debe estar cerca de yTop + 0.67 * h
+  const apexYRel = h > 0 ? (apexPoint.y - yTop) / h : 0.67;
+  const idealYRel = 0.67;
+  const yRelDiff = Math.abs(apexYRel - idealYRel);
+  const yLocationScore = Math.max(0, 100 - yRelDiff * 160);
+
+  // Retorno a la vertical en el extremo inferior: pEnd.x debe estar cerca de refX
+  const returnDiff = Math.abs(pEnd.x - refX);
+  const returnScore = Math.max(0, 100 - returnDiff * 5);
+
+  const score = Math.round(
+    deflectionScore * 0.45 +
+    yLocationScore * 0.35 +
+    returnScore * 0.20
+  );
+
+  return {
+    score: Math.min(100, Math.max(0, score)),
+    hasKink,
+    isCorrectDirection,
+    apexDeflection: maxTargetDeflection,
+    apexYRel,
+  };
+}
+
+/**
  * Evalúa el reto de Carriles y Espaciado Rítmico (Consistencia 1.1)
  */
 export function evaluateSpacingTrackSubmission(
@@ -1234,6 +1339,295 @@ export function evaluateSpacingTrackSubmission(
     }
   }
   const isReversed = trackStrokes.length > 0 && reversedCount >= Math.max(1, Math.ceil(trackStrokes.length * 0.3));
+
+  const kinkType = params.kinkType;
+  const isKinked = kinkType && kinkType !== 'none';
+  const blocks = params.blocks;
+
+  // 1.8 Rama de evaluación específica para carriles con quiebre triangular y bloques delimitados (E5.1 / E5.2)
+  if (isKinked && blocks && blocks.length > 0) {
+    const singleBand = bands[0];
+    const b1 = blocks[0];
+    const b2 = blocks[1];
+
+    // Clasificar trazos por bloque y detectar trazos en el gap de pausa
+    const b1Strokes: typeof trackStrokes = [];
+    const b2Strokes: typeof trackStrokes = [];
+    const gapStrokes: typeof trackStrokes = [];
+
+    for (const ts of trackStrokes) {
+      if (ts.avgX >= b1.xStart - 6 && ts.avgX <= b1.xEnd + 6) {
+        b1Strokes.push(ts);
+      } else if (b2 && ts.avgX >= b2.xStart - 6 && ts.avgX <= b2.xEnd + 6) {
+        b2Strokes.push(ts);
+      } else if (b2 && ts.avgX > b1.xEnd + 6 && ts.avgX < b2.xStart - 6) {
+        gapStrokes.push(ts);
+      }
+    }
+
+    const blockList = [
+      { def: b1, strokes: b1Strokes },
+      ...(b2 ? [{ def: b2, strokes: b2Strokes }] : []),
+    ];
+
+    let totalBlockSpacingScore = 0;
+    let totalBlockBoundaryScore = 0;
+    let totalBlockKinkScore = 0;
+    let totalBlockParallelismScore = 0;
+    let blocksDrawnCount = 0;
+    let missingKinkCount = 0;
+    let wrongDirKinkCount = 0;
+    const allSpacings: number[] = [];
+
+    for (const blk of blockList) {
+      const bStrokes = blk.strokes;
+      if (bStrokes.length < 2) {
+        continue;
+      }
+      blocksDrawnCount++;
+
+      // Ordenar trazos de izquierda a derecha
+      bStrokes.sort((a, b) => a.avgX - b.avgX);
+
+      // Espaciados en el bloque: incluyendo la distancia desde la línea inicial y hasta la línea final
+      const spacings: number[] = [];
+      const dStart = bStrokes[0].avgX - blk.def.xStart;
+      if (dStart > 0) {
+        spacings.push(dStart);
+        allSpacings.push(dStart);
+      }
+      for (let i = 0; i < bStrokes.length - 1; i++) {
+        const dx = bStrokes[i + 1].avgX - bStrokes[i].avgX;
+        spacings.push(dx);
+        allSpacings.push(dx);
+      }
+      const dEnd = blk.def.xEnd - bStrokes[bStrokes.length - 1].avgX;
+      if (dEnd > 0) {
+        spacings.push(dEnd);
+        allSpacings.push(dEnd);
+      }
+
+      const meanDx = spacings.reduce((a, b) => a + b, 0) / (spacings.length || 1);
+      let varDx = 0;
+      for (const d of spacings) {
+        varDx += (d - meanDx) * (d - meanDx);
+      }
+      const stdDx = Math.sqrt(varDx / (spacings.length || 1));
+
+      const accuracyVsTarget = Math.max(0, 100 - Math.abs(meanDx - targetSpacing) * 7.5);
+      const regularity = Math.max(0, 100 - stdDx * 12);
+      const blockSpacingScore = accuracyVsTarget * 0.45 + regularity * 0.55;
+      totalBlockSpacingScore += blockSpacingScore;
+
+      // Contención en carriles
+      let blockBoundarySum = 0;
+      for (const s of bStrokes) {
+        const topErr = Math.abs(s.topY - singleBand.yTop);
+        const botErr = Math.abs(s.botY - singleBand.yBottom);
+        const strokeBoundary = Math.max(0, 100 - (Math.max(0, topErr - 4) + Math.max(0, botErr - 4)) * 4);
+        blockBoundarySum += strokeBoundary;
+      }
+      totalBlockBoundaryScore += blockBoundarySum / bStrokes.length;
+
+      // Fidelidad del quiebre y paralelismo vertical
+      let blockKinkSum = 0;
+      let blockAngleSum = 0;
+      for (const s of bStrokes) {
+        const kinkEval = evaluateKinkFidelity(s.stroke, kinkType as 'triangle_left' | 'triangle_right', singleBand.yTop, singleBand.yBottom);
+        blockKinkSum += kinkEval.score;
+        if (!kinkEval.hasKink) missingKinkCount++;
+        if (kinkEval.hasKink && !kinkEval.isCorrectDirection) wrongDirKinkCount++;
+
+        const p1 = s.stroke.points[0];
+        const pEnd = s.stroke.points[s.stroke.points.length - 1];
+        const acuteAngle = (Math.atan2(Math.abs(pEnd.y - p1.y), Math.abs(pEnd.x - p1.x)) * 180) / Math.PI;
+        const angleDev = Math.abs(acuteAngle - 90);
+        blockAngleSum += Math.max(0, 100 - angleDev * 4.0);
+      }
+      totalBlockKinkScore += blockKinkSum / bStrokes.length;
+      totalBlockParallelismScore += blockAngleSum / bStrokes.length;
+    }
+
+    const coverageRatio = blocksDrawnCount / blockList.length;
+    const avgSpacingScore = blocksDrawnCount > 0 ? (totalBlockSpacingScore / blocksDrawnCount) * coverageRatio : 0;
+    const avgBoundaryScore = blocksDrawnCount > 0 ? (totalBlockBoundaryScore / blocksDrawnCount) * coverageRatio : 0;
+    const avgKinkScore = blocksDrawnCount > 0 ? totalBlockKinkScore / blocksDrawnCount : 0;
+    const avgParallelismScore = blocksDrawnCount > 0 ? totalBlockParallelismScore / blocksDrawnCount : 0;
+
+    const measuredAvgSpacingPx = allSpacings.length > 0 ? Math.round((allSpacings.reduce((a, b) => a + b, 0) / allSpacings.length) * 10) / 10 : 0;
+    let allVar = 0;
+    if (allSpacings.length > 0) {
+      for (const d of allSpacings) allVar += (d - measuredAvgSpacingPx) * (d - measuredAvgSpacingPx);
+    }
+    const measuredSpacingVariance = allSpacings.length > 0 ? Math.round(Math.sqrt(allVar / allSpacings.length) * 10) / 10 : 0;
+
+    const strokeCountPenalty = trackStrokes.length < challenge.minRequiredStrokes
+      ? Math.min(30, (challenge.minRequiredStrokes - trackStrokes.length) * 4)
+      : 0;
+
+    const gapPenalty = Math.min(20, gapStrokes.length * 5);
+
+    // Cinemática
+    const activePhase = challenge.activePhase || 1;
+    const kinematicsList = trackStrokes.map((ts) =>
+      analyzeStrokeKinematics(ts.stroke, targetDir, activePhase, challenge.targetLengthPx || 141)
+    );
+    const avgSpeed = Math.round(
+      kinematicsList.reduce((acc, k) => acc + k.avgSpeedPxPerSec, 0) / (kinematicsList.length || 1)
+    );
+    const avgFluency = Math.round(
+      kinematicsList.reduce((acc, k) => acc + k.fluencyScore, 0) / (kinematicsList.length || 1)
+    );
+    const avgDuration = Math.round(
+      kinematicsList.reduce((acc, k) => acc + k.durationMs, 0) / (kinematicsList.length || 1)
+    );
+    const allPhasePassed = kinematicsList.length > 0 && kinematicsList.every((k) => k.phasePassed);
+    const kinematics = kinematicsList[0]
+      ? {
+          ...kinematicsList[0],
+          durationMs: avgDuration,
+          avgSpeedPxPerSec: avgSpeed,
+          fluencyScore: avgFluency,
+          phasePassed: allPhasePassed,
+        }
+      : undefined;
+
+    // Ponderación geométrica con fidelidad de quiebre
+    let geometricScore =
+      avgSpacingScore * 0.35 +
+      avgKinkScore * 0.30 +
+      avgBoundaryScore * 0.20 +
+      avgParallelismScore * 0.15 -
+      strokeCountPenalty -
+      gapPenalty;
+
+    geometricScore = Math.max(0, Math.min(100, Math.round(geometricScore)));
+
+    const isMissingKinks = trackStrokes.length > 0 && missingKinkCount >= Math.max(2, Math.ceil(trackStrokes.length * 0.4));
+    const isWrongDirKinks = trackStrokes.length > 0 && wrongDirKinkCount >= Math.max(2, Math.ceil(trackStrokes.length * 0.4));
+
+    if (isMissingKinks) {
+      geometricScore = Math.min(geometricScore, 30);
+    } else if (isWrongDirKinks) {
+      geometricScore = Math.min(geometricScore, 40);
+    }
+
+    let overallScore = geometricScore;
+    let phasePassed = false;
+    if (activePhase === 1) {
+      overallScore = geometricScore;
+      phasePassed = overallScore >= 75;
+    } else if (activePhase === 2) {
+      const fluency = kinematics?.fluencyScore || 80;
+      overallScore = Math.round(geometricScore * 0.80 + fluency * 0.20);
+      phasePassed = overallScore >= 75 && fluency >= 70;
+    } else {
+      const speedPassed = kinematics?.phasePassed ?? true;
+      const speedScore = speedPassed ? 100 : 50;
+      overallScore = Math.round(geometricScore * 0.70 + speedScore * 0.30);
+      phasePassed = overallScore >= 75 && speedPassed;
+    }
+
+    let passed = overallScore >= 75;
+
+    const solutionOverlay = {
+      points: [],
+      multiLines: challenge.ghostSolutionStrokes || [],
+      color: '#000000',
+      label: `Paso Objetivo: ${targetSpacing}px con Quiebre`,
+    };
+
+    let feedbackTitle = '¡Quiebres y Espaciado Logrados!';
+    let feedbackMessage = `Has conseguido un paso medio de ${measuredAvgSpacingPx}px (objetivo: ${targetSpacing}px) con buena reproducción del quiebre triangular.`;
+    let tipMessage = 'Mantén la altura del vértice alineada visualmente en todos los trazos.';
+    let avatarMood: AvatarMood = 'wink';
+    let directionWarning: string | undefined;
+
+    if (isReversed) {
+      directionWarning = '⚠️ DIRECCIÓN INVERTIDA: Has trazado de abajo a arriba. Debes trazar de arriba a abajo (↓).';
+      overallScore = 0;
+      phasePassed = false;
+      passed = false;
+      feedbackTitle = 'Dirección Invertida 🔄';
+      feedbackMessage = directionWarning;
+      tipMessage = 'Traza de arriba a abajo (↓): empieza en el carril superior y desciende hacia el inferior realizando el quiebre.';
+      avatarMood = 'fail-spiral';
+    } else if (isMissingKinks) {
+      const dirText = kinkType === 'triangle_left' ? 'hacia la izquierda (◄)' : 'hacia la derecha (►)';
+      feedbackTitle = kinkType === 'triangle_left' ? '¡Falta el Quiebre Triangular! ◄' : '¡Falta el Quiebre Triangular! ►';
+      feedbackMessage = `Has trazado líneas verticales rectas. Este ejercicio requiere realizar el quiebre triangular ${dirText} en la zona inferior de cada línea, idéntico a las líneas de INICIO y FIN.`;
+      tipMessage = `Baja verticalmente, desvíate en triángulo ${dirText} a 2/3 de la altura, y retorna a la vertical.`;
+      avatarMood = 'curious';
+      passed = false;
+      phasePassed = false;
+    } else if (isWrongDirKinks) {
+      const expectedDir = kinkType === 'triangle_left' ? 'izquierda ◄' : 'derecha ►';
+      feedbackTitle = '¡Quiebre en Sentido Opuesto!';
+      feedbackMessage = `Has dirigido el vértice hacia el lado contrario. El quiebre debe apuntar hacia la ${expectedDir}.`;
+      tipMessage = `Compara con el patrón de muestra a la izquierda antes de trazar.`;
+      avatarMood = 'curious';
+      passed = false;
+      phasePassed = false;
+    } else if (blocksDrawnCount < blockList.length) {
+      feedbackTitle = 'Bloques Incompletos';
+      feedbackMessage = `Has completado ${blocksDrawnCount} de los ${blockList.length} bloques requeridos. Rellena tanto el Bloque 1 como el Bloque 2, respetando el espacio de pausa central.`;
+      tipMessage = 'Usa la pausa entre bloques para descansar la mano sin tocar el lienzo.';
+      avatarMood = 'curious';
+      passed = false;
+      phasePassed = false;
+    } else if (gapStrokes.length > 2) {
+      feedbackTitle = 'Trazos en Zona de Pausa ⚠️';
+      feedbackMessage = `Has dibujado ${gapStrokes.length} líneas en la zona de separación central. Los bloques deben estar separados por un espacio vacío de pausa.`;
+      tipMessage = 'Respeta la zona de separación entre el Bloque 1 y el Bloque 2.';
+      avatarMood = 'curious';
+    } else if (overallScore >= 90) {
+      feedbackTitle = '¡Precisión Magistral! 🌟';
+      feedbackMessage = `Quiebres nítidos y espaciado de ${measuredAvgSpacingPx}px (±${measuredSpacingVariance}px). Ambos bloques ejecutados con maestría.`;
+      tipMessage = 'Excelente control rítmico. Intenta ahora superar las fases de fluidez y velocidad.';
+      avatarMood = 'success-stars';
+    } else if (overallScore >= 75) {
+      feedbackTitle = '¡Nivel Superado! ✅';
+      feedbackMessage = `Buen control de la forma con quiebre (${overallScore}%). El paso se mantiene constante a lo largo de los dos bloques.`;
+      tipMessage = 'Busca que todos los vértices del quiebre queden a la misma altura horizontal.';
+      avatarMood = 'wink';
+    } else {
+      feedbackTitle = 'Falta de Consistencia 💨';
+      feedbackMessage = trackStrokes.length < challenge.minRequiredStrokes
+        ? `Has trazado muy pocas líneas (${trackStrokes.length} de al menos ${challenge.minRequiredStrokes}). Rellena ambos bloques.`
+        : `La regularidad del espaciado o la definición del quiebre necesitan más ajuste (${overallScore}%).`;
+      tipMessage = 'Fíjate en las líneas guía de INICIO y FIN para calibrar la distancia y el ángulo del quiebre.';
+      avatarMood = 'fail-spiral';
+    }
+
+    return {
+      overallScore,
+      passed: passed && !isReversed,
+      isReversed,
+      directionWarning,
+      metrics: {
+        parallelismScore: Math.round(avgParallelismScore),
+        spacingScore: Math.round(avgSpacingScore),
+        straightnessScore: Math.round(avgKinkScore),
+        tonalDensityScore: Math.round(coverageRatio * 100),
+        boundaryScore: Math.round(avgBoundaryScore),
+      },
+      detectedStats: {
+        strokeCount: trackStrokes.length,
+        measuredAvgSpacingPx,
+        spacingVariance: measuredSpacingVariance,
+        measuredAvgAngleDeg: 90,
+        measuredOpticalDensityPct: 0,
+      },
+      feedbackTitle,
+      feedbackMessage,
+      tipMessage,
+      solutionOverlay,
+      avatarMood,
+      kinematics,
+      currentPhase: activePhase,
+      phasePassed: phasePassed && !isReversed,
+    };
+  }
 
   // 2. Asignar trazos a cada franja/carril según cercanía en Y
   const bandStrokesMap = new Map<string, typeof trackStrokes>();

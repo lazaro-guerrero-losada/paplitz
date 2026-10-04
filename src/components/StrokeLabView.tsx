@@ -491,7 +491,11 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
 
       // Etiqueta superior de muestra
       let sampleLabel = `MUESTRA (${subdivisionLabel})`;
-      if (sp.angleDeg && sp.direction) {
+      if (sp.kinkType === 'triangle_left') {
+        sampleLabel = `MUESTRA ◄ (x/2 = ${targetSpacingPx}px)`;
+      } else if (sp.kinkType === 'triangle_right') {
+        sampleLabel = `MUESTRA ► (x/2 = ${targetSpacingPx}px)`;
+      } else if (sp.angleDeg && sp.direction) {
         const arrowMap: Record<string, string> = {
           bottom_up_left_right: '↗',
           top_down_right_left: '↙',
@@ -524,14 +528,24 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
       ctx.strokeStyle = '#000000';
       ctx.lineWidth = 2.4;
       ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
       ctx.setLineDash([]);
       for (const sLine of samplePattern.lines) {
-        const x1 = sLine.x1 ?? (sLine as any).x ?? 0;
-        const x2 = sLine.x2 ?? (sLine as any).x ?? 0;
-        ctx.beginPath();
-        ctx.moveTo(x1, sLine.y1);
-        ctx.lineTo(x2, sLine.y2);
-        ctx.stroke();
+        if (sLine.points && sLine.points.length > 1) {
+          ctx.beginPath();
+          ctx.moveTo(sLine.points[0].x, sLine.points[0].y);
+          for (let pIdx = 1; pIdx < sLine.points.length; pIdx++) {
+            ctx.lineTo(sLine.points[pIdx].x, sLine.points[pIdx].y);
+          }
+          ctx.stroke();
+        } else {
+          const x1 = sLine.x1 ?? (sLine as any).x ?? 0;
+          const x2 = sLine.x2 ?? (sLine as any).x ?? 0;
+          ctx.beginPath();
+          ctx.moveTo(x1, sLine.y1!);
+          ctx.lineTo(x2, sLine.y2!);
+          ctx.stroke();
+        }
       }
 
       // 2. CARRILES GUÍA DE DIBUJO (Derecha) — SIEMPRE VISIBLES PARA DIBUJAR DENTRO
@@ -571,6 +585,74 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
         }
       }
 
+      // 2.5 LÍNEAS DE INICIO Y FINAL DE BLOQUES (Con pausas/gaps intermedias)
+      if (sp.blocks && sp.blocks.length > 0) {
+        const b = bands[0];
+        for (let bIdx = 0; bIdx < sp.blocks.length; bIdx++) {
+          const blk = sp.blocks[bIdx];
+
+          // 1. Línea Inicial del bloque (Start Line) pre-dibujada sólida
+          ctx.strokeStyle = '#000000';
+          ctx.lineWidth = 2.4;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.setLineDash([]);
+          ctx.beginPath();
+          ctx.moveTo(blk.startLinePoints[0].x, blk.startLinePoints[0].y);
+          for (let pIdx = 1; pIdx < blk.startLinePoints.length; pIdx++) {
+            ctx.lineTo(blk.startLinePoints[pIdx].x, blk.startLinePoints[pIdx].y);
+          }
+          ctx.stroke();
+
+          // 2. Línea Final del bloque (Final Line) pre-dibujada sólida
+          ctx.beginPath();
+          ctx.moveTo(blk.finalLinePoints[0].x, blk.finalLinePoints[0].y);
+          for (let pIdx = 1; pIdx < blk.finalLinePoints.length; pIdx++) {
+            ctx.lineTo(blk.finalLinePoints[pIdx].x, blk.finalLinePoints[pIdx].y);
+          }
+          ctx.stroke();
+
+          // Indicadores textuales de inicio y fin
+          ctx.fillStyle = '#000000';
+          ctx.font = 'bold 8px monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText('INICIO', blk.xStart, b.yTop - 4);
+          ctx.fillText('FIN', blk.xEnd, b.yTop - 4);
+
+          // Ticks verticales adicionales en inicio y fin
+          ctx.strokeStyle = '#000000';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(blk.xStart, b.yTop - 3);
+          ctx.lineTo(blk.xStart, b.yTop + 3);
+          ctx.moveTo(blk.xEnd, b.yTop - 3);
+          ctx.lineTo(blk.xEnd, b.yTop + 3);
+          ctx.stroke();
+
+          // Título de Bloque
+          ctx.fillStyle = '#000000';
+          ctx.font = 'bold 9px monospace';
+          ctx.fillText(`BLOQUE ${bIdx + 1}`, (blk.xStart + blk.xEnd) / 2, b.yTop - 13);
+
+          // Indicador inferior: Rellenar en el medio
+          ctx.fillStyle = '#666666';
+          ctx.font = '8px monospace';
+          ctx.textBaseline = 'top';
+          ctx.fillText(`↔ Rellenar (${targetSpacingPx}px)`, (blk.xStart + blk.xEnd) / 2, b.yBottom + 6);
+
+          // Indicador de Pausa en el gap
+          if (bIdx < sp.blocks.length - 1) {
+            const nextBlk = sp.blocks[bIdx + 1];
+            const gapMid = (blk.xEnd + nextBlk.xStart) / 2;
+            ctx.fillStyle = '#999999';
+            ctx.font = 'bold 8px monospace';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('(PAUSA)', gapMid, (b.yTop + b.yBottom) / 2);
+          }
+        }
+      }
+
       // Indicador de guía textual
       const firstB = bands[0];
       ctx.fillStyle = '#666666';
@@ -578,7 +660,10 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
       ctx.textAlign = 'left';
       ctx.textBaseline = 'bottom';
       let promptText = `→ Dibuja hacia la derecha con el mismo espaciado (${targetSpacingPx}px)`;
-      if (sp.direction) {
+      if (sp.kinkType && sp.kinkType !== 'none') {
+        const arrow = sp.kinkType === 'triangle_left' ? '◄' : '►';
+        promptText = `↓ Dibuja trazos con quiebre (${arrow}) de arriba a abajo entre INICIO y FIN al paso ${subdivisionLabel} (${targetSpacingPx}px)`;
+      } else if (sp.direction) {
         switch (sp.direction) {
           case 'bottom_up_left_right':
             promptText = `↗ Traza de abajo a arriba hacia la derecha al paso ${subdivisionLabel} (${targetSpacingPx}px)`;
@@ -597,7 +682,7 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
             break;
         }
       }
-      ctx.fillText(promptText, trackXStart, firstB.yTop - 6);
+      ctx.fillText(promptText, trackXStart, firstB.yTop - (sp.blocks && sp.blocks.length > 0 ? 25 : 6));
 
       ctx.restore();
     }

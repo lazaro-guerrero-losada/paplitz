@@ -12,9 +12,9 @@
 1. [Resumen Ejecutivo & Visión del Proyecto](#1-resumen-ejecutivo--visión-del-proyecto)
 2. [Guía Rápida para Abrir y Trabajar en Otro PC (Quickstart)](#2-guía-rápida-para-abrir-y-trabajar-en-otro-pc-quickstart)
 3. [Estructura del Proyecto y Mapa de Archivos](#3-estructura-del-proyecto-y-mapa-de-archivos)
-4. [Catálogo Completo de Ejercicios (260 Retos)](#4-catálogo-completo-de-ejercicios-260-retos)
+4. [Catálogo Completo de Ejercicios (266 Retos)](#4-catálogo-completo-de-ejercicios-266-retos)
    - [4.1 Calistenia Dinámica de Trazo Único (218 Retos)](#41-calistenia-dinámica-de-trazo-único-218-retos)
-   - [4.2 Espaciado y Carriles de Ritmo (E1.1 a E3.2)](#42-espaciado-y-carriles-de-ritmo-e11-a-e32)
+   - [4.2 Espaciado y Carriles de Ritmo (E1.1 a E5.2)](#42-espaciado-y-carriles-de-ritmo-e11-a-e52)
    - [4.3 Las 42 Páginas del Cuaderno Técnico (Bloques 1 al 8)](#43-las-42-páginas-del-cuaderno-técnico-bloques-1-al-8)
 5. [Motor de Generación Procedural y Geometría](#5-motor-de-generación-procedural-y-geometría)
 6. [Motor de Evaluación Analítica y Cinemática Biomecánica](#6-motor-de-evaluación-analítica-y-cinemática-biomecánica)
@@ -130,9 +130,9 @@ Web dibujitos/ (paplitz-drawing-lab)
 │   └── lib/                      # Núcleo analítico, generadores y tipos
 │       ├── strokeTypes.ts        # ⭐ Definiciones TypeScript completas:
 │       │                         #    - LabExerciseDef, ProceduralStrokeChallenge
-│       │                         #    - ALL_SINGLE_STROKE_EXERCISES (222 niveles)
+│       │                         #    - ALL_SINGLE_STROKE_EXERCISES (224 niveles)
 │       │                         #    - ALL_42_EXERCISES (42 páginas del cuaderno)
-│       │                         #    - ALL_LAB_EXERCISES (264 ejercicios totales)
+│       │                         #    - ALL_LAB_EXERCISES (266 ejercicios totales)
 │       │                         #    - SpacingTrackConfig, SpacingTrackParams
 │       │                         #    - StrokeEvaluation, KeyPoint, TargetLineDef
 │       │
@@ -141,7 +141,7 @@ Web dibujitos/ (paplitz-drawing-lab)
 │       │                         #    - generateSingleStrokeChallenge (Líneas y curvas)
 │       │                         #    - generateMultiLineChallenge (2 o 3 líneas dispersas)
 │       │                         #    - generateRadialRosetteChallenge (Rosetas D11 y D12)
-│       │                         #    - generateSpacingTrackChallenge (Carriles E1.1 a E3.2)
+│       │                         #    - generateSpacingTrackChallenge (Carriles E1.1 a E5.2)
 │       │                         #    - Generadores para las 42 páginas del cuaderno
 │       │
 │       ├── strokeEvaluator.ts    # ⭐ Evaluador analítico instantáneo y biomecánico:
@@ -173,9 +173,9 @@ Web dibujitos/ (paplitz-drawing-lab)
 
 ---
 
-## 4. Catálogo Completo de Ejercicios (264 Retos)
+## 4. Catálogo Completo de Ejercicios (266 Retos)
 
-El catálogo unificado en `src/lib/strokeTypes.ts` combina **222 Calistenias Dinámicas** (212 de trazo único, curvas y rosetas + 10 de espaciado y carriles) y las **42 Páginas del Cuaderno Técnico**, sumando un total de **264 ejercicios** agrupados por bloques temáticos.
+El catálogo unificado en `src/lib/strokeTypes.ts` combina **224 Calistenias Dinámicas** (212 de trazo único, curvas y rosetas + 12 de espaciado y carriles) y las **42 Páginas del Cuaderno Técnico**, sumando un total de **266 ejercicios** agrupados por bloques temáticos.
 
 ### 4.1 Calistenia Dinámica de Trazo Único y Rosetas (212 Retos)
 
@@ -200,7 +200,7 @@ Entrenamiento biomecánico repetitivo con evaluación inmediata al levantar el l
 
 ---
 
-### 4.2 Espaciado y Carriles de Ritmo (E1.1 a E4.4)
+### 4.2 Espaciado y Carriles de Ritmo (E1.1 a E5.2)
 
 Inspirado en el Ejercicio 1.1 del cuaderno de dibujo (*"Making Strokes Consistent / Spacing"*). Se ubican en el bloque **`⚡ Calistenia: Espaciado & Carriles (Ritmo)`**:
 
@@ -244,6 +244,15 @@ Inspirado en el Ejercicio 1.1 del cuaderno de dibujo (*"Making Strokes Consisten
     - 1 franja de altura $y = 130$px, espaciado fino $x/2 = 8$px.
     - Diagonales espejo a $75^\circ$ respecto a la horizontal.
     - Trazo ascendente inverso de abajo hacia arriba proyectando hacia la izquierda (↖).
+11. **E5.1 — Carril Quiebre Triangular ◄ (Bloques & Pausas · x/2):**
+    - 1 franja de altura $y = 130$px, espaciado fino $x/2 = 8$px.
+    - Trazos verticales con quiebre triangular hacia la izquierda (◄) en el tercio inferior (vértice a $2/3$ de la altura, deflexión $16$px).
+    - Distribución en bloques discretos de ancho $\approx y$ ($128$px) separados por una zona vacía de pausa ($48$px).
+    - Cada bloque incluye líneas guía de referencia pre-dibujadas de **INICIO** y **FIN** con el quiebre triangular, delimitando el espacio que el usuario debe rellenar ($15$ líneas interiores por bloque).
+12. **E5.2 — Carril Quiebre Triangular ► (Espejo Bloques & Pausas · x/2):**
+    - 1 franja de altura $y = 130$px, espaciado fino $x/2 = 8$px.
+    - Quiebre triangular en espejo hacia la derecha (►) en el tercio inferior.
+    - Misma estructura de bloques delimitados con líneas sólidas de **INICIO** y **FIN**, y zona intermedia de pausa.
 
 **Reglas de diseño de estos ejercicios:**
 - **Muestra permanente:** El bloque izquierdo con la referencia nunca se oculta, permitiendo al usuario calibrar su ojo en todo momento. Muestra la dirección y ángulo exactos (`MUESTRA ↗ (~75°)`).
@@ -329,7 +338,7 @@ Si el usuario empieza a dibujar en el punto de llegada ② y termina en el punto
 
 ### 6.4 Algoritmo de Evaluación de Espaciado & Carriles
 
-En los ejercicios `E1.1` a `E3.2`:
+#### Para carriles continuos rectos y diagonales (`E1.1` a `E4.4`):
 1. Se filtran los trazos situados en el carril de dibujo ($X \ge X_{\text{inicio}} - 15$).
 2. Se asigna cada trazo a su franja correspondiente según su centroide vertical $Y$.
 3. Para cada franja con $\ge 2$ líneas:
@@ -338,7 +347,21 @@ En los ejercicios `E1.1` a `E3.2`:
    - Se obtiene la media $\mu_{\Delta x}$ y la desviación estándar $\sigma_{\Delta x}$.
    - **Nota de espaciado:** $0.45 \times \text{FidelidadAlPasoObjetivo} + 0.55 \times \text{RegularidadInterna}$.
    - **Nota de carriles:** Penaliza si los trazos no llegan o rebasan los rieles superior e inferior con tolerancia de $\pm 6$px.
-   - **Rectitud y verticalidad:** Se evalúa la proximidad a $90^\circ$ de cada trazo.
+   - **Rectitud y angularidad:** Se evalúa la proximidad al ángulo objetivo ($90^\circ$ vertical o $75^\circ$ diagonal con validación de cuadrante slash/backslash).
+
+#### Para carriles con quiebre triangular y bloques delimitados (`E5.1` y `E5.2`):
+1. **Fidelidad del Quiebre Triangular (`evaluateKinkFidelity`):**
+   - Se localiza la deflexión horizontal máxima respecto al eje superior de la línea.
+   - Se valida el sentido del quiebre: deflexión hacia la izquierda (◄ para E5.1) o hacia la derecha (► para E5.2).
+   - Se evalúa la cercanía de la deflexión al objetivo ($16$px).
+   - Se comprueba la altura vertical relativa del vértice ($y_{\text{apex}} \approx y_{\text{top}} + 0.67 \cdot h$, tolerancia en $[0.55, 0.80]$).
+   - Se verifica el retorno a la vertical en el extremo inferior.
+   - **Detección de líneas rectas sin quiebre:** Si el usuario dibuja líneas verticales rectas ordinarias ($\Delta X < 4$px), se penaliza la nota drásticamente ($\le 30\%$) con mensaje diagnóstico: *"¡Falta el Quiebre Triangular! ◄/►"*.
+2. **Partición por Bloques y Control de Pausas:**
+   - Los trazos se clasifican automáticamente en Bloque 1 ($X \in [160, 302]$) y Bloque 2 ($X \in [338, 480]$).
+   - Se evalúan los intervalos internos incluyendo la distancia desde la línea de **INICIO** pre-dibujada hasta el primer trazo, y desde el último trazo hasta la línea de **FIN**.
+   - Se detectan trazos indebidos en la zona central de pausa ($X \in (302, 338)$), aplicando penalización y retroalimentación para que el alumno descanse la mano sin dibujar en ese intervalo.
+   - Se exige completar ambos bloques (penalización si se deja uno en blanco).
 
 ---
 
@@ -395,6 +418,14 @@ A continuación se resumen los avances implementados en la última fase de traba
    - 6 nuevos niveles de ritmo interlineal con muestra permanente en la izquierda y rieles horizontales.
    - Soporte de longitud adaptable a la pantalla.
    - Fases 1, 2 y 3 habilitadas para ritmo motor.
+7. **Carriles Diagonales de 75° (E4.1 a E4.4):**
+   - 4 niveles de diagonales inclinadas a $75^\circ$ en paso fino $x/2 = 8$px en los 4 cuadrantes biomecánicos (↗ D1, ↙ D2, ↘ D3, ↖ D4).
+   - Validación rigurosa de dirección, pendiente geométrica y cuadrante (slash vs backslash).
+8. **Carriles con Quiebre Triangular y Bloques Delimitados (E5.1 y E5.2):**
+   - Reproducción fiel del ejercicio del manual con quiebre en rodilla hacia la izquierda (◄) y espejo hacia la derecha (►) a $2/3$ de la altura.
+   - Bloques discretos de ancho $\approx y$ ($128$px) delimitados por líneas sólidas de **INICIO** y **FIN** pre-dibujadas.
+   - Zona de pausa central para descansar la mano sin tocar el lienzo.
+   - Motor analítico específico (`evaluateKinkFidelity`) que penaliza líneas rectas y verifica la altura, dirección y deflexión del vértice.
 
 ---
 

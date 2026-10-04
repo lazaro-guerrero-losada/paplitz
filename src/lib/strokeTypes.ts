@@ -77,6 +77,18 @@ export interface SpacingTrackConfig {
   baseHeightPx: number;       // ej: 130px
   angleDeg?: number;          // 90 (vertical) o ~75 (diagonal)
   direction?: StrokeDirection;
+  kinkType?: 'none' | 'triangle_left' | 'triangle_right';
+  hasBlocksWithGaps?: boolean;
+}
+
+export interface SpacingTrackBlock {
+  id: string;
+  xStart: number;
+  xEnd: number;
+  width: number;
+  startLinePoints: { x: number; y: number }[];
+  finalLinePoints: { x: number; y: number }[];
+  targetInteriorLineCount: number;
 }
 
 export interface LabExerciseDef {
@@ -193,7 +205,7 @@ export interface ProceduralStrokeChallenge {
       xStart: number;
       xEnd: number;
       stepX: number;
-      lines: { x?: number; x1?: number; x2?: number; y1: number; y2: number }[];
+      lines: { x?: number; x1?: number; x2?: number; y1?: number; y2?: number; points?: { x: number; y: number }[] }[];
     };
     trackXStart: number;
     trackXEnd: number;
@@ -202,6 +214,8 @@ export interface ProceduralStrokeChallenge {
     angleDeg?: number;
     direction?: StrokeDirection;
     dxOffset?: number;
+    kinkType?: 'none' | 'triangle_left' | 'triangle_right';
+    blocks?: SpacingTrackBlock[];
   };
 }
 
@@ -305,11 +319,16 @@ function buildSpacingTrackLevel(
   baseSpacingPx = 16,
   baseHeightPx = 130,
   direction: StrokeDirection = 'vertical_top_down',
-  angleDeg = 90
+  angleDeg = 90,
+  kinkType: 'none' | 'triangle_left' | 'triangle_right' = 'none',
+  hasBlocksWithGaps = false
 ): LabExerciseDef {
   const stepLabel = spacingMultiplier === 1 ? 'x' : 'x/2';
   const isDiagonal = angleDeg !== 90;
-  const metrics = isDiagonal
+  const isKink = kinkType !== 'none';
+  const metrics = isKink
+    ? `Espaciado constante (${stepLabel} = ${baseSpacingPx * spacingMultiplier}px), contención en carriles y quiebre triangular`
+    : isDiagonal
     ? `Espaciado constante (${stepLabel} = ${baseSpacingPx * spacingMultiplier}px), contención en carriles y ángulo ~${angleDeg}°`
     : `Espaciado constante (${stepLabel} = ${baseSpacingPx * spacingMultiplier}px), contención en carriles y verticalidad`;
 
@@ -332,6 +351,8 @@ function buildSpacingTrackLevel(
       baseHeightPx,
       direction,
       angleDeg,
+      kinkType,
+      hasBlocksWithGaps,
     },
     singleStrokeConfig: {
       direction,
@@ -573,6 +594,8 @@ export const ALL_SINGLE_STROKE_EXERCISES: LabExerciseDef[] = [
   buildSpacingTrackLevel('sp_08', 'E4.2', 'Carril Diagonal ↙ D2 (Arriba-Abajo / Der-Izq · 75°)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 1, 0.5, 'Media', 'Franja de altura y con diagonales descendentes inversas a ~75°. Traza de arriba hacia abajo y de derecha a izquierda al paso x/2.', 'Traza líneas diagonales descendentes (↙) de arriba a abajo al paso fino x/2.', 16, 130, 'top_down_right_left', 75),
   buildSpacingTrackLevel('sp_09', 'E4.3', 'Carril Diagonal ↘ D3 (Arriba-Abajo / Izq-Der · 75°)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 1, 0.5, 'Media', 'Franja de altura y con diagonales descendentes a ~75° (espejo D3). Traza de arriba hacia abajo y de izquierda a derecha al paso x/2.', 'Traza líneas diagonales descendentes (↘) de arriba a abajo al paso fino x/2.', 16, 130, 'top_down_left_right', 75),
   buildSpacingTrackLevel('sp_10', 'E4.4', 'Carril Diagonal ↖ D4 (Abajo-Arriba / Der-Izq · 75°)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 1, 0.5, 'Media', 'Franja de altura y con diagonales ascendentes inversas a ~75° (espejo D4). Traza de abajo hacia arriba y de derecha a izquierda al paso x/2.', 'Traza líneas diagonales ascendentes (↖) de abajo a arriba al paso fino x/2.', 16, 130, 'bottom_up_right_left', 75),
+  buildSpacingTrackLevel('sp_11', 'E5.1', 'Carril Quiebre Triangular ◄ (Bloques & Gaps · x/2)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 1, 0.5, 'Difícil', 'Líneas verticales con quiebre triangular a la izquierda (◄). Bloques de ancho y separados por pausas. Rellena cada bloque entre la línea de inicio y final.', 'Dibuja líneas con quiebre triangular hacia la izquierda (◄) al paso fino x/2 rellenando cada bloque entre la línea de inicio y final.', 16, 130, 'vertical_top_down', 90, 'triangle_left', true),
+  buildSpacingTrackLevel('sp_12', 'E5.2', 'Carril Quiebre Triangular ► (Bloques & Gaps · x/2)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 1, 0.5, 'Difícil', 'Líneas verticales con quiebre triangular hacia la derecha (►, espejo). Bloques de ancho y separados por pausas y líneas de inicio y final.', 'Dibuja líneas con quiebre triangular hacia la derecha (►) al paso fino x/2 rellenando cada bloque entre la línea de inicio y final.', 16, 130, 'vertical_top_down', 90, 'triangle_right', true),
 
   // CURVAS Y ARCOS (C & S)
   buildSingleStrokeLevel('cc_01', 'CC.01', 'Arco en C Fijo (Guía Gris)', '⚡ Calistenia: Trazos Curvos & Arcos (C & S)', 'curve_c', 'fixed', 'gray_line', 'Fácil', 'Curva suave en arco de parábola con guía gris visible.', 'Sigue la trayectoria curvada desde ① hasta ②.', 'subtle'),
@@ -647,7 +670,7 @@ export const ALL_42_EXERCISES: WorkbookExerciseDef[] = [
 ];
 
 /**
- * Catálogo Maestro Completo: 222 Calistenias Dinámicas + 42 Páginas del Cuaderno (264 Ejercicios)
+ * Catálogo Maestro Completo: 224 Calistenias Dinámicas + 42 Páginas del Cuaderno (266 Ejercicios)
  */
 export const ALL_LAB_EXERCISES: LabExerciseDef[] = [
   ...ALL_SINGLE_STROKE_EXERCISES,
