@@ -521,13 +521,68 @@ export function generateVInvertedStrokePoints(
   ];
 }
 
+export function generateCurvedVerticalStrokePoints(
+  x: number,
+  yTop: number,
+  yBottom: number,
+  curveType: 'curve_c_left' | 'curve_c_right' | 'curve_wave_vertical' | 'curve_wave_slanted'
+): { x: number; y: number }[] {
+  const h = yBottom - yTop;
+  const N = 16;
+  const pts: { x: number; y: number }[] = [];
+  for (let i = 0; i <= N; i++) {
+    const t = i / N;
+    const y = yTop + t * h;
+    let px = x;
+    if (curveType === 'curve_c_left') {
+      px = x - 4 * 20 * t * (1 - t);
+    } else if (curveType === 'curve_c_right') {
+      px = x + 4 * 20 * t * (1 - t);
+    } else if (curveType === 'curve_wave_vertical') {
+      px = x - 16 * Math.sin(2 * Math.PI * t);
+    } else if (curveType === 'curve_wave_slanted') {
+      px = x + (36 * (1 - Math.cos(Math.PI * t))) / 2;
+    }
+    pts.push({ x: Math.round(px * 10) / 10, y: Math.round(y * 10) / 10 });
+  }
+  return pts;
+}
+
+export function generateCurvedHorizontalStrokePoints(
+  xStart: number,
+  xEnd: number,
+  yBase: number,
+  curveType: 'curve_arch_up' | 'curve_arch_down' | 'curve_wave_horizontal'
+): { x: number; y: number }[] {
+  const w = xEnd - xStart;
+  const N = curveType === 'curve_wave_horizontal' ? 20 : 16;
+  const pts: { x: number; y: number }[] = [];
+  for (let i = 0; i <= N; i++) {
+    const t = i / N;
+    const x = xStart + t * w;
+    let py = yBase;
+    if (curveType === 'curve_arch_up') {
+      py = yBase - 4 * 18 * t * (1 - t);
+    } else if (curveType === 'curve_arch_down') {
+      py = yBase + 4 * 18 * t * (1 - t);
+    } else if (curveType === 'curve_wave_horizontal') {
+      py = yBase + 14 * Math.sin(2 * Math.PI * t);
+    }
+    pts.push({ x: Math.round(x * 10) / 10, y: Math.round(py * 10) / 10 });
+  }
+  return pts;
+}
+
 export function generateKinkStrokePoints(
   x: number,
   yTop: number,
   yBottom: number,
-  kinkType: 'triangle_left' | 'triangle_right' | 'chevron_left' | 'v_concentric' | 'v_inverted' | 'zigzag_wave' | 'bracket_left' = 'triangle_left',
+  kinkType: 'triangle_left' | 'triangle_right' | 'chevron_left' | 'v_concentric' | 'v_inverted' | 'zigzag_wave' | 'bracket_left' | 'curve_c_left' | 'curve_c_right' | 'curve_wave_vertical' | 'curve_wave_slanted' = 'triangle_left',
   apexOffset?: number
 ): { x: number; y: number }[] {
+  if (kinkType === 'curve_c_left' || kinkType === 'curve_c_right' || kinkType === 'curve_wave_vertical' || kinkType === 'curve_wave_slanted') {
+    return generateCurvedVerticalStrokePoints(x, yTop, yBottom, kinkType);
+  }
   const h = yBottom - yTop;
   if (kinkType === 'bracket_left') {
     const defl = apexOffset ?? 26;
@@ -665,18 +720,20 @@ export function generateSpacingTrackChallenge(
   const bandHeight = bands[0].height;
   const radAngle = (angleDeg * Math.PI) / 180;
   const dxOffset = isDiagonal ? Math.round(bandHeight / Math.tan(radAngle)) : 0;
-  const isKink = cfg.kinkType && cfg.kinkType !== 'none';
-  const kinkType = cfg.kinkType || 'none';
+  const kinkType = cfg.kinkType;
+  const isKink = kinkType && kinkType !== 'none';
   const isChevron = kinkType === 'chevron_left';
   const isV = kinkType === 'v_concentric';
   const isVInverted = kinkType === 'v_inverted';
   const isZigzagWave = kinkType === 'zigzag_wave';
   const isZigzagZN = kinkType === 'zigzag_zn';
   const isBracket = kinkType === 'bracket_left';
+  const isVerticalCurve = kinkType === 'curve_c_left' || kinkType === 'curve_c_right' || kinkType === 'curve_wave_vertical' || kinkType === 'curve_wave_slanted';
+  const isHorizontalCurve = kinkType === 'curve_arch_up' || kinkType === 'curve_arch_down' || kinkType === 'curve_wave_horizontal';
 
   // 2. Patrón de muestra (izquierda)
-  const sampleXStart = (isV || isVInverted || isZigzagZN) ? 24 : (isChevron || isZigzagWave || isBracket) ? 44 : isDiagonal || isKink ? 28 : 35;
-  const sampleWidth = (isV || isVInverted || isZigzagZN) ? 100 : (isChevron || isZigzagWave || isBracket) ? 72 : isDiagonal || isKink ? 80 : 96;
+  const sampleXStart = (isV || isVInverted || isZigzagZN || isHorizontalCurve) ? 24 : (isChevron || isZigzagWave || isBracket || isVerticalCurve) ? 44 : isDiagonal || isKink ? 28 : 35;
+  const sampleWidth = (isV || isVInverted || isZigzagZN || isHorizontalCurve) ? 100 : (isChevron || isZigzagWave || isBracket || isVerticalCurve) ? 72 : isDiagonal || isKink ? 80 : 96;
   const sampleXEnd = sampleXStart + sampleWidth;
   const sampleLines: { x1?: number; y1: number; x2?: number; y2: number; points?: { x: number; y: number }[]; hasArrow?: boolean }[] = [];
 
@@ -733,8 +790,29 @@ export function generateSpacingTrackChallenge(
         });
         lineIdx++;
       }
+    } else if (isHorizontalCurve) {
+      const b = bands[0];
+      let startBaseY = b.yTop + 34;
+      let endBaseY = b.yBottom;
+      if (kinkType === 'curve_arch_down') {
+        startBaseY = b.yTop + 2;
+        endBaseY = b.yBottom - 32;
+      } else if (kinkType === 'curve_wave_horizontal') {
+        startBaseY = b.yTop + 18;
+        endBaseY = b.yBottom - 16;
+      }
+      let lineIdx = 0;
+      for (let yb = startBaseY; yb <= endBaseY + 0.1; yb += targetSpacingPx) {
+        sampleLines.push({
+          points: generateCurvedHorizontalStrokePoints(sampleXStart, sampleXEnd, Math.round(yb), kinkType as any),
+          y1: b.yTop,
+          y2: b.yBottom,
+          hasArrow: lineIdx === 3,
+        });
+        lineIdx++;
+      }
     } else {
-      const stepStart = (isChevron || isZigzagWave || isBracket) ? sampleXStart + 4 : sampleXStart + 8;
+      const stepStart = (isChevron || isZigzagWave || isBracket || isVerticalCurve) ? sampleXStart + 4 : sampleXStart + 8;
       for (let x = stepStart; x <= sampleXEnd; x += targetSpacingPx) {
         sampleLines.push({
           points: generateKinkStrokePoints(Math.round(x), bands[0].yTop, bands[0].yBottom, kinkType as any),
@@ -894,7 +972,37 @@ export function generateSpacingTrackChallenge(
           targetInteriorLineCount: 11,
         },
       ];
-    } else if (isChevron || isZigzagWave || isBracket) {
+    } else if (isHorizontalCurve) {
+      let startBaseY = b.yTop + 34; // 239
+      let finalBaseY = b.yBottom;   // 335
+      if (kinkType === 'curve_arch_down') {
+        startBaseY = b.yTop + 2;     // 207
+        finalBaseY = b.yBottom - 32; // 303
+      } else if (kinkType === 'curve_wave_horizontal') {
+        startBaseY = b.yTop + 18;    // 223
+        finalBaseY = b.yBottom - 16; // 319
+      }
+      blocks = [
+        {
+          id: 'b1',
+          xStart: 188,
+          xEnd: 316,
+          width: 128,
+          startLinePoints: generateCurvedHorizontalStrokePoints(188, 316, startBaseY, kinkType as any),
+          finalLinePoints: generateCurvedHorizontalStrokePoints(188, 316, finalBaseY, kinkType as any),
+          targetInteriorLineCount: 11,
+        },
+        {
+          id: 'b2',
+          xStart: 364,
+          xEnd: 492,
+          width: 128,
+          startLinePoints: generateCurvedHorizontalStrokePoints(364, 492, startBaseY, kinkType as any),
+          finalLinePoints: generateCurvedHorizontalStrokePoints(364, 492, finalBaseY, kinkType as any),
+          targetInteriorLineCount: 11,
+        },
+      ];
+    } else if (isChevron || isZigzagWave || isBracket || isVerticalCurve) {
       blocks = [
         {
           id: 'b1',
@@ -1007,7 +1115,29 @@ export function generateSpacingTrackChallenge(
           points: generateZNStrokePoints(364, 492, y, amp),
         });
       }
-    } else if (isChevron || isZigzagWave || isBracket) {
+    } else if (isHorizontalCurve) {
+      let startBaseY = b.yTop + 34;
+      let finalBaseY = b.yBottom;
+      if (kinkType === 'curve_arch_down') {
+        startBaseY = b.yTop + 2;
+        finalBaseY = b.yBottom - 32;
+      } else if (kinkType === 'curve_wave_horizontal') {
+        startBaseY = b.yTop + 18;
+        finalBaseY = b.yBottom - 16;
+      }
+      // Bloque 1 (entre 188 y 316)
+      for (let y = startBaseY + targetSpacingPx; y < finalBaseY - 0.1; y += targetSpacingPx) {
+        ghostSolutionStrokes.push({
+          points: generateCurvedHorizontalStrokePoints(188, 316, y, kinkType as any),
+        });
+      }
+      // Bloque 2 (entre 364 y 492)
+      for (let y = startBaseY + targetSpacingPx; y < finalBaseY - 0.1; y += targetSpacingPx) {
+        ghostSolutionStrokes.push({
+          points: generateCurvedHorizontalStrokePoints(364, 492, y, kinkType as any),
+        });
+      }
+    } else if (isChevron || isZigzagWave || isBracket || isVerticalCurve) {
       // Bloque 1 (entre 188 y 316)
       for (let x = 188 + targetSpacingPx; x < 316 - 0.1; x += targetSpacingPx) {
         ghostSolutionStrokes.push({
@@ -1112,6 +1242,27 @@ export function generateSpacingTrackChallenge(
     } else if (kinkType === 'bracket_left') {
       sym = '[';
       kinkName = 'Quiebre en Corchete';
+    } else if (kinkType === 'curve_c_left') {
+      sym = '◄';
+      kinkName = 'Arco en C Vertical Izquierda';
+    } else if (kinkType === 'curve_c_right') {
+      sym = '►';
+      kinkName = 'Arco en C Vertical Derecha';
+    } else if (kinkType === 'curve_arch_up') {
+      sym = '⌒';
+      kinkName = 'Arco Convexo Arriba';
+    } else if (kinkType === 'curve_arch_down') {
+      sym = '∪';
+      kinkName = 'Arco Cóncavo Abajo';
+    } else if (kinkType === 'curve_wave_horizontal') {
+      sym = '~';
+      kinkName = 'Onda en S Horizontal';
+    } else if (kinkType === 'curve_wave_vertical') {
+      sym = '§';
+      kinkName = 'Onda en S Vertical';
+    } else if (kinkType === 'curve_wave_slanted') {
+      sym = '∿';
+      kinkName = 'Onda en S Inclinada';
     }
     subtitle = `2 Bloques (Ancho y) · Paso ${subdivLabel} (${targetSpacingPx}px) · ${kinkName} (${sym})`;
   } else if (isDiagonal) {
@@ -1120,7 +1271,7 @@ export function generateSpacingTrackChallenge(
     subtitle = `${cfg.bandCount} Franja${cfg.bandCount > 1 ? 's' : ''} (Alt: ${bands[0].height}px) · ${subdivLabel} (${targetSpacingPx}px)`;
   }
 
-  const minRequiredStrokes = (isV || isVInverted) ? 7 : isZigzagZN ? 10 : isKink ? 10 : Math.max(3, 3 * cfg.bandCount);
+  const minRequiredStrokes = (isV || isVInverted) ? 7 : (isZigzagZN || isHorizontalCurve) ? 10 : isKink ? 10 : Math.max(3, 3 * cfg.bandCount);
 
   return {
     id: `track-${exercise.code}-${seed}`,
@@ -1135,7 +1286,19 @@ export function generateSpacingTrackChallenge(
     targetMetricsText: exercise.metrics,
     targetAngleDeg: angleDeg,
     targetSpacingPx,
-    targetLengthPx: isKink ? (isZigzagZN ? 164 : (isV || isVInverted) ? 145 : isZigzagWave ? 145 : isBracket ? 144 : isChevron ? 140 : 141) : Math.hypot(dxOffset, bands[0].height),
+    targetLengthPx: isKink
+      ? (isZigzagZN ? 164
+        : (isV || isVInverted) ? 145
+        : isZigzagWave ? 145
+        : isBracket ? 144
+        : (kinkType === 'curve_c_left' || kinkType === 'curve_c_right') ? 138
+        : (kinkType === 'curve_arch_up' || kinkType === 'curve_arch_down') ? 134
+        : kinkType === 'curve_wave_horizontal' ? 135
+        : kinkType === 'curve_wave_vertical' ? 139
+        : kinkType === 'curve_wave_slanted' ? 135
+        : isChevron ? 140
+        : 141)
+      : Math.hypot(dxOffset, bands[0].height),
     minRequiredStrokes,
     directionKey: direction,
     guideMode: 'gray_line',

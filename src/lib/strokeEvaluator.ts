@@ -1554,9 +1554,337 @@ function evaluateBracketFidelity(
   };
 }
 
+/**
+ * Evalúa la fidelidad de un arco en C vertical (curve_c_left o curve_c_right):
+ * - Comienza en el riel superior (xStart, yTop) y termina en el inferior (xStart, yBottom)
+ * - Ambos extremos caen sobre la misma vertical (|pEnd.x - pStart.x| <= 12px)
+ * - Curva continua parabólica/circular con deflexión lateral de ~20px en la mitad del recorrido
+ */
+function evaluateCArcFidelity(
+  stroke: RawStroke,
+  yTop: number,
+  yBottom: number,
+  direction: 'left' | 'right'
+): {
+  score: number;
+  hasKink: boolean;
+  isCorrectDirection: boolean;
+  apexDeflection: number;
+  apexYRel: number;
+} {
+  if (stroke.points.length < 4) {
+    return { score: 10, hasKink: false, isCorrectDirection: false, apexDeflection: 0, apexYRel: 0.5 };
+  }
+  const h = yBottom - yTop;
+  const pStart = stroke.points[0];
+  const pEnd = stroke.points[stroke.points.length - 1];
+  const refX = (pStart.x + pEnd.x) / 2;
+
+  let maxTargetDefl = 0;
+  let maxOppositeDefl = 0;
+  let apexPoint = stroke.points[0];
+
+  for (const p of stroke.points) {
+    const targetDx = direction === 'left' ? refX - p.x : p.x - refX;
+    const oppDx = -targetDx;
+    if (p.y >= yTop + h * 0.15 && p.y <= yTop + h * 0.85) {
+      if (targetDx > maxTargetDefl) {
+        maxTargetDefl = targetDx;
+        apexPoint = p;
+      }
+      if (oppDx > maxOppositeDefl) {
+        maxOppositeDefl = oppDx;
+      }
+    }
+  }
+
+  const hasKink = maxTargetDefl >= 6.0;
+  const isCorrectDirection = hasKink && maxTargetDefl >= maxOppositeDefl;
+
+  if (!hasKink) {
+    return { score: 15, hasKink: false, isCorrectDirection: false, apexDeflection: maxTargetDefl, apexYRel: 0.5 };
+  }
+  if (!isCorrectDirection) {
+    return { score: 25, hasKink: true, isCorrectDirection: false, apexDeflection: maxTargetDefl, apexYRel: 0.5 };
+  }
+
+  const deflDiff = Math.abs(maxTargetDefl - 20);
+  const deflScore = Math.max(0, 100 - deflDiff * 4.5);
+
+  const apexYRel = h > 0 ? (apexPoint.y - yTop) / h : 0.5;
+  const yRelDiff = Math.abs(apexYRel - 0.5);
+  const yScore = Math.max(0, 100 - yRelDiff * 150);
+
+  const endDiff = Math.abs(pEnd.x - pStart.x);
+  const endScore = Math.max(0, 100 - endDiff * 5);
+
+  const score = Math.round(deflScore * 0.45 + yScore * 0.35 + endScore * 0.20);
+  return {
+    score: Math.min(100, Math.max(0, score)),
+    hasKink,
+    isCorrectDirection,
+    apexDeflection: maxTargetDefl,
+    apexYRel,
+  };
+}
+
+/**
+ * Evalúa la fidelidad de una onda en S vertical (curve_wave_vertical):
+ * - Comienza en el riel superior y termina en el riel inferior con extremos alineados en X
+ * - Mitad superior: deflexión hacia la izquierda de ~16px
+ * - Mitad inferior: deflexión hacia la derecha de ~16px
+ */
+function evaluateVerticalWaveFidelity(
+  stroke: RawStroke,
+  yTop: number,
+  yBottom: number
+): {
+  score: number;
+  hasKink: boolean;
+  isCorrectDirection: boolean;
+  apexDeflection: number;
+  apexYRel: number;
+} {
+  if (stroke.points.length < 4) {
+    return { score: 10, hasKink: false, isCorrectDirection: false, apexDeflection: 0, apexYRel: 0.5 };
+  }
+  const h = yBottom - yTop;
+  const pStart = stroke.points[0];
+  const pEnd = stroke.points[stroke.points.length - 1];
+  const refX = (pStart.x + pEnd.x) / 2;
+
+  let maxLeft = 0;
+  let maxRight = 0;
+
+  for (const p of stroke.points) {
+    const leftDx = refX - p.x;
+    const rightDx = p.x - refX;
+    if (p.y >= yTop + h * 0.10 && p.y <= yTop + h * 0.50) {
+      if (leftDx > maxLeft) maxLeft = leftDx;
+    }
+    if (p.y >= yTop + h * 0.50 && p.y <= yTop + h * 0.90) {
+      if (rightDx > maxRight) maxRight = rightDx;
+    }
+  }
+
+  const hasKink = maxLeft >= 5.0 && maxRight >= 5.0;
+  const isCorrectDirection = pEnd.y > pStart.y + 40 && hasKink;
+
+  if (!hasKink) {
+    return { score: 15, hasKink: false, isCorrectDirection: false, apexDeflection: (maxLeft + maxRight) / 2, apexYRel: 0.5 };
+  }
+  if (!isCorrectDirection) {
+    return { score: 25, hasKink: true, isCorrectDirection: false, apexDeflection: (maxLeft + maxRight) / 2, apexYRel: 0.5 };
+  }
+
+  const leftScore = Math.max(0, 100 - Math.abs(maxLeft - 16) * 4.5);
+  const rightScore = Math.max(0, 100 - Math.abs(maxRight - 16) * 4.5);
+  const endDiff = Math.abs(pEnd.x - pStart.x);
+  const endScore = Math.max(0, 100 - endDiff * 6);
+
+  const score = Math.round(leftScore * 0.40 + rightScore * 0.40 + endScore * 0.20);
+  return {
+    score: Math.min(100, Math.max(0, score)),
+    hasKink,
+    isCorrectDirection,
+    apexDeflection: (maxLeft + maxRight) / 2,
+    apexYRel: 0.5,
+  };
+}
+
+/**
+ * Evalúa la fidelidad de una onda en S inclinada / diagonal (curve_wave_slanted):
+ * - Comienza en el riel superior en X0 y termina en el riel inferior desplazada a la derecha (~X0 + 36px)
+ * - Transición en S suave: tangentes verticales en extremos y pendiente diagonal en el centro
+ */
+function evaluateSlantedWaveFidelity(
+  stroke: RawStroke,
+  yTop: number,
+  yBottom: number
+): {
+  score: number;
+  hasKink: boolean;
+  isCorrectDirection: boolean;
+  apexDeflection: number;
+  apexYRel: number;
+} {
+  if (stroke.points.length < 4) {
+    return { score: 10, hasKink: false, isCorrectDirection: false, apexDeflection: 0, apexYRel: 0.5 };
+  }
+  const pStart = stroke.points[0];
+  const pEnd = stroke.points[stroke.points.length - 1];
+  const h = yBottom - yTop;
+
+  const actualShift = pEnd.x - pStart.x;
+  const isCorrectDirection = pEnd.y > pStart.y + 40 && actualShift >= 10;
+  const hasKink = actualShift >= 16;
+
+  if (!hasKink) {
+    return { score: 15, hasKink: false, isCorrectDirection: false, apexDeflection: actualShift, apexYRel: 0.5 };
+  }
+  if (!isCorrectDirection) {
+    return { score: 25, hasKink: true, isCorrectDirection: false, apexDeflection: actualShift, apexYRel: 0.5 };
+  }
+
+  const shiftScore = Math.max(0, 100 - Math.abs(actualShift - 36) * 3.5);
+
+  // Verificación de punto medio cerca de pStart.x + actualShift / 2
+  const midPoints = stroke.points.filter((p) => p.y >= yTop + h * 0.40 && p.y <= yTop + h * 0.60);
+  const avgMidX = midPoints.length > 0 ? midPoints.reduce((acc, p) => acc + p.x, 0) / midPoints.length : pStart.x + actualShift / 2;
+  const targetMidX = pStart.x + actualShift / 2;
+  const midScore = Math.max(0, 100 - Math.abs(avgMidX - targetMidX) * 4.0);
+
+  const score = Math.round(shiftScore * 0.60 + midScore * 0.40);
+  return {
+    score: Math.min(100, Math.max(0, score)),
+    hasKink,
+    isCorrectDirection,
+    apexDeflection: actualShift,
+    apexYRel: 0.5,
+  };
+}
+
+/**
+ * Evalúa la fidelidad de un arco horizontal (curve_arch_up o curve_arch_down):
+ * - Se traza de izquierda a derecha (xStart a xEnd)
+ * - curve_arch_up: arco convexo hacia arriba (deflexión negativa en Y de ~18px)
+ * - curve_arch_down: arco cóncavo hacia abajo (deflexión positiva en Y de ~18px)
+ */
+function evaluateHorizontalArcFidelity(
+  stroke: RawStroke,
+  xStart: number,
+  xEnd: number,
+  direction: 'up' | 'down'
+): {
+  score: number;
+  hasCurve: boolean;
+  isCorrectDirection: boolean;
+  yBase: number;
+  deflection: number;
+} {
+  if (stroke.points.length < 4) {
+    return { score: 10, hasCurve: false, isCorrectDirection: false, yBase: 250, deflection: 0 };
+  }
+  const pStart = stroke.points[0];
+  const pEnd = stroke.points[stroke.points.length - 1];
+  const w = xEnd - xStart;
+  const yBase = (pStart.y + pEnd.y) / 2;
+
+  let maxTargetDefl = 0;
+  let maxOppositeDefl = 0;
+  let apexPoint = stroke.points[0];
+
+  for (const p of stroke.points) {
+    const targetDy = direction === 'up' ? yBase - p.y : p.y - yBase;
+    const oppDy = -targetDy;
+    if (p.x >= xStart + w * 0.15 && p.x <= xStart + w * 0.85) {
+      if (targetDy > maxTargetDefl) {
+        maxTargetDefl = targetDy;
+        apexPoint = p;
+      }
+      if (oppDy > maxOppositeDefl) {
+        maxOppositeDefl = oppDy;
+      }
+    }
+  }
+
+  const isLeftToRight = pEnd.x > pStart.x + 40;
+  const hasCurve = maxTargetDefl >= 6.0;
+  const isCorrectDirection = isLeftToRight && hasCurve && maxTargetDefl >= maxOppositeDefl;
+
+  if (!hasCurve) {
+    return { score: 15, hasCurve: false, isCorrectDirection: false, yBase, deflection: maxTargetDefl };
+  }
+  if (!isCorrectDirection) {
+    return { score: 25, hasCurve: true, isCorrectDirection: false, yBase, deflection: maxTargetDefl };
+  }
+
+  const deflScore = Math.max(0, 100 - Math.abs(maxTargetDefl - 18) * 4.5);
+  const apexXRel = w > 0 ? (apexPoint.x - xStart) / w : 0.5;
+  const xScore = Math.max(0, 100 - Math.abs(apexXRel - 0.5) * 150);
+  const endYDiff = Math.abs(pEnd.y - pStart.y);
+  const endScore = Math.max(0, 100 - endYDiff * 5);
+
+  const score = Math.round(deflScore * 0.45 + xScore * 0.35 + endScore * 0.20);
+  return {
+    score: Math.min(100, Math.max(0, score)),
+    hasCurve,
+    isCorrectDirection,
+    yBase,
+    deflection: maxTargetDefl,
+  };
+}
+
+/**
+ * Evalúa la fidelidad de una onda en S horizontal (curve_wave_horizontal):
+ * - Se traza de izquierda a derecha (xStart a xEnd)
+ * - Primera mitad: valle / deflexión hacia abajo (~14px)
+ * - Segunda mitad: cresta / deflexión hacia arriba (~14px)
+ */
+function evaluateHorizontalWaveFidelity(
+  stroke: RawStroke,
+  xStart: number,
+  xEnd: number
+): {
+  score: number;
+  hasCurve: boolean;
+  isCorrectDirection: boolean;
+  yBase: number;
+  ampDown: number;
+  ampUp: number;
+} {
+  if (stroke.points.length < 4) {
+    return { score: 10, hasCurve: false, isCorrectDirection: false, yBase: 250, ampDown: 0, ampUp: 0 };
+  }
+  const pStart = stroke.points[0];
+  const pEnd = stroke.points[stroke.points.length - 1];
+  const w = xEnd - xStart;
+  const yBase = (pStart.y + pEnd.y) / 2;
+
+  let maxDown = 0;
+  let maxUp = 0;
+
+  for (const p of stroke.points) {
+    const downDy = p.y - yBase;
+    const upDy = yBase - p.y;
+    if (p.x >= xStart + w * 0.10 && p.x <= xStart + w * 0.50) {
+      if (downDy > maxDown) maxDown = downDy;
+    }
+    if (p.x >= xStart + w * 0.50 && p.x <= xStart + w * 0.90) {
+      if (upDy > maxUp) maxUp = upDy;
+    }
+  }
+
+  const isLeftToRight = pEnd.x > pStart.x + 40;
+  const hasCurve = maxDown >= 5.0 && maxUp >= 5.0;
+  const isCorrectDirection = isLeftToRight && hasCurve;
+
+  if (!hasCurve) {
+    return { score: 15, hasCurve: false, isCorrectDirection: false, yBase, ampDown: maxDown, ampUp: maxUp };
+  }
+  if (!isCorrectDirection) {
+    return { score: 25, hasCurve: true, isCorrectDirection: false, yBase, ampDown: maxDown, ampUp: maxUp };
+  }
+
+  const downScore = Math.max(0, 100 - Math.abs(maxDown - 14) * 4.5);
+  const upScore = Math.max(0, 100 - Math.abs(maxUp - 14) * 4.5);
+  const endYDiff = Math.abs(pEnd.y - pStart.y);
+  const endScore = Math.max(0, 100 - endYDiff * 6);
+
+  const score = Math.round(downScore * 0.40 + upScore * 0.40 + endScore * 0.20);
+  return {
+    score: Math.min(100, Math.max(0, score)),
+    hasCurve,
+    isCorrectDirection,
+    yBase,
+    ampDown: maxDown,
+    ampUp: maxUp,
+  };
+}
+
 function evaluateKinkFidelity(
   stroke: RawStroke,
-  kinkType: 'triangle_left' | 'triangle_right' | 'chevron_left' | 'zigzag_wave' | 'bracket_left',
+  kinkType: 'triangle_left' | 'triangle_right' | 'chevron_left' | 'zigzag_wave' | 'bracket_left' | 'curve_c_left' | 'curve_c_right' | 'curve_wave_vertical' | 'curve_wave_slanted',
   yTop: number,
   yBottom: number
 ): {
@@ -1571,6 +1899,18 @@ function evaluateKinkFidelity(
   }
   if (kinkType === 'bracket_left') {
     return evaluateBracketFidelity(stroke, yTop, yBottom);
+  }
+  if (kinkType === 'curve_c_left') {
+    return evaluateCArcFidelity(stroke, yTop, yBottom, 'left');
+  }
+  if (kinkType === 'curve_c_right') {
+    return evaluateCArcFidelity(stroke, yTop, yBottom, 'right');
+  }
+  if (kinkType === 'curve_wave_vertical') {
+    return evaluateVerticalWaveFidelity(stroke, yTop, yBottom);
+  }
+  if (kinkType === 'curve_wave_slanted') {
+    return evaluateSlantedWaveFidelity(stroke, yTop, yBottom);
   }
 
   if (stroke.points.length < 3) {
@@ -2594,15 +2934,35 @@ export function evaluateSpacingTrackSubmission(
     };
   }
 
-  // 1.78 Rama de evaluación específica para carriles de Relámpago Z/N horizontal (E9.1)
-  if (kinkType === 'zigzag_zn' && blocks && blocks.length > 0) {
+  // 1.78 Rama de evaluación específica para carriles de patrones horizontales (E9.1 Z/N, E13.1 Arco Arriba, E14.1 Arco Abajo, E15.1 Onda Horizontal)
+  const isHorizontalPattern = (kinkType === 'zigzag_zn' || kinkType === 'curve_arch_up' || kinkType === 'curve_arch_down' || kinkType === 'curve_wave_horizontal') && blocks && blocks.length > 0;
+  if (isHorizontalPattern) {
     const singleBand = bands[0];
     const b1 = blocks[0];
     const b2 = blocks[1];
 
+    type PatternFidelity = { score: number; hasPattern: boolean; isCorrectDirection: boolean; yBase: number };
+
+    const evaluateStrokeFidelity = (stroke: RawStroke, xStart: number, xEnd: number): PatternFidelity => {
+      if (kinkType === 'zigzag_zn') {
+        const res = evaluateZNWaveFidelity(stroke, xStart, xEnd, singleBand.yTop, singleBand.yBottom);
+        return { score: res.score, hasPattern: res.hasZN, isCorrectDirection: res.isCorrectDirection, yBase: res.yBase };
+      }
+      if (kinkType === 'curve_arch_up') {
+        const res = evaluateHorizontalArcFidelity(stroke, xStart, xEnd, 'up');
+        return { score: res.score, hasPattern: res.hasCurve, isCorrectDirection: res.isCorrectDirection, yBase: res.yBase };
+      }
+      if (kinkType === 'curve_arch_down') {
+        const res = evaluateHorizontalArcFidelity(stroke, xStart, xEnd, 'down');
+        return { score: res.score, hasPattern: res.hasCurve, isCorrectDirection: res.isCorrectDirection, yBase: res.yBase };
+      }
+      const res = evaluateHorizontalWaveFidelity(stroke, xStart, xEnd);
+      return { score: res.score, hasPattern: res.hasCurve, isCorrectDirection: res.isCorrectDirection, yBase: res.yBase };
+    };
+
     // Clasificar trazos por bloque y detectar trazos en el gap de pausa
-    const b1Strokes: { stroke: RawStroke; ts: typeof trackStrokes[0]; fidelity: ReturnType<typeof evaluateZNWaveFidelity> }[] = [];
-    const b2Strokes: { stroke: RawStroke; ts: typeof trackStrokes[0]; fidelity: ReturnType<typeof evaluateZNWaveFidelity> }[] = [];
+    const b1Strokes: { stroke: RawStroke; ts: typeof trackStrokes[0]; fidelity: PatternFidelity }[] = [];
+    const b2Strokes: { stroke: RawStroke; ts: typeof trackStrokes[0]; fidelity: PatternFidelity }[] = [];
     const gapStrokes: RawStroke[] = [];
 
     for (const ts of trackStrokes) {
@@ -2616,10 +2976,10 @@ export function evaluateSpacingTrackSubmission(
       const midX = (minX + maxX) / 2;
 
       if (midX >= 170 && midX <= 330) {
-        const fidelity = evaluateZNWaveFidelity(ts.stroke, b1.xStart, b1.xEnd, singleBand.yTop, singleBand.yBottom);
+        const fidelity = evaluateStrokeFidelity(ts.stroke, b1.xStart, b1.xEnd);
         b1Strokes.push({ stroke: ts.stroke, ts, fidelity });
       } else if (b2 && midX >= 346 && midX <= 510) {
-        const fidelity = evaluateZNWaveFidelity(ts.stroke, b2.xStart, b2.xEnd, singleBand.yTop, singleBand.yBottom);
+        const fidelity = evaluateStrokeFidelity(ts.stroke, b2.xStart, b2.xEnd);
         b2Strokes.push({ stroke: ts.stroke, ts, fidelity });
       } else if (b2 && midX > 322 && midX < 358) {
         gapStrokes.push(ts.stroke);
@@ -2632,12 +2992,22 @@ export function evaluateSpacingTrackSubmission(
     ];
 
     let totalBlockSpacingScore = 0;
-    let totalBlockZNFidelityScore = 0;
+    let totalBlockPatternFidelityScore = 0;
     let totalBlockBoundaryScore = 0;
     let blocksDrawnCount = 0;
-    let missingZNCount = 0;
+    let missingPatternCount = 0;
     let wrongDirCount = 0;
     const allSpacings: number[] = [];
+
+    let startBaseY = singleBand.yTop + 34; // 239
+    let finalBaseY = singleBand.yBottom;   // 335
+    if (kinkType === 'curve_arch_down') {
+      startBaseY = singleBand.yTop + 2;     // 207
+      finalBaseY = singleBand.yBottom - 32; // 303
+    } else if (kinkType === 'curve_wave_horizontal') {
+      startBaseY = singleBand.yTop + 18;    // 223
+      finalBaseY = singleBand.yBottom - 16; // 319
+    }
 
     for (const blk of blockList) {
       const bItems = blk.strokes;
@@ -2649,11 +3019,7 @@ export function evaluateSpacingTrackSubmission(
       // Ordenar trazos de arriba a abajo por su baseline yBase
       bItems.sort((a, b) => a.fidelity.yBase - b.fidelity.yBase);
 
-      // Espaciados en el bloque: distancia desde la línea de inicio superior (yBase = yTop + 34 = 239)
-      // y distancia entre trazos consecutivos, y hasta la línea final inferior (yBase = yBottom = 335)
       const spacings: number[] = [];
-      const startBaseY = singleBand.yTop + 34; // 239
-      const finalBaseY = singleBand.yBottom; // 335
 
       const dStart = bItems[0].fidelity.yBase - startBaseY;
       if (dStart > 0) {
@@ -2687,26 +3053,26 @@ export function evaluateSpacingTrackSubmission(
       const blockSpacingScore = accuracyVsTarget * 0.45 + regularity * 0.55;
       totalBlockSpacingScore += blockSpacingScore;
 
-      // Fidelidad del relámpago Z/N y contención vertical en carriles
-      let blockZNFidelitySum = 0;
+      // Fidelidad del patrón horizontal y contención vertical en carriles
+      let blockFidelitySum = 0;
       let blockBoundarySum = 0;
       for (const item of bItems) {
-        blockZNFidelitySum += item.fidelity.score;
-        if (!item.fidelity.hasZN) missingZNCount++;
-        if (item.fidelity.hasZN && !item.fidelity.isCorrectDirection) wrongDirCount++;
+        blockFidelitySum += item.fidelity.score;
+        if (!item.fidelity.hasPattern) missingPatternCount++;
+        if (item.fidelity.hasPattern && !item.fidelity.isCorrectDirection) wrongDirCount++;
 
         const topErr = Math.max(0, singleBand.yTop - item.ts.topY);
         const botErr = Math.max(0, item.ts.botY - singleBand.yBottom);
         const strokeBoundary = Math.max(0, 100 - (topErr + botErr) * 4);
         blockBoundarySum += strokeBoundary;
       }
-      totalBlockZNFidelityScore += blockZNFidelitySum / bItems.length;
+      totalBlockPatternFidelityScore += blockFidelitySum / bItems.length;
       totalBlockBoundaryScore += blockBoundarySum / bItems.length;
     }
 
     const coverageRatio = blocksDrawnCount / blockList.length;
     const avgSpacingScore = blocksDrawnCount > 0 ? (totalBlockSpacingScore / blocksDrawnCount) * coverageRatio : 0;
-    const avgZNFidelityScore = blocksDrawnCount > 0 ? (totalBlockZNFidelityScore / blocksDrawnCount) : 0;
+    const avgPatternFidelityScore = blocksDrawnCount > 0 ? (totalBlockPatternFidelityScore / blocksDrawnCount) : 0;
     const avgBoundaryScore = blocksDrawnCount > 0 ? (totalBlockBoundaryScore / blocksDrawnCount) * coverageRatio : 0;
 
     const measuredAvgSpacingPx = allSpacings.length > 0 ? Math.round((allSpacings.reduce((a, b) => a + b, 0) / allSpacings.length) * 10) / 10 : 0;
@@ -2725,7 +3091,7 @@ export function evaluateSpacingTrackSubmission(
     // Cinemática
     const activePhase = challenge.activePhase || 1;
     const kinematicsList = trackStrokes.map((ts) =>
-      analyzeStrokeKinematics(ts.stroke, targetDir, activePhase, challenge.targetLengthPx || 164)
+      analyzeStrokeKinematics(ts.stroke, targetDir, activePhase, challenge.targetLengthPx || 135)
     );
     const avgSpeed = Math.round(
       kinematicsList.reduce((acc, k) => acc + k.avgSpeedPxPerSec, 0) / (kinematicsList.length || 1)
@@ -2750,19 +3116,19 @@ export function evaluateSpacingTrackSubmission(
     // Ponderación geométrica
     let geometricScore =
       avgSpacingScore * 0.40 +
-      avgZNFidelityScore * 0.35 +
+      avgPatternFidelityScore * 0.35 +
       avgBoundaryScore * 0.25 -
       strokeCountPenalty -
       gapPenalty;
 
     geometricScore = Math.max(0, Math.min(100, Math.round(geometricScore)));
 
-    const isMissingZNs = trackStrokes.length > 0 && missingZNCount >= Math.max(2, Math.ceil(trackStrokes.length * 0.4));
-    const isWrongDirZNs = trackStrokes.length > 0 && wrongDirCount >= Math.max(2, Math.ceil(trackStrokes.length * 0.4));
+    const isMissingPatterns = trackStrokes.length > 0 && missingPatternCount >= Math.max(2, Math.ceil(trackStrokes.length * 0.4));
+    const isWrongDirPatterns = trackStrokes.length > 0 && wrongDirCount >= Math.max(2, Math.ceil(trackStrokes.length * 0.4));
 
-    if (isMissingZNs) {
+    if (isMissingPatterns) {
       geometricScore = Math.min(geometricScore, 30);
-    } else if (isWrongDirZNs) {
+    } else if (isWrongDirPatterns) {
       geometricScore = Math.min(geometricScore, 40);
     }
 
@@ -2784,35 +3150,97 @@ export function evaluateSpacingTrackSubmission(
 
     let passed = overallScore >= 75;
 
+    let patternLabel = `Paso Objetivo: ${targetSpacing}px con Relámpago Z/N ↗↘↗`;
+    let successTitle = '¡Relámpagos Z/N y Espaciado Logrados!';
+    let successMsg = `Has conseguido un paso medio de ${measuredAvgSpacingPx}px (objetivo: ${targetSpacing}px) con buena reproducción del relámpago horizontal Z/N ↗↘↗.`;
+    let defaultTip = 'Mantén los picos a 1/3 y los valles a 2/3 del ancho del bloque, con espaciado constante.';
+    let missingTitle = '¡Falta el Relámpago en Z/N! ↗↘↗';
+    let missingMsg = 'Has trazado líneas horizontales rectas. Este ejercicio consiste en trazar el patrón continuo de relámpago en Z/N (↗↘↗) con 2 quiebres angulares, idéntico a las líneas de INICIO y FIN.';
+    let missingTip = 'Asciende en diagonal (↗) al primer tercio, baja en diagonal (↘) al segundo tercio, y vuelve a ascender (↗) hasta el final sin levantar el lápiz.';
+    let wrongDirTitle = 'Dirección Invertida en Z/N 🔄';
+    let wrongDirMsg = 'Has comenzado por la derecha. Debes trazar de izquierda a derecha: ascender (↗), descender (↘) y ascender (↗).';
+    let wrongDirTip = 'Observa la flecha en la muestra: inicia a la izquierda y termina a la derecha.';
+    let title90 = '¡Relámpagos Z/N Impecables! 🌟';
+    let msg75 = `Buen control de los relámpagos Z/N (${overallScore}%). El espaciado de ${targetSpacing}px se mantiene regular en vertical.`;
+
+    if (kinkType === 'curve_arch_up') {
+      patternLabel = `Paso Objetivo: ${targetSpacing}px con Arco Convexo ⌒`;
+      successTitle = '¡Arcos Convexos y Espaciado Logrados!';
+      successMsg = `Has conseguido un paso medio de ${measuredAvgSpacingPx}px (objetivo: ${targetSpacing}px) con buena curvatura convexa ⌒.`;
+      defaultTip = 'Mantén la curvatura regular con el punto más alto en el centro del bloque sin hacer picos angulares.';
+      missingTitle = '¡Falta el Arco Convexo! ⌒';
+      missingMsg = 'Has trazado líneas horizontales rectas. Este ejercicio consiste en trazar arcos continuos curvados hacia arriba (⌒), idénticos a las líneas de INICIO y FIN.';
+      missingTip = 'Inicia a la izquierda, cúrvate suavemente hacia arriba hasta el centro (~18px de altura) y desciende suavemente a la derecha sin levantar el lápiz.';
+      wrongDirTitle = 'Dirección o Curva Invertida 🔄';
+      wrongDirMsg = 'Has comenzado por la derecha o curvado hacia abajo. Traza de izquierda a derecha con comba convexa hacia arriba (⌒).';
+      wrongDirTip = 'Observa la flecha en la muestra: de izquierda a derecha curvando hacia arriba.';
+      title90 = '¡Arcos Convexos Impecables! 🌟';
+      msg75 = `Buen control de los arcos convexos (${overallScore}%). El paso de ${targetSpacing}px se mantiene regular en vertical.`;
+    } else if (kinkType === 'curve_arch_down') {
+      patternLabel = `Paso Objetivo: ${targetSpacing}px con Arco Cóncavo ∪`;
+      successTitle = '¡Arcos Cóncavos y Espaciado Logrados!';
+      successMsg = `Has conseguido un paso medio de ${measuredAvgSpacingPx}px (objetivo: ${targetSpacing}px) con buena curvatura cóncava ∪.`;
+      defaultTip = 'Mantén la curvatura regular con el punto más bajo en el centro del bloque sin hacer quiebres.';
+      missingTitle = '¡Falta el Arco Cóncavo! ∪';
+      missingMsg = 'Has trazado líneas horizontales rectas. Este ejercicio consiste en trazar arcos continuos curvados hacia abajo (∪), idénticos a las líneas de INICIO y FIN.';
+      missingTip = 'Inicia a la izquierda, desciende en comba suave hacia abajo (~18px de profundidad) y asciende a la derecha sin levantar el lápiz.';
+      wrongDirTitle = 'Dirección o Curva Invertida 🔄';
+      wrongDirMsg = 'Has comenzado por la derecha o curvado hacia arriba. Traza de izquierda a derecha con comba cóncava hacia abajo (∪).';
+      wrongDirTip = 'Observa la flecha en la muestra: de izquierda a derecha curvando hacia abajo.';
+      title90 = '¡Arcos Cóncavos Impecables! 🌟';
+      msg75 = `Buen control de los arcos cóncavos (${overallScore}%). El paso de ${targetSpacing}px se mantiene regular en vertical.`;
+    } else if (kinkType === 'curve_wave_horizontal') {
+      patternLabel = `Paso Objetivo: ${targetSpacing}px con Onda Horizontal ~`;
+      successTitle = '¡Onda Horizontal y Espaciado Logrados!';
+      successMsg = `Has conseguido un paso medio de ${measuredAvgSpacingPx}px (objetivo: ${targetSpacing}px) con buena reproducción de la onda en S horizontal ~.`;
+      defaultTip = 'Mantén una transición suave entre el valle en la primera mitad y la cresta en la segunda mitad.';
+      missingTitle = '¡Falta la Onda Horizontal en S! ~';
+      missingMsg = 'Has trazado líneas horizontales rectas. Este ejercicio consiste en trazar ondas continuas en S horizontal (~), idénticas a las líneas de INICIO y FIN.';
+      missingTip = 'Inicia a la izquierda, desciende en seno (~14px) en la primera mitad y asciende en cresta (~14px) en la segunda mitad sin levantar el lápiz.';
+      wrongDirTitle = 'Dirección u Onda Invertida 🔄';
+      wrongDirMsg = 'Has trazado en sentido contrario o invertido las combas. Traza de izquierda a derecha: comba hacia abajo primero, hacia arriba después.';
+      wrongDirTip = 'Observa la flecha en la muestra: de izquierda a derecha con ondulación suave.';
+      title90 = '¡Ondas Horizontales Impecables! 🌟';
+      msg75 = `Buen control de las ondas en S (${overallScore}%). El paso de ${targetSpacing}px se mantiene regular en vertical.`;
+    }
+
     const solutionOverlay = {
       points: [],
       multiLines: challenge.ghostSolutionStrokes || [],
       color: '#000000',
-      label: `Paso Objetivo: ${targetSpacing}px con Relámpago Z/N ↗↘↗`,
+      label: patternLabel,
     };
 
-    let feedbackTitle = '¡Relámpagos Z/N y Espaciado Logrados!';
-    let feedbackMessage = `Has conseguido un paso medio de ${measuredAvgSpacingPx}px (objetivo: ${targetSpacing}px) con buena reproducción del relámpago horizontal Z/N ↗↘↗.`;
-    let tipMessage = 'Mantén los picos a 1/3 y los valles a 2/3 del ancho del bloque, con espaciado constante.';
+    let feedbackTitle = successTitle;
+    let feedbackMessage = successMsg;
+    let tipMessage = defaultTip;
     let avatarMood: AvatarMood = 'wink';
 
-    if (isMissingZNs) {
-      feedbackTitle = '¡Falta el Relámpago en Z/N! ↗↘↗';
-      feedbackMessage = 'Has trazado líneas horizontales rectas. Este ejercicio consiste en trazar el patrón continuo de relámpago en Z/N (↗↘↗) con 2 quiebres angulares, idéntico a las líneas de INICIO y FIN.';
-      tipMessage = 'Asciende en diagonal (↗) al primer tercio, baja en diagonal (↘) al segundo tercio, y vuelve a ascender (↗) hasta el final sin levantar el lápiz.';
+    if (isReversed) {
+      feedbackTitle = 'Dirección Invertida 🔄';
+      feedbackMessage = '⚠️ DIRECCIÓN INVERTIDA: Has trazado de derecha a izquierda. Debes trazar de izquierda a derecha (→).';
+      tipMessage = 'Traza de izquierda a derecha (→): inicia en el extremo izquierdo y avanza hacia la derecha.';
+      avatarMood = 'fail-spiral';
+      passed = false;
+      phasePassed = false;
+      overallScore = 0;
+    } else if (isMissingPatterns) {
+      feedbackTitle = missingTitle;
+      feedbackMessage = missingMsg;
+      tipMessage = missingTip;
       avatarMood = 'curious';
       passed = false;
       phasePassed = false;
-    } else if (isWrongDirZNs) {
-      feedbackTitle = 'Dirección Invertida en Z/N 🔄';
-      feedbackMessage = 'Has comenzado por la derecha. Debes trazar de izquierda a derecha: ascender (↗), descender (↘) y ascender (↗).';
-      tipMessage = 'Observa la flecha en la muestra: inicia a la izquierda y termina a la derecha.';
+    } else if (isWrongDirPatterns) {
+      feedbackTitle = wrongDirTitle;
+      feedbackMessage = wrongDirMsg;
+      tipMessage = wrongDirTip;
       avatarMood = 'curious';
       passed = false;
       phasePassed = false;
     } else if (blocksDrawnCount < blockList.length) {
       feedbackTitle = 'Bloques Incompletos';
-      feedbackMessage = `Has completado ${blocksDrawnCount} de los ${blockList.length} bloques requeridos. Rellena tanto el Bloque 1 como el Bloque 2 con el relámpago Z/N, respetando la pausa central.`;
+      feedbackMessage = `Has completado ${blocksDrawnCount} de los ${blockList.length} bloques requeridos. Rellena tanto el Bloque 1 como el Bloque 2, respetando la pausa central.`;
       tipMessage = 'Usa la pausa entre bloques para descansar la mano sin tocar el lienzo.';
       avatarMood = 'curious';
       passed = false;
@@ -2823,21 +3251,21 @@ export function evaluateSpacingTrackSubmission(
       tipMessage = 'Respeta la zona de separación entre el Bloque 1 y el Bloque 2.';
       avatarMood = 'curious';
     } else if (overallScore >= 90) {
-      feedbackTitle = '¡Relámpagos Z/N Impecables! 🌟';
+      feedbackTitle = title90;
       feedbackMessage = `Paso medio de ${measuredAvgSpacingPx}px (objetivo: ${targetSpacing}px) con excelente paralelismo y ritmo en ambos bloques.`;
       tipMessage = 'Excelente control y ritmo. Pasa ahora a las fases de fluidez y velocidad.';
       avatarMood = 'success-stars';
     } else if (overallScore >= 75) {
       feedbackTitle = '¡Nivel Superado! ✅';
-      feedbackMessage = `Buen control de los relámpagos Z/N (${overallScore}%). El espaciado de ${targetSpacing}px se mantiene regular en vertical.`;
-      tipMessage = 'Intenta que cada pico y valle queden alineados a 1/3 y 2/3 de ancho.';
+      feedbackMessage = msg75;
+      tipMessage = defaultTip;
       avatarMood = 'wink';
     } else {
       feedbackTitle = 'Falta de Consistencia 💨';
       feedbackMessage = trackStrokes.length < challenge.minRequiredStrokes
-        ? `Has trazado muy pocas líneas (${trackStrokes.length} de al menos ${challenge.minRequiredStrokes}). Rellena ambos bloques con los relámpagos Z/N.`
-        : `La regularidad del paso (${measuredAvgSpacingPx}px) o la fidelidad del relámpago no alcanzan el 75%.`;
-      tipMessage = 'Mantén la velocidad constante en todo el recorrido de la onda.';
+        ? `Has trazado muy pocas líneas (${trackStrokes.length} de al menos ${challenge.minRequiredStrokes}). Rellena ambos bloques con las líneas requeridas.`
+        : `La regularidad del paso (${measuredAvgSpacingPx}px) o la fidelidad del patrón no alcanzan el 75%.`;
+      tipMessage = 'Mantén la velocidad constante en todo el recorrido.';
       avatarMood = 'fail-spiral';
     }
 
@@ -2848,9 +3276,9 @@ export function evaluateSpacingTrackSubmission(
       currentPhase: activePhase as (1 | 2 | 3),
       kinematics,
       metrics: {
-        parallelismScore: Math.round(avgZNFidelityScore),
+        parallelismScore: Math.round(avgPatternFidelityScore),
         spacingScore: Math.round(avgSpacingScore),
-        straightnessScore: Math.round(avgZNFidelityScore),
+        straightnessScore: Math.round(avgPatternFidelityScore),
         tonalDensityScore: Math.round(avgBoundaryScore),
         boundaryScore: Math.round(avgBoundaryScore),
       },
@@ -2966,7 +3394,7 @@ export function evaluateSpacingTrackSubmission(
       let blockKinkSum = 0;
       let blockAngleSum = 0;
       for (const s of bStrokes) {
-        const kinkEval = evaluateKinkFidelity(s.stroke, kinkType as 'triangle_left' | 'triangle_right' | 'chevron_left' | 'zigzag_wave', singleBand.yTop, singleBand.yBottom);
+        const kinkEval = evaluateKinkFidelity(s.stroke, kinkType as any, singleBand.yTop, singleBand.yBottom);
         blockKinkSum += kinkEval.score;
         if (!kinkEval.hasKink) missingKinkCount++;
         if (kinkEval.hasKink && !kinkEval.isCorrectDirection) wrongDirKinkCount++;
@@ -2974,7 +3402,8 @@ export function evaluateSpacingTrackSubmission(
         const p1 = s.stroke.points[0];
         const pEnd = s.stroke.points[s.stroke.points.length - 1];
         const acuteAngle = (Math.atan2(Math.abs(pEnd.y - p1.y), Math.abs(pEnd.x - p1.x)) * 180) / Math.PI;
-        const angleDev = Math.abs(acuteAngle - 90);
+        const targetStrokeAngle = kinkType === 'curve_wave_slanted' ? 74.5 : 90;
+        const angleDev = Math.abs(acuteAngle - targetStrokeAngle);
         blockAngleSum += Math.max(0, 100 - angleDev * 4.0);
       }
       totalBlockKinkScore += blockKinkSum / bStrokes.length;
@@ -3073,6 +3502,14 @@ export function evaluateSpacingTrackSubmission(
         ? `Paso Objetivo: ${targetSpacing}px con Quiebre en Chevron ◄`
         : kinkType === 'bracket_left'
         ? `Paso Objetivo: ${targetSpacing}px con Quiebre en Corchete [`
+        : kinkType === 'curve_c_left'
+        ? `Paso Objetivo: ${targetSpacing}px con Arco C Izquierda (`
+        : kinkType === 'curve_c_right'
+        ? `Paso Objetivo: ${targetSpacing}px con Arco C Derecha )`
+        : kinkType === 'curve_wave_vertical'
+        ? `Paso Objetivo: ${targetSpacing}px con Onda Vertical en S §`
+        : kinkType === 'curve_wave_slanted'
+        ? `Paso Objetivo: ${targetSpacing}px con Onda Inclinada ∿`
         : `Paso Objetivo: ${targetSpacing}px con Quiebre`,
     };
 
@@ -3082,6 +3519,14 @@ export function evaluateSpacingTrackSubmission(
       ? '¡Quiebres en Chevron y Espaciado Logrados!'
       : kinkType === 'bracket_left'
       ? '¡Quiebres en Corchete y Espaciado Logrados!'
+      : kinkType === 'curve_c_left'
+      ? '¡Arcos C a la Izquierda y Espaciado Logrados!'
+      : kinkType === 'curve_c_right'
+      ? '¡Arcos C a la Derecha y Espaciado Logrados!'
+      : kinkType === 'curve_wave_vertical'
+      ? '¡Onda Vertical en S y Espaciado Logrados!'
+      : kinkType === 'curve_wave_slanted'
+      ? '¡Onda Inclinada y Espaciado Logrados!'
       : '¡Quiebres y Espaciado Logrados!';
     let feedbackMessage = kinkType === 'zigzag_wave'
       ? `Has conseguido un paso medio de ${measuredAvgSpacingPx}px (objetivo: ${targetSpacing}px) con buena reproducción del patrón zigzag en onda ◄►◄.`
@@ -3089,6 +3534,14 @@ export function evaluateSpacingTrackSubmission(
       ? `Has conseguido un paso medio de ${measuredAvgSpacingPx}px (objetivo: ${targetSpacing}px) con buena reproducción del patrón chevron ◄.`
       : kinkType === 'bracket_left'
       ? `Has conseguido un paso medio de ${measuredAvgSpacingPx}px (objetivo: ${targetSpacing}px) con buena reproducción del patrón en corchete [.`
+      : kinkType === 'curve_c_left'
+      ? `Has conseguido un paso medio de ${measuredAvgSpacingPx}px (objetivo: ${targetSpacing}px) con buena curvatura convexa a la izquierda (.`
+      : kinkType === 'curve_c_right'
+      ? `Has conseguido un paso medio de ${measuredAvgSpacingPx}px (objetivo: ${targetSpacing}px) con buena curvatura convexa a la derecha ).`
+      : kinkType === 'curve_wave_vertical'
+      ? `Has conseguido un paso medio de ${measuredAvgSpacingPx}px (objetivo: ${targetSpacing}px) con buena ondulación vertical continua §.`
+      : kinkType === 'curve_wave_slanted'
+      ? `Has conseguido un paso medio de ${measuredAvgSpacingPx}px (objetivo: ${targetSpacing}px) con desplazamiento lateral suave de 36px ∿.`
       : `Has conseguido un paso medio de ${measuredAvgSpacingPx}px (objetivo: ${targetSpacing}px) con buena reproducción del quiebre triangular.`;
     let tipMessage = kinkType === 'zigzag_wave'
       ? 'Mantén los vértices del zigzag alineados a 1/4, 1/2 y 3/4 de la altura de la franja.'
@@ -3096,6 +3549,12 @@ export function evaluateSpacingTrackSubmission(
       ? 'Mantén los vértices del chevron alineados al centro de la franja.'
       : kinkType === 'bracket_left'
       ? 'Mantén los quiebres alineados a 1/3 y 2/3 de altura, con el tramo central vertical.'
+      : kinkType === 'curve_c_left' || kinkType === 'curve_c_right'
+      ? 'Mantén la máxima comba (~20px) en el centro exacto de la altura del carril.'
+      : kinkType === 'curve_wave_vertical'
+      ? 'Mantén una transición armónica entre la comba izquierda superior y la comba derecha inferior.'
+      : kinkType === 'curve_wave_slanted'
+      ? 'Inicia verticalmente arriba y desplázate progresivamente hacia la derecha en curva continua en S.'
       : 'Mantén la altura del vértice alineada visualmente en todos los trazos.';
     let avatarMood: AvatarMood = 'wink';
     let directionWarning: string | undefined;
@@ -3122,6 +3581,22 @@ export function evaluateSpacingTrackSubmission(
         feedbackTitle = '¡Falta el Quiebre en Corchete! [';
         feedbackMessage = 'Has trazado líneas verticales rectas. Este ejercicio requiere realizar el doble quiebre en corchete ([) hacia la izquierda a 1/3 y 2/3 de la altura con tramo vertical central, idéntico a las líneas de INICIO y FIN.';
         tipMessage = 'Baja en diagonal hacia la izquierda hasta 1/3 de altura (~26px), continúa recto vertical hasta 2/3, y regresa en diagonal hacia la derecha hasta el carril inferior.';
+      } else if (kinkType === 'curve_c_left') {
+        feedbackTitle = '¡Falta el Arco Curvo en C! (';
+        feedbackMessage = 'Has trazado líneas verticales rectas. Este ejercicio requiere trazar arcos curvados convexos hacia la izquierda ((), idénticos a las líneas de INICIO y FIN.';
+        tipMessage = 'Inicia arriba, curva suavemente hacia la izquierda con comba de ~20px y regresa al carril inferior verticalmente.';
+      } else if (kinkType === 'curve_c_right') {
+        feedbackTitle = '¡Falta el Arco Curvo en C Invertido! )';
+        feedbackMessage = 'Has trazado líneas verticales rectas. Este ejercicio requiere trazar arcos curvados convexos hacia la derecha ()), idénticos a las líneas de INICIO y FIN.';
+        tipMessage = 'Inicia arriba, curva suavemente hacia la derecha con comba de ~20px y regresa al carril inferior verticalmente.';
+      } else if (kinkType === 'curve_wave_vertical') {
+        feedbackTitle = '¡Falta la Onda Vertical en S! §';
+        feedbackMessage = 'Has trazado líneas verticales rectas. Este ejercicio requiere trazar ondas continuas en forma de S vertical (§), idénticas a las líneas de INICIO y FIN.';
+        tipMessage = 'Baja curvando primero hacia la izquierda (~16px), cruza el eje al centro y curva hacia la derecha (~16px) antes de llegar a la base.';
+      } else if (kinkType === 'curve_wave_slanted') {
+        feedbackTitle = '¡Falta la Onda Inclinada en S! ∿';
+        feedbackMessage = 'Has trazado líneas verticales rectas. Este ejercicio requiere trazar una onda suave inclinada con desplazamiento hacia la derecha (+36px), idéntica a las líneas de INICIO y FIN.';
+        tipMessage = 'Inicia arriba, desciende curvando hacia la derecha hasta terminar desplazado 36px respecto al origen.';
       } else {
         const dirText = kinkType === 'triangle_left' ? 'hacia la izquierda (◄)' : 'hacia la derecha (►)';
         feedbackTitle = kinkType === 'triangle_left' ? '¡Falta el Quiebre Triangular! ◄' : '¡Falta el Quiebre Triangular! ►';
@@ -3144,6 +3619,22 @@ export function evaluateSpacingTrackSubmission(
         feedbackTitle = '¡Corchete en Sentido Opuesto!';
         feedbackMessage = 'Has dirigido los quiebres hacia la derecha. El quiebre en corchete debe apuntar hacia la izquierda ([).';
         tipMessage = 'Observa el patrón de muestra a la izquierda: los quiebres entran hacia la izquierda.';
+      } else if (kinkType === 'curve_c_left') {
+        feedbackTitle = '¡Arco C en Sentido Opuesto!';
+        feedbackMessage = 'Has curvado hacia la derecha. La comba del arco C debe apuntar hacia la izquierda (().';
+        tipMessage = 'Observa el patrón de muestra a la izquierda: la curva abre hacia la derecha y se comba a la izquierda.';
+      } else if (kinkType === 'curve_c_right') {
+        feedbackTitle = '¡Arco en Sentido Opuesto!';
+        feedbackMessage = 'Has curvado hacia la izquierda. La comba del arco debe apuntar hacia la derecha ()).';
+        tipMessage = 'Observa el patrón de muestra a la izquierda: la curva se comba hacia la derecha.';
+      } else if (kinkType === 'curve_wave_vertical') {
+        feedbackTitle = '¡Onda en Sentido Opuesto!';
+        feedbackMessage = 'Has invertido las combas. Debes curvar primero hacia la izquierda y luego hacia la derecha.';
+        tipMessage = 'Observa el patrón de muestra: primero comba a la izquierda, después a la derecha.';
+      } else if (kinkType === 'curve_wave_slanted') {
+        feedbackTitle = '¡Inclinación en Sentido Opuesto!';
+        feedbackMessage = 'Has trazado recto o inclinado hacia la izquierda. La onda debe desplazarse progresivamente hacia la derecha (+36px).';
+        tipMessage = 'Observa el patrón de muestra: arranca a la izquierda y termina desplazado hacia la derecha.';
       } else {
         const expectedDir = kinkType === 'triangle_left' ? 'izquierda ◄' : 'derecha ►';
         feedbackTitle = '¡Quiebre en Sentido Opuesto!';

@@ -77,7 +77,7 @@ export interface SpacingTrackConfig {
   baseHeightPx: number;       // ej: 130px
   angleDeg?: number;          // 90 (vertical) o ~75 (diagonal)
   direction?: StrokeDirection;
-  kinkType?: 'none' | 'triangle_left' | 'triangle_right' | 'chevron_left' | 'v_concentric' | 'v_inverted' | 'zigzag_wave' | 'zigzag_zn' | 'bracket_left';
+  kinkType?: 'none' | 'triangle_left' | 'triangle_right' | 'chevron_left' | 'v_concentric' | 'v_inverted' | 'zigzag_wave' | 'zigzag_zn' | 'bracket_left' | 'curve_c_left' | 'curve_c_right' | 'curve_arch_up' | 'curve_arch_down' | 'curve_wave_horizontal' | 'curve_wave_vertical' | 'curve_wave_slanted';
   hasBlocksWithGaps?: boolean;
 }
 
@@ -214,7 +214,7 @@ export interface ProceduralStrokeChallenge {
     angleDeg?: number;
     direction?: StrokeDirection;
     dxOffset?: number;
-    kinkType?: 'none' | 'triangle_left' | 'triangle_right' | 'chevron_left' | 'v_concentric' | 'v_inverted' | 'zigzag_wave' | 'zigzag_zn' | 'bracket_left';
+    kinkType?: 'none' | 'triangle_left' | 'triangle_right' | 'chevron_left' | 'v_concentric' | 'v_inverted' | 'zigzag_wave' | 'zigzag_zn' | 'bracket_left' | 'curve_c_left' | 'curve_c_right' | 'curve_arch_up' | 'curve_arch_down' | 'curve_wave_horizontal' | 'curve_wave_vertical' | 'curve_wave_slanted';
     blocks?: SpacingTrackBlock[];
   };
 }
@@ -320,7 +320,7 @@ function buildSpacingTrackLevel(
   baseHeightPx = 130,
   direction: StrokeDirection = 'vertical_top_down',
   angleDeg = 90,
-  kinkType: 'none' | 'triangle_left' | 'triangle_right' | 'chevron_left' | 'v_concentric' | 'v_inverted' | 'zigzag_wave' | 'zigzag_zn' | 'bracket_left' = 'none',
+  kinkType: 'none' | 'triangle_left' | 'triangle_right' | 'chevron_left' | 'v_concentric' | 'v_inverted' | 'zigzag_wave' | 'zigzag_zn' | 'bracket_left' | 'curve_c_left' | 'curve_c_right' | 'curve_arch_up' | 'curve_arch_down' | 'curve_wave_horizontal' | 'curve_wave_vertical' | 'curve_wave_slanted' = 'none',
   hasBlocksWithGaps = false
 ): LabExerciseDef {
   const stepLabel = spacingMultiplier === 1 ? 'x' : 'x/2';
@@ -332,7 +332,21 @@ function buildSpacingTrackLevel(
   const isZigzagWave = kinkType === 'zigzag_wave';
   const isZigzagZN = kinkType === 'zigzag_zn';
   const isBracket = kinkType === 'bracket_left';
-  const metrics = isBracket
+  const metrics = kinkType === 'curve_c_left'
+    ? `Espaciado constante (${stepLabel} = ${baseSpacingPx * spacingMultiplier}px), contención en carriles y arco en C ◄`
+    : kinkType === 'curve_c_right'
+    ? `Espaciado constante (${stepLabel} = ${baseSpacingPx * spacingMultiplier}px), contención en carriles y arco en C ►`
+    : kinkType === 'curve_arch_up'
+    ? `Espaciado constante (${stepLabel} = ${baseSpacingPx * spacingMultiplier}px), contención en carriles y arco convexo ⌒`
+    : kinkType === 'curve_arch_down'
+    ? `Espaciado constante (${stepLabel} = ${baseSpacingPx * spacingMultiplier}px), contención en carriles y arco cóncavo ∪`
+    : kinkType === 'curve_wave_horizontal'
+    ? `Espaciado constante (${stepLabel} = ${baseSpacingPx * spacingMultiplier}px), contención en carriles y onda en S ~`
+    : kinkType === 'curve_wave_vertical'
+    ? `Espaciado constante (${stepLabel} = ${baseSpacingPx * spacingMultiplier}px), contención en carriles y onda en S §`
+    : kinkType === 'curve_wave_slanted'
+    ? `Espaciado constante (${stepLabel} = ${baseSpacingPx * spacingMultiplier}px), contención en carriles y onda inclinada ∿`
+    : isBracket
     ? `Espaciado constante (${stepLabel} = ${baseSpacingPx * spacingMultiplier}px), contención en carriles y quiebre en corchete [`
     : isZigzagZN
     ? `Espaciado constante (${stepLabel} = ${baseSpacingPx * spacingMultiplier}px), contención en carriles y relámpago Z/N ↗↘↗`
@@ -620,6 +634,13 @@ export const ALL_SINGLE_STROKE_EXERCISES: LabExerciseDef[] = [
   buildSpacingTrackLevel('sp_16', 'E8.1', 'Carril Zigzag en Onda ◄►◄ (Bloques & Pausas · x/2)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 1, 0.5, 'Difícil', 'Líneas paralelas continuas con triple quiebre alternado en onda (◄►◄). Bloques de ancho y separados por pausas. Rellena cada bloque entre la línea de inicio y final.', 'Dibuja líneas continuas con quiebre alternado en onda (◄►◄) al paso fino x/2 rellenando cada bloque entre la línea de inicio y final.', 16, 130, 'vertical_top_down', 90, 'zigzag_wave', true),
   buildSpacingTrackLevel('sp_17', 'E9.1', 'Carril Relámpago Z/N ↗↘↗ (Bloques & Pausas · x/2)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 1, 0.5, 'Difícil', 'Líneas paralelas continuas en zigzag relámpago en Z/N (↗↘↗). Bloques de ancho y separados por pausas. Rellena cada bloque entre la línea de inicio y final.', 'Dibuja líneas continuas en relámpago Z/N (↗↘↗) al paso fino x/2 rellenando cada bloque entre la línea de inicio y final.', 16, 130, 'horizontal_left_right', 0, 'zigzag_zn', true),
   buildSpacingTrackLevel('sp_18', 'E10.1', 'Carril Quiebre en Corchete [ (Bloques & Pausas · x/2)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 1, 0.5, 'Difícil', 'Líneas paralelas continuas con doble quiebre en corchete ( [ ). Bloques de ancho y separados por pausas. Rellena cada bloque entre la línea de inicio y final.', 'Dibuja líneas continuas con doble quiebre en corchete ( [ ) al paso fino x/2 rellenando cada bloque entre la línea de inicio y final.', 16, 130, 'vertical_top_down', 90, 'bracket_left', true),
+  buildSpacingTrackLevel('sp_19', 'E11.1', 'Carril Arco en C Vertical ◄ (Bloques & Pausas · x/2)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 1, 0.5, 'Difícil', 'Líneas paralelas continuas con arco curvo en C abombado hacia la izquierda ( ◄ ). Bloques de ancho y separados por pausas. Rellena cada bloque entre la línea de inicio y final.', 'Dibuja arcos curvos en C continuos hacia la izquierda ( ◄ ) al paso fino x/2 rellenando cada bloque entre la línea de inicio y final.', 16, 130, 'vertical_top_down', 90, 'curve_c_left', true),
+  buildSpacingTrackLevel('sp_20', 'E12.1', 'Carril Arco en C Vertical ► (Bloques & Pausas · x/2)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 1, 0.5, 'Difícil', 'Líneas paralelas continuas con arco curvo en C abombado hacia la derecha ( ► ). Bloques de ancho y separados por pausas. Rellena cada bloque entre la línea de inicio y final.', 'Dibuja arcos curvos en C continuos hacia la derecha ( ► ) al paso fino x/2 rellenando cada bloque entre la línea de inicio y final.', 16, 130, 'vertical_top_down', 90, 'curve_c_right', true),
+  buildSpacingTrackLevel('sp_21', 'E13.1', 'Carril Arco Convexo Arriba ⌒ (Bloques & Pausas · x/2)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 1, 0.5, 'Difícil', 'Líneas paralelas continuas con arco horizontal arqueado hacia arriba ( ⌒ / bóveda). Bloques de ancho y separados por pausas. Rellena cada bloque entre la línea de inicio y final.', 'Dibuja arcos horizontales continuos convexos hacia arriba ( ⌒ ) al paso fino x/2 rellenando cada bloque de arriba hacia abajo.', 16, 130, 'horizontal_left_right', 0, 'curve_arch_up', true),
+  buildSpacingTrackLevel('sp_22', 'E14.1', 'Carril Arco Cóncavo Abajo ∪ (Bloques & Pausas · x/2)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 1, 0.5, 'Difícil', 'Líneas paralelas continuas con arco horizontal arqueado hacia abajo ( ∪ / cuenco). Bloques de ancho y separados por pausas. Rellena cada bloque entre la línea de inicio y final.', 'Dibuja arcos horizontales continuos cóncavos hacia abajo ( ∪ ) al paso fino x/2 rellenando cada bloque de arriba hacia abajo.', 16, 130, 'horizontal_left_right', 0, 'curve_arch_down', true),
+  buildSpacingTrackLevel('sp_23', 'E15.1', 'Carril Onda en S Horizontal ~ (Bloques & Pausas · x/2)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 1, 0.5, 'Difícil', 'Líneas paralelas continuas con onda sinusoidal en S horizontal ( ~ ). Bloques de ancho y separados por pausas. Rellena cada bloque entre la línea de inicio y final.', 'Dibuja líneas horizontales continuas con onda en S ( ~ ) al paso fino x/2 rellenando cada bloque de arriba hacia abajo.', 16, 130, 'horizontal_left_right', 0, 'curve_wave_horizontal', true),
+  buildSpacingTrackLevel('sp_24', 'E16.1', 'Carril Onda en S Vertical § (Bloques & Pausas · x/2)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 1, 0.5, 'Difícil', 'Líneas paralelas continuas con onda sinusoidal en S vertical ( § ). Bloques de ancho y separados por pausas. Rellena cada bloque entre la línea de inicio y final.', 'Dibuja líneas verticales continuas con onda en S ( § ) al paso fino x/2 rellenando cada bloque de izquierda a derecha.', 16, 130, 'vertical_top_down', 90, 'curve_wave_vertical', true),
+  buildSpacingTrackLevel('sp_25', 'E17.1', 'Carril Onda en S Inclinada ∿ (Bloques & Pausas · x/2)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 1, 0.5, 'Difícil', 'Líneas paralelas continuas con onda en S inclinada hacia la derecha ( ∿ ). Bloques de ancho y separados por pausas. Rellena cada bloque entre la línea de inicio y final.', 'Dibuja líneas continuas con onda en S inclinada ( ∿ ) al paso fino x/2 rellenando cada bloque de izquierda a derecha.', 16, 130, 'vertical_top_down', 90, 'curve_wave_slanted', true),
 
   // CURVAS Y ARCOS (C & S)
   buildSingleStrokeLevel('cc_01', 'CC.01', 'Arco en C Fijo (Guía Gris)', '⚡ Calistenia: Trazos Curvos & Arcos (C & S)', 'curve_c', 'fixed', 'gray_line', 'Fácil', 'Curva suave en arco de parábola con guía gris visible.', 'Sigue la trayectoria curvada desde ① hasta ②.', 'subtle'),
@@ -694,7 +715,7 @@ export const ALL_42_EXERCISES: WorkbookExerciseDef[] = [
 ];
 
 /**
- * Catálogo Maestro Completo: 230 Calistenias Dinámicas + 42 Páginas del Cuaderno (272 Ejercicios)
+ * Catálogo Maestro Completo: 237 Calistenias Dinámicas + 42 Páginas del Cuaderno (279 Ejercicios)
  */
 export const ALL_LAB_EXERCISES: LabExerciseDef[] = [
   ...ALL_SINGLE_STROKE_EXERCISES,

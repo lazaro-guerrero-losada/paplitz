@@ -12,9 +12,9 @@
 1. [Resumen Ejecutivo & Visión del Proyecto](#1-resumen-ejecutivo--visión-del-proyecto)
 2. [Guía Rápida para Abrir y Trabajar en Otro PC (Quickstart)](#2-guía-rápida-para-abrir-y-trabajar-en-otro-pc-quickstart)
 3. [Estructura del Proyecto y Mapa de Archivos](#3-estructura-del-proyecto-y-mapa-de-archivos)
-4. [Catálogo Completo de Ejercicios (272 Retos)](#4-catálogo-completo-de-ejercicios-272-retos)
+4. [Catálogo Completo de Ejercicios (279 Retos)](#4-catálogo-completo-de-ejercicios-279-retos)
    - [4.1 Calistenia Dinámica de Trazo Único (212 Retos)](#41-calistenia-dinámica-de-trazo-único-212-retos)
-   - [4.2 Espaciado y Carriles de Ritmo (E1.1 a E10.1)](#42-espaciado-y-carriles-de-ritmo-e11-a-e101)
+   - [4.2 Espaciado y Carriles de Ritmo (E1.1 a E17.1)](#42-espaciado-y-carriles-de-ritmo-e11-a-e171)
    - [4.3 Las 42 Páginas del Cuaderno Técnico (Bloques 1 al 8)](#43-las-42-páginas-del-cuaderno-técnico-bloques-1-al-8)
 5. [Motor de Generación Procedural y Geometría](#5-motor-de-generación-procedural-y-geometría)
 6. [Motor de Evaluación Analítica y Cinemática Biomecánica](#6-motor-de-evaluación-analítica-y-cinemática-biomecánica)
@@ -173,9 +173,9 @@ Web dibujitos/ (paplitz-drawing-lab)
 
 ---
 
-## 4. Catálogo Completo de Ejercicios (272 Retos)
+## 4. Catálogo Completo de Ejercicios (279 Retos)
 
-El catálogo unificado en `src/lib/strokeTypes.ts` combina **230 Calistenias Dinámicas** (212 de trazo único, curvas y rosetas + 18 de espaciado y carriles) y las **42 Páginas del Cuaderno Técnico**, sumando un total de **272 ejercicios** agrupados por bloques temáticos.
+El catálogo unificado en `src/lib/strokeTypes.ts` combina **237 Calistenias Dinámicas** (212 de trazo único, curvas y rosetas + 25 de espaciado y carriles) y las **42 Páginas del Cuaderno Técnico**, sumando un total de **279 ejercicios** agrupados por bloques temáticos.
 
 ### 4.1 Calistenia Dinámica de Trazo Único y Rosetas (212 Retos)
 
@@ -200,7 +200,7 @@ Entrenamiento biomecánico repetitivo con evaluación inmediata al levantar el l
 
 ---
 
-### 4.2 Espaciado y Carriles de Ritmo (E1.1 a E10.1)
+### 4.2 Espaciado y Carriles de Ritmo (E1.1 a E17.1)
 
 Inspirado en el Ejercicio 1.1 del cuaderno de dibujo (*"Making Strokes Consistent / Spacing"*). Se ubican en el bloque **`⚡ Calistenia: Espaciado & Carriles (Ritmo)`**:
 
@@ -304,13 +304,63 @@ Inspirado en el Ejercicio 1.1 del cuaderno de dibujo (*"Making Strokes Consisten
     - **Relleno paralelo uniforme:** El alumno dibuja 15 trazos interiores por bloque espaciados a paso fino $x/2 = 8$px trazando de arriba hacia abajo sin levantar el lápiz durante cada trazo.
     - **Muestra permanente:** Bloque de muestra a la izquierda (`MUESTRA CORCHETE [ (x/2 = 8px)`) con flecha direccional en el extremo inferior y dot de inicio (●) en el riel superior.
     - **Sin versión en espejo:** Diseñado exclusivamente en orientación hacia la izquierda según las especificaciones didácticas del método.
+19. **E11.1 — Carril Arco C Izquierda ( (Bloques & Pausas · x/2):**
+    - 1 franja de altura $y = 130$px ($y_{\text{top}} = 205, y_{\text{bottom}} = 335$), espaciado fino $x/2 = 8$px.
+    - Patrón geométrico de líneas paralelas curvas en arco convexo hacia la izquierda (`(`) (Página 5, Ejercicio 1.5 del cuaderno técnico: *Curved Lines*).
+    - **Trazo vertical continuo de arriba hacia abajo (↓):** Se inicia en $(X, y_{\text{top}})$, se desciende curvando suavemente hacia la izquierda con comba parabólica máxima de $20$px en el centro vertical ($y \approx 0.50h$), y se aterriza verticalmente en el riel inferior $(X, y_{\text{bottom}})$. Longitud de arco nominal: $\approx 136$px.
+    - **Líneas pre-dibujadas de INICIO y FIN:** Cada bloque cuenta con líneas guía sólidas pre-dibujadas completas con la geometría del arco C en $X_{\text{start}}$ ($188$ y $364$) y $X_{\text{end}}$ ($316$ y $492$).
+    - **2 bloques independientes con pausa central:** Bloque 1 ($X \in [188, 316]$) y Bloque 2 ($X \in [364, 492]$), cada uno de ancho $y = 128$px, separados por un espacio de pausa de $48$px con etiqueta `(PAUSA)`.
+    - **Relleno paralelo uniforme:** 15 trazos interiores por bloque espaciados a paso fino $x/2 = 8$px.
+    - **Muestra permanente:** Bloque a la izquierda (`MUESTRA ARCO C ( (x/2 = 8px)`) con flecha direccional al final y dot de inicio (●) en el riel superior.
+20. **E12.1 — Carril Arco C Derecha ) (Bloques & Pausas · x/2):**
+    - 1 franja de altura $y = 130$px, espaciado fino $x/2 = 8$px.
+    - Patrón geométrico de líneas paralelas curvas en arco convexo hacia la derecha (`)`).
+    - **Trazo continuo descendente:** Comba parabólica máxima de $20$px hacia la derecha en el centro vertical ($y \approx 0.50h$).
+    - **Líneas de INICIO y FIN:** Guías sólidas pre-dibujadas en ambos bloques delimitando el área de dibujo.
+    - **2 bloques con pausa central:** Bloque 1 y Bloque 2 de $128$px cada uno con pausa de $48$px, 15 trazos por bloque.
+    - **Muestra permanente:** Bloque a la izquierda (`MUESTRA ARCO C ) (x/2 = 8px)`) con flecha y dot (●).
+21. **E13.1 — Carril Arco Convexo Horizontal ⌒ (Bloques & Pausas · x/2):**
+    - 1 franja de altura $y = 130$px, espaciado fino vertical $x/2 = 8$px.
+    - Patrón geométrico de líneas paralelas curvas en arco convexo hacia arriba (`⌒`).
+    - **Trazo horizontal continuo de izquierda a derecha (→):** Se inicia en $(X_{\text{start}}, y_{\text{base}})$, se curva suavemente elevándose hacia arriba con deflexión máxima de $18$px en el centro ($X_{\text{start}} + W/2, y_{\text{base}} - 18$px), y desciende suavemente retornando al nivel base en $(X_{\text{end}}, y_{\text{base}})$. Longitud nominal: $\approx 134$px.
+    - **Líneas de INICIO y FIN:** Línea superior sólida pre-dibujada en $y_{\text{base}} = 239$px (apoyando su cúpula en $y_{\text{top}} = 205$px) y línea inferior sólida en $y_{\text{base}} = 335$px.
+    - **2 bloques con pausa central:** Bloque 1 y Bloque 2 de ancho $W = 128$px con pausa intermedia de $48$px y 11 trazos interiores por bloque.
+    - **Muestra permanente:** Bloque a la izquierda (`MUESTRA ARCO ⌒ (x/2 = 8px)`) con flecha direccional a la derecha y dot (●) a la izquierda.
+22. **E14.1 — Carril Arco Cóncavo Horizontal ∪ (Bloques & Pausas · x/2):**
+    - 1 franja de altura $y = 130$px, espaciado fino vertical $x/2 = 8$px.
+    - Patrón geométrico de líneas paralelas curvas en arco cóncavo hacia abajo (`∪`).
+    - **Trazo horizontal continuo de izquierda a derecha (→):** Deflexión máxima de $18$px hacia abajo en el centro del bloque ($X_{\text{start}} + W/2, y_{\text{base}} + 18$px).
+    - **Líneas de INICIO y FIN:** Línea superior en $y_{\text{base}} = 207$px y línea inferior en $y_{\text{base}} = 303$px (con el seno del arco tocando $y_{\text{bottom}} = 335$px).
+    - **2 bloques con pausa central:** 11 trazos interiores por bloque con pausa de $48$px.
+    - **Muestra permanente:** Bloque a la izquierda (`MUESTRA ARCO ∪ (x/2 = 8px)`).
+23. **E15.1 — Carril Onda Horizontal en S ~ (Bloques & Pausas · x/2):**
+    - 1 franja de altura $y = 130$px, espaciado fino vertical $x/2 = 8$px.
+    - Patrón geométrico de líneas paralelas en onda continua sinusoidal horizontal (`~`).
+    - **Trazo horizontal continuo de izquierda a derecha (→):** Primera mitad con valle/comba hacia abajo de amplitud $14$px ($y(t) = y_{\text{base}} + 14 \sin(2\pi t)$), punto de inflexión en el centro del bloque, y segunda mitad con cresta/comba hacia arriba de amplitud $14$px. Longitud nominal: $\approx 135$px.
+    - **Líneas de INICIO y FIN:** Línea superior en $y_{\text{base}} = 223$px y línea inferior en $y_{\text{base}} = 319$px.
+    - **2 bloques con pausa central:** 11 trazos interiores por bloque con pausa de $48$px.
+    - **Muestra permanente:** Bloque a la izquierda (`MUESTRA ONDA ~ (x/2 = 8px)`).
+24. **E16.1 — Carril Onda Vertical en S § (Bloques & Pausas · x/2):**
+    - 1 franja de altura $y = 130$px, espaciado fino $x/2 = 8$px.
+    - Patrón geométrico de líneas paralelas en onda continua sinusoidal vertical (`§`).
+    - **Trazo vertical continuo de arriba hacia abajo (↓):** Primera mitad con comba hacia la izquierda ($X - 16\sin(2\pi t)$), punto de inflexión en el centro de altura, y segunda mitad con comba hacia la derecha ($+16$px). Longitud nominal: $\approx 137$px.
+    - **Líneas de INICIO y FIN:** Guías sólidas pre-dibujadas completas con la onda en $X_{\text{start}}$ y $X_{\text{end}}$.
+    - **2 bloques con pausa central:** 15 trazos interiores por bloque con pausa de $48$px.
+    - **Muestra permanente:** Bloque a la izquierda (`MUESTRA ONDA § (x/2 = 8px)`).
+25. **E17.1 — Carril Onda Inclinada en S ∿ (Bloques & Pausas · x/2):**
+    - 1 franja de altura $y = 130$px, espaciado fino $x/2 = 8$px.
+    - Patrón geométrico de líneas paralelas curvas en onda suavemente inclinada con desplazamiento lateral hacia la derecha (`∿`).
+    - **Trazo continuo descendente con desplazamiento progresivo:** Se inicia verticalmente en el riel superior $(X, y_{\text{top}})$ y se desliza lateralmente en curva continua en S suave hasta terminar desplazado $+36$px en el riel inferior $(X + 36, y_{\text{bottom}})$. Longitud nominal: $\approx 139$px.
+    - **Líneas de INICIO y FIN:** Guías sólidas pre-dibujadas con la curva inclinada delimitando cada bloque.
+    - **2 bloques con pausa central:** 15 trazos interiores por bloque con pausa de $48$px.
+    - **Muestra permanente:** Bloque a la izquierda (`MUESTRA ONDA ∿ (x/2 = 8px)`).
 
 **Reglas de diseño de estos ejercicios:**
-- **Muestra permanente:** El bloque izquierdo con la referencia nunca se oculta, permitiendo al usuario calibrar su ojo en todo momento. Muestra la dirección y ángulo exactos (`MUESTRA ↗ (~75°)`, `MUESTRA CHEVRON ◄`, `MUESTRA VÉRTICES EN V ∨`, `MUESTRA VÉRTICES EN ∧`, `MUESTRA ZIGZAG ◄►◄`, `MUESTRA RELÁMPAGO Z/N ↗↘↗`, `MUESTRA CORCHETE [`).
-- **Flechas indicadoras de dirección:** En los niveles diagonales (E4.1 a E4.4) y con quiebre/vértice/relámpago/corchete (E5, E6, E7, E8, E9 y E10), una de las líneas del bloque de muestra cuenta con un icono de flecha sólida al final del trazo y un punto de origen (●) al inicio, indicando visualmente de manera inequívoca el sentido y dirección del movimiento biomecánico.
+- **Muestra permanente:** El bloque izquierdo con la referencia nunca se oculta, permitiendo al usuario calibrar su ojo en todo momento. Muestra la dirección y ángulo exactos (`MUESTRA ↗ (~75°)`, `MUESTRA CHEVRON ◄`, `MUESTRA VÉRTICES EN V ∨`, `MUESTRA VÉRTICES EN ∧`, `MUESTRA ZIGZAG ◄►◄`, `MUESTRA RELÁMPAGO Z/N ↗↘↗`, `MUESTRA CORCHETE [`, `MUESTRA ARCO C (`, `MUESTRA ARCO C )`, `MUESTRA ARCO ⌒`, `MUESTRA ARCO ∪`, `MUESTRA ONDA ~`, `MUESTRA ONDA §`, `MUESTRA ONDA ∿`).
+- **Flechas indicadoras de dirección:** En todos los niveles diagonales, con quiebre y con patrones curvos (E4 a E17), una de las líneas del bloque de muestra cuenta con un icono de flecha sólida al final del trazo y un punto de origen (●) al inicio, indicando visualmente de manera inequívoca el sentido y dirección del movimiento biomecánico.
 - **Lienzo limpio sin textos superfluos:** Se han eliminado los textos de ayuda flotantes redundantes dentro del lienzo para preservar la pureza visual y permitir que las líneas pre-dibujadas de inicio guíen intuitivamente la ejecución.
 - **Longitud adaptable:** El carril se extiende a lo ancho de la pantalla; no hay un número rígido obligatorio de líneas (se evalúan todas las líneas trazadas, requiriendo un mínimo de 3 por franja en continuos y 10 en bloques).
-- **Verificación rigurosa de sentido y pendiente:** Trazar en dirección contraria otorga $0\%$ de calificación con advertencia visual inmediata. La inclinación de la pendiente se valida contra el cuadrante angular exacto.
+- **Verificación rigurosa de sentido y pendiente:** Trazar en dirección contraria otorga $0\%$ de calificación con advertencia visual inmediata. La inclinación y curvatura se validan rigurosamente (penalizando líneas rectas sin curva a $\le 30\%$).
 - **Soporte de Fases 1, 2 y 3:** Se evalúa precisión de espaciado, fluidez de ritmo y velocidad de ejecución.
 
 ---
@@ -437,6 +487,21 @@ Si el usuario empieza a dibujar en el punto de llegada ② y termina en el punto
    - Se mide la distancia $\Delta y$ desde la línea de **INICIO** pre-dibujada ($y_{\text{base}} = 239$px) hasta la primera trazada por el alumno, entre cada par consecutivo (objetivo: $x/2 = 8$px), y hasta la línea de **FIN** pre-dibujada ($y_{\text{base}} = 335$px).
    - Partición independiente en Bloque 1 y Bloque 2, exigiendo completar ambos bloques y penalizando trazos en el espacio de pausa central.
 
+#### Para carriles de Patrones Curvos (E11.1 a E17.1):
+1. **Fidelidad de Arcos en C (`evaluateCArcFidelity`, E11.1 y E12.1):**
+   - **Arco C Izquierda (`curve_c_left`) y Derecha (`curve_c_right`):** Validación de comba parabólica suave con deflexión máxima de $20$px en el centro de la altura ($y \approx 0.50h$).
+   - Verificación de verticalidad de los extremos ($|X_{\text{start}} - X_{\text{end}}| \le 8$px) y sentido descendente (↓).
+   - Penalización drástica ($\le 30\%$) si se trazan líneas rectas sin curvatura o si se curva en sentido opuesto.
+2. **Fidelidad de Arcos Horizontales (`evaluateHorizontalArcFidelity`, E13.1 y E14.1):**
+   - **Arco Convexo Arriba (`curve_arch_up`):** Cúpula con elevación de $18$px en el centro del bloque ($X_{\text{start}} + W/2$).
+   - **Arco Cóncavo Abajo (`curve_arch_down`):** Seno con profundidad de $18$px en el centro del bloque.
+   - Sentido horizontal estricto de izquierda a derecha (→).
+3. **Fidelidad de Ondas en S (`evaluateHorizontalWaveFidelity`, `evaluateVerticalWaveFidelity` y `evaluateSlantedWaveFidelity`, E15.1, E16.1 y E17.1):**
+   - **Onda Horizontal (`curve_wave_horizontal`):** Validación de doble comba sinusoidal (valle de $14$px en primera mitad, cresta de $14$px en segunda mitad).
+   - **Onda Vertical (`curve_wave_vertical`):** Validación de doble comba sinusoidal (comba izquierda de $16$px en primera mitad, comba derecha de $16$px en segunda mitad).
+   - **Onda Inclinada (`curve_wave_slanted`):** Validación de desplazamiento lateral continuo hacia la derecha ($+36$px) con ángulo rector adaptado de $\approx 74.5^\circ$.
+   - Penalización a $\le 30\%$ si se trazan rectas o $\le 40\%$ en dirección invertida.
+
 ---
 
 ## 7. Interfaz de Usuario (UI/UX) y Experiencia en Tablet / PC
@@ -448,7 +513,7 @@ Ubicada en `src/components/StrokeLabView.tsx`.
    - La barra lateral izquierda y el lienzo caben simultáneamente en la pantalla en tablets y portátiles sin requerir scroll vertical.
    - El lienzo mantiene su relación de aspecto técnica `600 / 540` con un margen inferior de respiración para que no quede pegado al borde.
 2. **Drawer Lateral Deslizante:**
-   - El catálogo completo de los 272 ejercicios se despliega mediante un panel lateral accesible con el botón de menú `☰`, con buscador y filtro por bloques.
+   - El catálogo completo de los 279 ejercicios se despliega mediante un panel lateral accesible con el botón de menú `☰`, con buscador y filtro por bloques.
 3. **Calificación Destacada y Telemetría:**
    - El porcentaje de nota se muestra en tamaño grande (`text-3xl / text-4xl`) con badge de estado (`Superado ✓`, `Ajustar`, `Dirección ⚠️`).
    - Muestra la duración en segundos y la velocidad en $px/s$.
@@ -532,7 +597,17 @@ A continuación se resumen los avances implementados en la última fase de traba
     - Líneas sólidas pre-dibujadas completas de **INICIO** y **FIN** para cada bloque.
     - 2 bloques independientes de ancho $y = 128$px separados por una pausa de descanso de mano de $48$px con 15 líneas interiores por bloque a paso $x/2 = 8$px.
     - Motor evaluador específico `evaluateBracketFidelity` con validación de deflexión lateral en ambos vértices, rectitud de columna vertical, alineación vertical de extremos y detección de sentido.
-    - Catálogo ampliado a 272 retos totales (230 dinámicos + 42 páginas de cuaderno).
+15. **Familia de Carriles de Patrones Curvos (E11.1 a E17.1):**
+    - Creación de 7 nuevos niveles de espaciado y ritmo en carriles basados en la Página 5 del cuaderno técnico (*Exercise 1.5 - Curved Lines*):
+      1. `E11.1`: Arco C Izquierda `(` (comba parabólica de $20$px hacia la izquierda, 15 trazos por bloque).
+      2. `E12.1`: Arco C Derecha `)` (comba parabólica de $20$px hacia la derecha, 15 trazos por bloque).
+      3. `E13.1`: Arco Convexo Arriba `⌒` (trazo horizontal de izquierda a derecha, elevación de $18$px, 11 trazos por bloque).
+      4. `E14.1`: Arco Cóncavo Abajo `∪` (trazo horizontal de izquierda a derecha, seno de $18$px hacia abajo, 11 trazos por bloque).
+      5. `E15.1`: Onda Horizontal en S `~` (trazo horizontal, seno de $14$px y cresta de $14$px, 11 trazos por bloque).
+      6. `E16.1`: Onda Vertical en S `§` (trazo vertical, doble comba sinusoidal de $16$px, 15 trazos por bloque).
+      7. `E17.1`: Onda Inclinada en S `∿` (trazo vertical con deslizamiento lateral progresivo hacia la derecha de $+36$px, ángulo rector $\approx 74.5^\circ$, 15 trazos por bloque).
+    - Misma disciplina rigurosa de 2 bloques discretos ($W = 128$px) delimitados por líneas sólidas de **INICIO** y **FIN**, zona central de pausa con etiqueta `(PAUSA)`, muestra permanente en la izquierda con flecha direccional y punto de inicio (●), y penalización estricta ($\le 30\%$) si se trazan líneas rectas sin curvatura o en sentido invertido.
+    - Catálogo ampliado a **279 retos totales** (237 dinámicos + 42 páginas de cuaderno).
 
 ---
 
@@ -547,7 +622,7 @@ Si retomas el proyecto en otro ordenador o deseas continuar ampliándolo, aquí 
 3. **Pruebas de Usabilidad con Stylus en Dispositivos Reales:**
    - Probar en iPad (Safari/Chrome) y tablet Android (Samsung Tab S con S-Pen) para verificar la curva de presión y respuesta háptica.
 4. **Empaquetado de Nueva Release:**
-   - Generar el nuevo `.apk` para Android y `.exe` para Windows incorporando todo el catálogo de 272 ejercicios.
+   - Generar el nuevo `.apk` para Android y `.exe` para Windows incorporando todo el catálogo de 279 ejercicios.
 
 ---
 

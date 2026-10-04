@@ -517,6 +517,20 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
         sampleLabel = `MUESTRA ZIGZAG ◄►◄ (x/2 = ${targetSpacingPx}px)`;
       } else if (sp.kinkType === 'bracket_left') {
         sampleLabel = `MUESTRA CORCHETE [ (x/2 = ${targetSpacingPx}px)`;
+      } else if (sp.kinkType === 'curve_c_left') {
+        sampleLabel = `MUESTRA ARCO EN C ◄ (x/2 = ${targetSpacingPx}px)`;
+      } else if (sp.kinkType === 'curve_c_right') {
+        sampleLabel = `MUESTRA ARCO EN C ► (x/2 = ${targetSpacingPx}px)`;
+      } else if (sp.kinkType === 'curve_arch_up') {
+        sampleLabel = `MUESTRA ARCO CONVEXO ⌒ (x/2 = ${targetSpacingPx}px)`;
+      } else if (sp.kinkType === 'curve_arch_down') {
+        sampleLabel = `MUESTRA ARCO CÓNCAVO ∪ (x/2 = ${targetSpacingPx}px)`;
+      } else if (sp.kinkType === 'curve_wave_horizontal') {
+        sampleLabel = `MUESTRA ONDA EN S ~ (x/2 = ${targetSpacingPx}px)`;
+      } else if (sp.kinkType === 'curve_wave_vertical') {
+        sampleLabel = `MUESTRA ONDA EN S § (x/2 = ${targetSpacingPx}px)`;
+      } else if (sp.kinkType === 'curve_wave_slanted') {
+        sampleLabel = `MUESTRA ONDA INCLINADA ∿ (x/2 = ${targetSpacingPx}px)`;
       } else if (sp.angleDeg && sp.direction) {
         const arrowMap: Record<string, string> = {
           bottom_up_left_right: '↗',
