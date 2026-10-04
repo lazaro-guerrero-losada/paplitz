@@ -589,7 +589,7 @@ export function generateSpacingTrackChallenge(
   const sampleXStart = isDiagonal || isKink ? 28 : 35;
   const sampleWidth = isDiagonal || isKink ? 80 : 96;
   const sampleXEnd = sampleXStart + sampleWidth;
-  const sampleLines: { x1?: number; y1: number; x2?: number; y2: number; points?: { x: number; y: number }[] }[] = [];
+  const sampleLines: { x1?: number; y1: number; x2?: number; y2: number; points?: { x: number; y: number }[]; hasArrow?: boolean }[] = [];
 
   if (isKink) {
     for (let x = sampleXStart + 8; x <= sampleXEnd; x += targetSpacingPx) {
@@ -628,6 +628,12 @@ export function generateSpacingTrackChallenge(
         }
       }
     }
+  }
+
+  // En ejercicios diagonales (E4.1 a E4.4), marcar una línea con flecha direccional en el extremo
+  if (isDiagonal && sampleLines.length > 0) {
+    const midIdx = Math.floor(sampleLines.length / 2);
+    sampleLines[midIdx].hasArrow = true;
   }
 
   // 3. Carril de dibujo (derecha)

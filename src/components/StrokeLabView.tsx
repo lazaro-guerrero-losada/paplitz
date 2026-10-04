@@ -530,7 +530,8 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.setLineDash([]);
-      for (const sLine of samplePattern.lines) {
+      for (let sIdx = 0; sIdx < samplePattern.lines.length; sIdx++) {
+        const sLine = samplePattern.lines[sIdx];
         if (sLine.points && sLine.points.length > 1) {
           ctx.beginPath();
           ctx.moveTo(sLine.points[0].x, sLine.points[0].y);
@@ -545,6 +546,67 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
           ctx.moveTo(x1, sLine.y1!);
           ctx.lineTo(x2, sLine.y2!);
           ctx.stroke();
+
+          // Flecha indicadora de dirección en una de las líneas para diagonales (E4.1 a E4.4)
+          const isDiagonalLevel =
+            sp.direction &&
+            [
+              'bottom_up_left_right',
+              'top_down_right_left',
+              'top_down_left_right',
+              'bottom_up_right_left',
+            ].includes(sp.direction);
+
+          const shouldDrawArrow =
+            sLine.hasArrow ||
+            (isDiagonalLevel && sIdx === Math.floor(samplePattern.lines.length / 2));
+
+          if (shouldDrawArrow && sp.direction) {
+            let pStart = { x: x1, y: sLine.y1! };
+            let pEnd = { x: x2, y: sLine.y2! };
+
+            if (sp.direction === 'top_down_right_left') {
+              // ↙ E4.2: De arriba-derecha a abajo-izquierda
+              pStart = { x: x2, y: sLine.y2! };
+              pEnd = { x: x1, y: sLine.y1! };
+            } else if (sp.direction === 'bottom_up_right_left') {
+              // ↖ E4.4: De abajo-derecha a arriba-izquierda
+              pStart = { x: x2, y: sLine.y2! };
+              pEnd = { x: x1, y: sLine.y1! };
+            } else if (sp.direction === 'bottom_up_left_right') {
+              // ↗ E4.1: De abajo-izquierda a arriba-derecha
+              pStart = { x: x1, y: sLine.y1! };
+              pEnd = { x: x2, y: sLine.y2! };
+            } else if (sp.direction === 'top_down_left_right') {
+              // ↘ E4.3: De arriba-izquierda a abajo-derecha
+              pStart = { x: x1, y: sLine.y1! };
+              pEnd = { x: x2, y: sLine.y2! };
+            }
+
+            const th = Math.atan2(pEnd.y - pStart.y, pEnd.x - pStart.x);
+            const arrowLen = 11;
+            const arrowHalfAngle = 0.42;
+
+            // Icono de flecha sólida en el extremo final (pEnd)
+            ctx.fillStyle = '#000000';
+            ctx.beginPath();
+            ctx.moveTo(pEnd.x, pEnd.y);
+            ctx.lineTo(
+              pEnd.x - arrowLen * Math.cos(th - arrowHalfAngle),
+              pEnd.y - arrowLen * Math.sin(th - arrowHalfAngle)
+            );
+            ctx.lineTo(
+              pEnd.x - arrowLen * Math.cos(th + arrowHalfAngle),
+              pEnd.y - arrowLen * Math.sin(th + arrowHalfAngle)
+            );
+            ctx.closePath();
+            ctx.fill();
+
+            // Pequeño dot de origen (●) en el extremo de inicio (pStart)
+            ctx.beginPath();
+            ctx.arc(pStart.x, pStart.y, 2.8, 0, Math.PI * 2);
+            ctx.fill();
+          }
         }
       }
 

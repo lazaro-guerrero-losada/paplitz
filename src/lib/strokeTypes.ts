@@ -205,7 +205,7 @@ export interface ProceduralStrokeChallenge {
       xStart: number;
       xEnd: number;
       stepX: number;
-      lines: { x?: number; x1?: number; x2?: number; y1?: number; y2?: number; points?: { x: number; y: number }[] }[];
+      lines: { x?: number; x1?: number; x2?: number; y1?: number; y2?: number; points?: { x: number; y: number }[]; hasArrow?: boolean }[];
     };
     trackXStart: number;
     trackXEnd: number;

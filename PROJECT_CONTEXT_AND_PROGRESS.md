@@ -256,6 +256,7 @@ Inspirado en el Ejercicio 1.1 del cuaderno de dibujo (*"Making Strokes Consisten
 
 **Reglas de diseño de estos ejercicios:**
 - **Muestra permanente:** El bloque izquierdo con la referencia nunca se oculta, permitiendo al usuario calibrar su ojo en todo momento. Muestra la dirección y ángulo exactos (`MUESTRA ↗ (~75°)`).
+- **Flecha indicadora de dirección en diagonales:** En los niveles diagonales (E4.1 a E4.4), una de las líneas del bloque de muestra cuenta con un icono de flecha sólida al final del trazo y un punto de origen (●) al inicio, indicando visualmente de manera inequívoca el sentido y dirección del movimiento biomecánico.
 - **Longitud adaptable:** El carril se extiende a lo ancho de la pantalla; no hay un número rígido obligatorio de líneas (se evalúan todas las líneas trazadas, requiriendo un mínimo de 3 por franja).
 - **Verificación rigurosa de sentido y pendiente:** Trazar en dirección contraria otorga $0\%$ de calificación con advertencia visual inmediata. La inclinación de la pendiente se valida contra el cuadrante angular exacto.
 - **Soporte de Fases 1, 2 y 3:** Se evalúa precisión de espaciado, fluidez de ritmo y velocidad de ejecución.
