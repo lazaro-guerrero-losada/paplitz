@@ -1,4 +1,4 @@
-import { RawStroke, ProceduralStrokeChallenge, StrokeEvaluation } from './strokeTypes';
+import { RawStroke, ProceduralStrokeChallenge, StrokeEvaluation, StrokeDirection } from './strokeTypes';
 import { AvatarMood } from './avatarTypes';
 import { analyzeStrokeKinematics, recordStrokeSpeed } from './strokeKinematics';
 
@@ -987,6 +987,8 @@ export function buildStrokeDebugReport(
       `--- OBJETIVO ---`,
       `Bandas: ${sp.bands.length} (Altura: ${sp.bands[0].height}px)`,
       `Paso Objetivo: ${sp.targetSpacingPx}px (${sp.subdivisionLabel})`,
+      `Ángulo Objetivo: ${sp.angleDeg ?? 90}°`,
+      `Dirección Objetivo: ${sp.direction || 'vertical_top_down'}`,
       `Carril X: de ${sp.trackXStart}px a ${sp.trackXEnd}px`,
       ``,
       `--- TRAZOS DEL USUARIO ---`,
@@ -1000,7 +1002,7 @@ export function buildStrokeDebugReport(
       `Espaciado y Ritmo: ${evaluation.metrics.spacingScore}%`,
       `Contención en Carriles: ${evaluation.metrics.boundaryScore}%`,
       `Rectitud: ${evaluation.metrics.straightnessScore}%`,
-      `Verticalidad: ${evaluation.metrics.parallelismScore}%`,
+      `Ángulo / Paralelismo: ${evaluation.metrics.parallelismScore}%`,
       `Cobertura de Franjas: ${evaluation.metrics.tonalDensityScore}%`,
       ``,
       evaluation.kinematics
@@ -1013,6 +1015,7 @@ export function buildStrokeDebugReport(
           ].join('\n')
         : '',
       ``,
+      evaluation.directionWarning ? `Aviso Dirección: ${evaluation.directionWarning}` : `Dirección: Correcta`,
       `Diagnóstico: ${evaluation.feedbackTitle} - ${evaluation.feedbackMessage}`,
       `================================================`,
     ].filter(Boolean).join('\n');
@@ -1074,6 +1077,48 @@ export function buildStrokeDebugReport(
   ].filter(Boolean).join('\n');
 }
 
+function isStrokeReversedInTrack(s: RawStroke, dir: StrokeDirection): boolean {
+  if (s.points.length < 2) return false;
+  const p1 = s.points[0];
+  const p2 = s.points[s.points.length - 1];
+  const dx = p2.x - p1.x;
+  const dy = p2.y - p1.y;
+
+  switch (dir) {
+    case 'vertical_top_down':
+      return dy < -10;
+    case 'vertical_bottom_up':
+      return dy > 10;
+    case 'bottom_up_left_right': // ↗ D1
+      return dy > 10 || dx < -10;
+    case 'top_down_right_left': // ↙ D2
+      return dy < -10 || dx > 10;
+    case 'top_down_left_right': // ↘ D3
+      return dy < -10 || dx < -10;
+    case 'bottom_up_right_left': // ↖ D4
+      return dy > 10 || dx > 10;
+    case 'horizontal_left_right':
+      return dx < -10;
+    case 'horizontal_right_left':
+      return dx > 10;
+    default:
+      return false;
+  }
+}
+
+function getStrokeSlopeAngle(stroke: RawStroke): { angleFromHorizontalDeg: number; isSlash: boolean } {
+  const p1 = stroke.points[0];
+  const p2 = stroke.points[stroke.points.length - 1];
+  const dx = p2.x - p1.x;
+  const dy = p2.y - p1.y;
+  const acuteAngle = (Math.atan2(Math.abs(dy), Math.abs(dx)) * 180) / Math.PI;
+  // En coordenadas de pantalla:
+  // dx * dy < 0 => sube hacia la derecha o baja hacia la izquierda (slash /)
+  // dx * dy > 0 => baja hacia la derecha o sube hacia la izquierda (backslash \)
+  const isSlash = dx * dy < 0;
+  return { angleFromHorizontalDeg: acuteAngle, isSlash };
+}
+
 /**
  * Evalúa el reto de Carriles y Espaciado Rítmico (Consistencia 1.1)
  */
@@ -1085,6 +1130,8 @@ export function evaluateSpacingTrackSubmission(
   const bands = params.bands;
   const targetSpacing = params.targetSpacingPx;
   const trackXStart = params.trackXStart;
+  const targetDir: StrokeDirection = params.direction || 'vertical_top_down';
+  const targetAngle: number = params.angleDeg ?? 90;
 
   if (strokes.length === 0) {
     return {
@@ -1105,7 +1152,7 @@ export function evaluateSpacingTrackSubmission(
         measuredOpticalDensityPct: 0,
       },
       feedbackTitle: '¡Lienzo Vacío!',
-      feedbackMessage: 'No has dibujado líneas en el carril. Observa la muestra a la izquierda y dibuja líneas verticales hacia la derecha.',
+      feedbackMessage: 'No has dibujado líneas en el carril. Observa la muestra a la izquierda y dibuja las líneas requeridas hacia la derecha.',
       tipMessage: 'Mantén un pulso constante y busca que el espacio entre trazos sea idéntico al del patrón de muestra.',
       avatarMood: 'surprised',
       solutionOverlay: {
@@ -1179,6 +1226,15 @@ export function evaluateSpacingTrackSubmission(
     };
   }
 
+  // 1.5 Detección de trazos en dirección invertida
+  let reversedCount = 0;
+  for (const ts of trackStrokes) {
+    if (isStrokeReversedInTrack(ts.stroke, targetDir)) {
+      reversedCount++;
+    }
+  }
+  const isReversed = trackStrokes.length > 0 && reversedCount >= Math.max(1, Math.ceil(trackStrokes.length * 0.3));
+
   // 2. Asignar trazos a cada franja/carril según cercanía en Y
   const bandStrokesMap = new Map<string, typeof trackStrokes>();
   for (const b of bands) {
@@ -1251,14 +1307,27 @@ export function evaluateSpacingTrackSubmission(
     }
     totalBoundaryScore += bandBoundarySum / bStrokes.length;
 
-    // Rectitud y verticalidad de los trazos de esta banda
+    // Rectitud y angularidad de los trazos de esta banda
     let bandStraightSum = 0;
     let bandAngleSum = 0;
     for (const s of bStrokes) {
       bandStraightSum += evaluateStrokeStraightness(s.stroke);
-      const ang = getStrokeAngleDeg(s.stroke);
-      const angleDev = Math.abs(ang - 90);
-      bandAngleSum += Math.max(0, 100 - angleDev * 3.5);
+      const { angleFromHorizontalDeg, isSlash } = getStrokeSlopeAngle(s.stroke);
+      let strokeAngleScore = 100;
+      if (targetAngle === 90) {
+        const angleDev = Math.abs(angleFromHorizontalDeg - 90);
+        strokeAngleScore = Math.max(0, 100 - angleDev * 3.5);
+      } else {
+        const angleDev = Math.abs(angleFromHorizontalDeg - targetAngle);
+        const expectedSlash =
+          targetDir === 'bottom_up_left_right' || targetDir === 'top_down_right_left';
+        if (isSlash !== expectedSlash) {
+          strokeAngleScore = 0;
+        } else {
+          strokeAngleScore = Math.max(0, 100 - angleDev * 4.0);
+        }
+      }
+      bandAngleSum += strokeAngleScore;
     }
     totalStraightnessScore += bandStraightSum / bStrokes.length;
     totalParallelismScore += bandAngleSum / bStrokes.length;
@@ -1288,7 +1357,7 @@ export function evaluateSpacingTrackSubmission(
   // Cinemática en los trazos dibujados: evaluamos cada trazo y promediamos
   const activePhase = challenge.activePhase || 1;
   const kinematicsList = trackStrokes.map((ts) =>
-    analyzeStrokeKinematics(ts.stroke, 'vertical_top_down', activePhase, challenge.targetLengthPx || 120)
+    analyzeStrokeKinematics(ts.stroke, targetDir, activePhase, challenge.targetLengthPx || 120)
   );
 
   const avgSpeed = Math.round(
@@ -1343,7 +1412,7 @@ export function evaluateSpacingTrackSubmission(
     phasePassed = overallScore >= 75 && speedPassed;
   }
 
-  const passed = overallScore >= 75;
+  let passed = overallScore >= 75;
 
   // Solución overlay con las líneas ideales
   const solutionOverlay = {
@@ -1357,8 +1426,35 @@ export function evaluateSpacingTrackSubmission(
   let feedbackMessage = `Has conseguido un paso medio de ${measuredAvgSpacingPx}px (objetivo: ${targetSpacing}px) con una regularidad de ±${measuredSpacingVariance}px.`;
   let tipMessage = 'Mantén la mirada un paso por delante de la mano para anticipar la separación uniforme.';
   let avatarMood: AvatarMood = 'wink';
+  let directionWarning: string | undefined;
 
-  if (missingBands > 0) {
+  if (isReversed) {
+    const dirNames: Record<StrokeDirection, string> = {
+      bottom_up_left_right: 'de abajo a arriba hacia la derecha (↗)',
+      top_down_right_left: 'de arriba a abajo hacia la izquierda (↙)',
+      top_down_left_right: 'de arriba a abajo hacia la derecha (↘)',
+      bottom_up_right_left: 'de abajo a arriba hacia la izquierda (↖)',
+      vertical_top_down: 'de arriba a abajo (↓)',
+      vertical_bottom_up: 'de abajo a arriba (↑)',
+      horizontal_left_right: 'de izquierda a derecha (→)',
+      horizontal_right_left: 'de derecha a izquierda (←)',
+      shallow_up_left_right: 'de izquierda a derecha (~15° ↗)',
+      shallow_up_right_left: 'de derecha a izquierda (~15° ↖)',
+      radial_outward: 'de dentro hacia afuera (☼)',
+      radial_inward: 'de fuera hacia dentro (❂)',
+      curve_c: 'siguiendo el arco en C',
+      curve_s: 'siguiendo la onda en S',
+    };
+    const expectedText = dirNames[targetDir] || 'en la dirección indicada';
+    directionWarning = `⚠️ DIRECCIÓN INVERTIDA: Has trazado en sentido contrario. Debes trazar ${expectedText}.`;
+    overallScore = 0;
+    phasePassed = false;
+    passed = false;
+    feedbackTitle = 'Dirección Invertida 🔄';
+    feedbackMessage = directionWarning;
+    tipMessage = `Respeta el sentido del trazo: ${expectedText}.`;
+    avatarMood = 'fail-spiral';
+  } else if (missingBands > 0) {
     feedbackTitle = 'Franjas Incompletas';
     feedbackMessage = `Has dibujado en ${evaluatedBandsCount} de las ${bands.length} franjas requeridas. Completa todas las franjas.`;
     tipMessage = 'Recorre cada carril horizontal de izquierda a derecha antes de calificar.';
@@ -1389,7 +1485,9 @@ export function evaluateSpacingTrackSubmission(
 
   return {
     overallScore,
-    passed,
+    passed: passed && !isReversed,
+    isReversed,
+    directionWarning,
     metrics: {
       parallelismScore: Math.round(avgParallelismScore),
       spacingScore: Math.round(avgSpacingScore),
@@ -1401,7 +1499,7 @@ export function evaluateSpacingTrackSubmission(
       strokeCount: trackStrokes.length,
       measuredAvgSpacingPx,
       spacingVariance: measuredSpacingVariance,
-      measuredAvgAngleDeg: 90,
+      measuredAvgAngleDeg: Math.round(targetAngle),
       measuredOpticalDensityPct: 0,
     },
     feedbackTitle,
@@ -1411,7 +1509,7 @@ export function evaluateSpacingTrackSubmission(
     avatarMood,
     kinematics,
     currentPhase: activePhase,
-    phasePassed,
+    phasePassed: phasePassed && !isReversed,
   };
 }
 

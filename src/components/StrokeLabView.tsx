@@ -490,11 +490,22 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
       ctx.strokeRect(sampleBoxX, sampleTop, sampleBoxW, sampleBot - sampleTop);
 
       // Etiqueta superior de muestra
+      let sampleLabel = `MUESTRA (${subdivisionLabel})`;
+      if (sp.angleDeg && sp.direction) {
+        const arrowMap: Record<string, string> = {
+          bottom_up_left_right: '↗',
+          top_down_right_left: '↙',
+          top_down_left_right: '↘',
+          bottom_up_right_left: '↖',
+        };
+        const arr = arrowMap[sp.direction] || '';
+        sampleLabel = `MUESTRA ${arr} (~${Math.round(sp.angleDeg)}°)`;
+      }
       ctx.fillStyle = '#000000';
       ctx.font = 'bold 10px monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
-      ctx.fillText(`MUESTRA (${subdivisionLabel})`, sampleBoxX + sampleBoxW / 2, sampleTop + 5);
+      ctx.fillText(sampleLabel, sampleBoxX + sampleBoxW / 2, sampleTop + 5);
 
       // Rieles de delimitación de la muestra
       for (const b of bands) {
@@ -509,15 +520,17 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
         ctx.stroke();
       }
 
-      // Trazos verticales entintados de muestra (referencia idéntica a libro de ejercicios)
+      // Trazos entintados de muestra (referencia idéntica a libro de ejercicios)
       ctx.strokeStyle = '#000000';
       ctx.lineWidth = 2.4;
       ctx.lineCap = 'round';
       ctx.setLineDash([]);
       for (const sLine of samplePattern.lines) {
+        const x1 = sLine.x1 ?? (sLine as any).x ?? 0;
+        const x2 = sLine.x2 ?? (sLine as any).x ?? 0;
         ctx.beginPath();
-        ctx.moveTo(sLine.x, sLine.y1);
-        ctx.lineTo(sLine.x, sLine.y2);
+        ctx.moveTo(x1, sLine.y1);
+        ctx.lineTo(x2, sLine.y2);
         ctx.stroke();
       }
 
@@ -564,7 +577,27 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
       ctx.font = '9px monospace';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'bottom';
-      ctx.fillText(`→ Dibuja hacia la derecha con el mismo espaciado (${targetSpacingPx}px)`, trackXStart, firstB.yTop - 6);
+      let promptText = `→ Dibuja hacia la derecha con el mismo espaciado (${targetSpacingPx}px)`;
+      if (sp.direction) {
+        switch (sp.direction) {
+          case 'bottom_up_left_right':
+            promptText = `↗ Traza de abajo a arriba hacia la derecha al paso ${subdivisionLabel} (${targetSpacingPx}px)`;
+            break;
+          case 'top_down_right_left':
+            promptText = `↙ Traza de arriba a abajo hacia la izquierda al paso ${subdivisionLabel} (${targetSpacingPx}px)`;
+            break;
+          case 'top_down_left_right':
+            promptText = `↘ Traza de arriba a abajo hacia la derecha al paso ${subdivisionLabel} (${targetSpacingPx}px)`;
+            break;
+          case 'bottom_up_right_left':
+            promptText = `↖ Traza de abajo a arriba hacia la izquierda al paso ${subdivisionLabel} (${targetSpacingPx}px)`;
+            break;
+          default:
+            promptText = `↓ Traza de arriba a abajo al paso ${subdivisionLabel} (${targetSpacingPx}px)`;
+            break;
+        }
+      }
+      ctx.fillText(promptText, trackXStart, firstB.yTop - 6);
 
       ctx.restore();
     }
@@ -723,6 +756,21 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
             ctx.lineTo(sPts[i].x, sPts[i].y);
           }
           ctx.stroke();
+
+          // Flecha direccional en el extremo final si tiene dirección configurada
+          if (challenge.spacingTrackParams.direction && sPts.length >= 2) {
+            const pEnd = sPts[sPts.length - 1];
+            const pPrev = sPts[Math.max(0, sPts.length - 3)];
+            const th = Math.atan2(pEnd.y - pPrev.y, pEnd.x - pPrev.x);
+            ctx.fillStyle = '#000000';
+            ctx.beginPath();
+            ctx.moveTo(pEnd.x, pEnd.y);
+            ctx.lineTo(pEnd.x - 7 * Math.cos(th - 0.45), pEnd.y - 7 * Math.sin(th - 0.45));
+            ctx.lineTo(pEnd.x - 7 * Math.cos(th + 0.45), pEnd.y - 7 * Math.sin(th + 0.45));
+            ctx.closePath();
+            ctx.fill();
+          }
+
           ctx.restore();
           continue;
         }

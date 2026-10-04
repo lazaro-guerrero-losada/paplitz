@@ -501,11 +501,16 @@ export function generateSpacingTrackChallenge(
     spacingMultiplier: 1,
     baseSpacingPx: 16,
     baseHeightPx: 130,
+    angleDeg: 90,
+    direction: 'vertical_top_down',
   };
 
   const targetSpacingPx = cfg.baseSpacingPx * cfg.spacingMultiplier;
   const subdivLabel = cfg.spacingMultiplier === 1 ? 'Paso x' : 'Paso x/2';
   const cy = canvasHeight / 2;
+  const angleDeg = cfg.angleDeg || 90;
+  const direction: import('./strokeTypes').StrokeDirection = cfg.direction || 'vertical_top_down';
+  const isDiagonal = angleDeg !== 90;
 
   // 1. Configuración de franjas según bandCount
   const bands: { id: string; yTop: number; yBottom: number; height: number }[] = [];
@@ -551,19 +556,43 @@ export function generateSpacingTrackChallenge(
     }
   }
 
+  // Desplazamiento horizontal para líneas diagonales (75°: ~35px)
+  const bandHeight = bands[0].height;
+  const radAngle = (angleDeg * Math.PI) / 180;
+  const dxOffset = isDiagonal ? Math.round(bandHeight / Math.tan(radAngle)) : 0;
+
   // 2. Patrón de muestra (izquierda)
-  const sampleXStart = 35;
-  const sampleWidth = 96; // ~96px de ancho de muestra
+  const sampleXStart = isDiagonal ? 28 : 35;
+  const sampleWidth = isDiagonal ? 80 : 96;
   const sampleXEnd = sampleXStart + sampleWidth;
-  const sampleLines: { x: number; y1: number; y2: number }[] = [];
+  const sampleLines: { x1: number; y1: number; x2: number; y2: number }[] = [];
 
   for (let x = sampleXStart; x <= sampleXEnd + 0.1; x += targetSpacingPx) {
     for (const band of bands) {
-      sampleLines.push({
-        x: Math.round(x * 10) / 10,
-        y1: band.yTop,
-        y2: band.yBottom,
-      });
+      if (!isDiagonal) {
+        sampleLines.push({
+          x1: Math.round(x * 10) / 10,
+          y1: band.yTop,
+          x2: Math.round(x * 10) / 10,
+          y2: band.yBottom,
+        });
+      } else if (direction === 'bottom_up_left_right' || direction === 'top_down_right_left') {
+        // Inclinación / (↗ o ↙)
+        sampleLines.push({
+          x1: Math.round(x * 10) / 10,
+          y1: band.yBottom,
+          x2: Math.round((x + dxOffset) * 10) / 10,
+          y2: band.yTop,
+        });
+      } else {
+        // Inclinación \ (↘ o ↖)
+        sampleLines.push({
+          x1: Math.round(x * 10) / 10,
+          y1: band.yTop,
+          x2: Math.round((x + dxOffset) * 10) / 10,
+          y2: band.yBottom,
+        });
+      }
     }
   }
 
@@ -580,15 +609,60 @@ export function generateSpacingTrackChallenge(
   // 4. Solución fantasma
   const ghostSolutionStrokes: { points: { x: number; y: number }[] }[] = [];
   for (const band of bands) {
-    for (let x = trackXStart + targetSpacingPx; x <= trackXEnd - 6; x += targetSpacingPx) {
-      ghostSolutionStrokes.push({
-        points: [
-          { x: Math.round(x * 10) / 10, y: band.yTop },
-          { x: Math.round(x * 10) / 10, y: band.yBottom },
-        ],
-      });
+    const maxX = trackXEnd - (isDiagonal ? dxOffset + 6 : 6);
+    for (let x = trackXStart + targetSpacingPx; x <= maxX; x += targetSpacingPx) {
+      if (!isDiagonal) {
+        ghostSolutionStrokes.push({
+          points: [
+            { x: Math.round(x * 10) / 10, y: band.yTop },
+            { x: Math.round(x * 10) / 10, y: band.yBottom },
+          ],
+        });
+      } else if (direction === 'bottom_up_left_right') {
+        // ↗ D1: de abajo hacia arriba
+        ghostSolutionStrokes.push({
+          points: [
+            { x: Math.round(x * 10) / 10, y: band.yBottom },
+            { x: Math.round((x + dxOffset) * 10) / 10, y: band.yTop },
+          ],
+        });
+      } else if (direction === 'top_down_right_left') {
+        // ↙ D2: de arriba hacia abajo
+        ghostSolutionStrokes.push({
+          points: [
+            { x: Math.round((x + dxOffset) * 10) / 10, y: band.yTop },
+            { x: Math.round(x * 10) / 10, y: band.yBottom },
+          ],
+        });
+      } else if (direction === 'top_down_left_right') {
+        // ↘ D3: de arriba hacia abajo
+        ghostSolutionStrokes.push({
+          points: [
+            { x: Math.round(x * 10) / 10, y: band.yTop },
+            { x: Math.round((x + dxOffset) * 10) / 10, y: band.yBottom },
+          ],
+        });
+      } else {
+        // ↖ D4: de abajo hacia arriba
+        ghostSolutionStrokes.push({
+          points: [
+            { x: Math.round((x + dxOffset) * 10) / 10, y: band.yBottom },
+            { x: Math.round(x * 10) / 10, y: band.yTop },
+          ],
+        });
+      }
     }
   }
+
+  let dirArrow = '↓';
+  if (direction === 'bottom_up_left_right') dirArrow = '↗';
+  else if (direction === 'top_down_right_left') dirArrow = '↙';
+  else if (direction === 'top_down_left_right') dirArrow = '↘';
+  else if (direction === 'bottom_up_right_left') dirArrow = '↖';
+
+  const subtitle = isDiagonal
+    ? `${subdivLabel} (${targetSpacingPx}px) · Diagonal ~${angleDeg}° (${dirArrow})`
+    : `${cfg.bandCount} Franja${cfg.bandCount > 1 ? 's' : ''} (Alt: ${bands[0].height}px) · ${subdivLabel} (${targetSpacingPx}px)`;
 
   const minRequiredStrokes = Math.max(3, 3 * cfg.bandCount);
 
@@ -598,16 +672,16 @@ export function generateSpacingTrackChallenge(
     code: exercise.code,
     category: 'parallel_lines',
     title: exercise.title,
-    subtitle: `${cfg.bandCount} Franja${cfg.bandCount > 1 ? 's' : ''} (Alt: ${bands[0].height}px) · ${subdivLabel} (${targetSpacingPx}px)`,
+    subtitle,
     blockTitle: exercise.block,
     seed,
     instruction: exercise.instruction,
     targetMetricsText: exercise.metrics,
-    targetAngleDeg: 90,
+    targetAngleDeg: angleDeg,
     targetSpacingPx,
-    targetLengthPx: bands[0].height,
+    targetLengthPx: Math.hypot(dxOffset, bands[0].height),
     minRequiredStrokes,
-    directionKey: 'vertical_top_down',
+    directionKey: direction,
     guideMode: 'gray_line',
     guideLines,
     ghostSolutionStrokes,
@@ -623,6 +697,9 @@ export function generateSpacingTrackChallenge(
       trackXEnd,
       targetSpacingPx,
       subdivisionLabel: subdivLabel,
+      angleDeg,
+      direction,
+      dxOffset,
     },
   };
 }

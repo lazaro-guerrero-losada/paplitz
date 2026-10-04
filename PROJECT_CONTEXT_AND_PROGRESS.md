@@ -111,7 +111,7 @@ Web dibujitos/ (paplitz-drawing-lab)
 │   ├── components/               # Componentes de interfaz de usuario
 │   │   ├── StrokeLabView.tsx     # ⭐ VISTA PRINCIPAL DEL LABORATORIO DE TRAZOS Y CALISTENIA
 │   │   │                         #    - Lienzo 600x540 adaptable sin scroll
-│   │   │                         #    - Drawer lateral de catálogo de 260 retos
+│   │   │                         #    - Drawer lateral de catálogo de 264 retos
 │   │   │                         #    - Selectores de fase didáctica (1, 2, 3)
 │   │   │                         #    - Controles de visualización (Mi Trazo / Solución)
 │   │   │                         #    - Modal de información de reto y fase
@@ -130,9 +130,9 @@ Web dibujitos/ (paplitz-drawing-lab)
 │   └── lib/                      # Núcleo analítico, generadores y tipos
 │       ├── strokeTypes.ts        # ⭐ Definiciones TypeScript completas:
 │       │                         #    - LabExerciseDef, ProceduralStrokeChallenge
-│       │                         #    - ALL_SINGLE_STROKE_EXERCISES (218 niveles)
+│       │                         #    - ALL_SINGLE_STROKE_EXERCISES (222 niveles)
 │       │                         #    - ALL_42_EXERCISES (42 páginas del cuaderno)
-│       │                         #    - ALL_LAB_EXERCISES (260 ejercicios totales)
+│       │                         #    - ALL_LAB_EXERCISES (264 ejercicios totales)
 │       │                         #    - SpacingTrackConfig, SpacingTrackParams
 │       │                         #    - StrokeEvaluation, KeyPoint, TargetLineDef
 │       │
@@ -173,11 +173,11 @@ Web dibujitos/ (paplitz-drawing-lab)
 
 ---
 
-## 4. Catálogo Completo de Ejercicios (260 Retos)
+## 4. Catálogo Completo de Ejercicios (264 Retos)
 
-El catálogo unificado en `src/lib/strokeTypes.ts` combina **218 Calistenias Dinámicas** y las **42 Páginas del Cuaderno Técnico**, sumando un total de **260 ejercicios** agrupados por bloques temáticos.
+El catálogo unificado en `src/lib/strokeTypes.ts` combina **222 Calistenias Dinámicas** (212 de trazo único, curvas y rosetas + 10 de espaciado y carriles) y las **42 Páginas del Cuaderno Técnico**, sumando un total de **264 ejercicios** agrupados por bloques temáticos.
 
-### 4.1 Calistenia Dinámica de Trazo Único (218 Retos)
+### 4.1 Calistenia Dinámica de Trazo Único y Rosetas (212 Retos)
 
 Entrenamiento biomecánico repetitivo con evaluación inmediata al levantar el lápiz:
 
@@ -200,7 +200,7 @@ Entrenamiento biomecánico repetitivo con evaluación inmediata al levantar el l
 
 ---
 
-### 4.2 Espaciado y Carriles de Ritmo (E1.1 a E3.2)
+### 4.2 Espaciado y Carriles de Ritmo (E1.1 a E4.4)
 
 Inspirado en el Ejercicio 1.1 del cuaderno de dibujo (*"Making Strokes Consistent / Spacing"*). Se ubican en el bloque **`⚡ Calistenia: Espaciado & Carriles (Ritmo)`**:
 
@@ -215,7 +215,7 @@ Inspirado en el Ejercicio 1.1 del cuaderno de dibujo (*"Making Strokes Consisten
 1. **E1.1 — Carril Único · Espaciado Base ($x$):**
    - 1 franja de altura $y = 130$px.
    - Muestra a la izquierda con paso $x = 16$px.
-   - Rieles horizontales en $y = 0$ y $y = 130$.
+   - Rieles horizontales en $y = 0$ y $y = 130$. Trazos verticales.
 2. **E1.2 — Carril Único · Espaciado Fino ($x/2$):**
    - 1 franja de altura $y = 130$px con el doble de densidad ($x/2 = 8$px).
 3. **E2.1 — Doble Carril · Espaciado Base ($x$):**
@@ -228,10 +228,27 @@ Inspirado en el Ejercicio 1.1 del cuaderno de dibujo (*"Making Strokes Consisten
    - Espaciado $x = 16$px. Trazos cortos y de alta cadencia.
 6. **E3.2 — Cuádruple Carril · Espaciado Fino ($x/2$):**
    - 4 franjas de altura $30$px con espaciado fino $x/2 = 8$px.
+7. **E4.1 — Carril Diagonal ↗ D1 (Abajo-Arriba / Izq-Der · 75°):**
+   - 1 franja de altura $y = 130$px, espaciado fino $x/2 = 8$px.
+   - Diagonales a $75^\circ$ respecto a la horizontal ($\Delta X \approx 35$px).
+   - Trazo ascendente de abajo hacia arriba proyectando hacia la derecha (↗).
+8. **E4.2 — Carril Diagonal ↙ D2 (Arriba-Abajo / Der-Izq · 75°):**
+   - 1 franja de altura $y = 130$px, espaciado fino $x/2 = 8$px.
+   - Diagonales a $75^\circ$ respecto a la horizontal.
+   - Trazo descendente inverso de arriba hacia abajo proyectando hacia la izquierda (↙).
+9. **E4.3 — Carril Diagonal ↘ D3 (Arriba-Abajo / Izq-Der · 75°):**
+   - 1 franja de altura $y = 130$px, espaciado fino $x/2 = 8$px.
+   - Diagonales espejo a $75^\circ$ respecto a la horizontal.
+   - Trazo descendente de arriba hacia abajo proyectando hacia la derecha (↘).
+10. **E4.4 — Carril Diagonal ↖ D4 (Abajo-Arriba / Der-Izq · 75°):**
+    - 1 franja de altura $y = 130$px, espaciado fino $x/2 = 8$px.
+    - Diagonales espejo a $75^\circ$ respecto a la horizontal.
+    - Trazo ascendente inverso de abajo hacia arriba proyectando hacia la izquierda (↖).
 
 **Reglas de diseño de estos ejercicios:**
-- **Muestra permanente:** El bloque izquierdo con la referencia nunca se oculta, permitiendo al usuario calibrar su ojo en todo momento.
+- **Muestra permanente:** El bloque izquierdo con la referencia nunca se oculta, permitiendo al usuario calibrar su ojo en todo momento. Muestra la dirección y ángulo exactos (`MUESTRA ↗ (~75°)`).
 - **Longitud adaptable:** El carril se extiende a lo ancho de la pantalla; no hay un número rígido obligatorio de líneas (se evalúan todas las líneas trazadas, requiriendo un mínimo de 3 por franja).
+- **Verificación rigurosa de sentido y pendiente:** Trazar en dirección contraria otorga $0\%$ de calificación con advertencia visual inmediata. La inclinación de la pendiente se valida contra el cuadrante angular exacto.
 - **Soporte de Fases 1, 2 y 3:** Se evalúa precisión de espaciado, fluidez de ritmo y velocidad de ejecución.
 
 ---

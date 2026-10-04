@@ -75,6 +75,8 @@ export interface SpacingTrackConfig {
   spacingMultiplier: 1 | 0.5; // 1 = paso x, 0.5 = paso x/2
   baseSpacingPx: number;      // ej: 16px
   baseHeightPx: number;       // ej: 130px
+  angleDeg?: number;          // 90 (vertical) o ~75 (diagonal)
+  direction?: StrokeDirection;
 }
 
 export interface LabExerciseDef {
@@ -191,12 +193,15 @@ export interface ProceduralStrokeChallenge {
       xStart: number;
       xEnd: number;
       stepX: number;
-      lines: { x: number; y1: number; y2: number }[];
+      lines: { x?: number; x1?: number; x2?: number; y1: number; y2: number }[];
     };
     trackXStart: number;
     trackXEnd: number;
     targetSpacingPx: number;
     subdivisionLabel: string;
+    angleDeg?: number;
+    direction?: StrokeDirection;
+    dxOffset?: number;
   };
 }
 
@@ -298,9 +303,16 @@ function buildSpacingTrackLevel(
   desc: string,
   instruction: string,
   baseSpacingPx = 16,
-  baseHeightPx = 130
+  baseHeightPx = 130,
+  direction: StrokeDirection = 'vertical_top_down',
+  angleDeg = 90
 ): LabExerciseDef {
   const stepLabel = spacingMultiplier === 1 ? 'x' : 'x/2';
+  const isDiagonal = angleDeg !== 90;
+  const metrics = isDiagonal
+    ? `Espaciado constante (${stepLabel} = ${baseSpacingPx * spacingMultiplier}px), contención en carriles y ángulo ~${angleDeg}°`
+    : `Espaciado constante (${stepLabel} = ${baseSpacingPx * spacingMultiplier}px), contención en carriles y verticalidad`;
+
   return {
     id,
     family: 'calisthenics_single',
@@ -309,7 +321,7 @@ function buildSpacingTrackLevel(
     block,
     category: 'parallel_lines',
     difficulty,
-    metrics: `Espaciado constante (${stepLabel} = ${baseSpacingPx * spacingMultiplier}px), contención en carriles y verticalidad`,
+    metrics,
     desc,
     instruction,
     isSingleStroke: true,
@@ -318,11 +330,14 @@ function buildSpacingTrackLevel(
       spacingMultiplier,
       baseSpacingPx,
       baseHeightPx,
+      direction,
+      angleDeg,
     },
     singleStrokeConfig: {
-      direction: 'vertical_top_down',
+      direction,
       variationType: 'fixed',
       guideType: 'gray_line',
+      baseAngleDeg: angleDeg,
     },
   };
 }
@@ -554,6 +569,10 @@ export const ALL_SINGLE_STROKE_EXERCISES: LabExerciseDef[] = [
   buildSpacingTrackLevel('sp_04', 'E2.2', 'Doble Carril — Espaciado Fino (x/2)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 2, 0.5, 'Difícil', 'Dos franjas de altura y/2 con densidad x/2. Requiere gran control de muñeca y detención precisa en cada carril.', 'Dibuja líneas verticales densas (x/2) en ambas franjas respetando el margen intermedio.'),
   buildSpacingTrackLevel('sp_05', 'E3.1', 'Cuádruple Carril — Espaciado Base (x)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 4, 1, 'Difícil', 'Cuatro franjas horizontales de altura y/4. Trazos verticales cortos y rápidos con ritmo continuo al paso x.', 'Dibuja trazos verticales cortos en las 4 franjas manteniendo el mismo espaciado x en todas.'),
   buildSpacingTrackLevel('sp_06', 'E3.2', 'Cuádruple Carril — Espaciado Fino (x/2)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 4, 0.5, 'Experto', 'Cuatro franjas de altura y/4 con espaciado fino x/2. Máxima concentración rítmica y motriz sobre micro-franjas.', 'Completa las 4 franjas con trazos cortos ultradensos (x/2) sin desbordar los carriles.'),
+  buildSpacingTrackLevel('sp_07', 'E4.1', 'Carril Diagonal ↗ D1 (Abajo-Arriba / Izq-Der · 75°)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 1, 0.5, 'Media', 'Franja de altura y con diagonales ascendentes a ~75°. Traza de abajo hacia arriba y de izquierda a derecha al paso x/2.', 'Traza líneas diagonales ascendentes (↗) de abajo a arriba al paso fino x/2.', 16, 130, 'bottom_up_left_right', 75),
+  buildSpacingTrackLevel('sp_08', 'E4.2', 'Carril Diagonal ↙ D2 (Arriba-Abajo / Der-Izq · 75°)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 1, 0.5, 'Media', 'Franja de altura y con diagonales descendentes inversas a ~75°. Traza de arriba hacia abajo y de derecha a izquierda al paso x/2.', 'Traza líneas diagonales descendentes (↙) de arriba a abajo al paso fino x/2.', 16, 130, 'top_down_right_left', 75),
+  buildSpacingTrackLevel('sp_09', 'E4.3', 'Carril Diagonal ↘ D3 (Arriba-Abajo / Izq-Der · 75°)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 1, 0.5, 'Media', 'Franja de altura y con diagonales descendentes a ~75° (espejo D3). Traza de arriba hacia abajo y de izquierda a derecha al paso x/2.', 'Traza líneas diagonales descendentes (↘) de arriba a abajo al paso fino x/2.', 16, 130, 'top_down_left_right', 75),
+  buildSpacingTrackLevel('sp_10', 'E4.4', 'Carril Diagonal ↖ D4 (Abajo-Arriba / Der-Izq · 75°)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 1, 0.5, 'Media', 'Franja de altura y con diagonales ascendentes inversas a ~75° (espejo D4). Traza de abajo hacia arriba y de derecha a izquierda al paso x/2.', 'Traza líneas diagonales ascendentes (↖) de abajo a arriba al paso fino x/2.', 16, 130, 'bottom_up_right_left', 75),
 
   // CURVAS Y ARCOS (C & S)
   buildSingleStrokeLevel('cc_01', 'CC.01', 'Arco en C Fijo (Guía Gris)', '⚡ Calistenia: Trazos Curvos & Arcos (C & S)', 'curve_c', 'fixed', 'gray_line', 'Fácil', 'Curva suave en arco de parábola con guía gris visible.', 'Sigue la trayectoria curvada desde ① hasta ②.', 'subtle'),
@@ -628,7 +647,7 @@ export const ALL_42_EXERCISES: WorkbookExerciseDef[] = [
 ];
 
 /**
- * Catálogo Maestro Completo: 212 Calistenias Dinámicas + 42 Páginas del Cuaderno (254 Ejercicios)
+ * Catálogo Maestro Completo: 222 Calistenias Dinámicas + 42 Páginas del Cuaderno (264 Ejercicios)
  */
 export const ALL_LAB_EXERCISES: LabExerciseDef[] = [
   ...ALL_SINGLE_STROKE_EXERCISES,
