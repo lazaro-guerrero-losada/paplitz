@@ -18,6 +18,7 @@
 
 ### 📦 [**👉 Download Latest Releases (.exe for Windows & .apk for Android)**](https://github.com/lazaro-guerrero-losada/paplitz/releases/latest)
 ### 🌐 [**👉 Or Launch the Live Web App Online (paplitz.vercel.app)**](https://paplitz.vercel.app/)
+### 📖 [**👉 Read the Complete Project Context, Architecture & Progress Report (PROJECT_CONTEXT_AND_PROGRESS.md)**](PROJECT_CONTEXT_AND_PROGRESS.md)
 
 *100% free, runs client-side in any modern web browser or as native offline desktop/mobile apps. Fully optimized for graphics tablets, active styluses (Apple Pencil, S-Pen, Wacom, Huion) with pressure sensitivity, and desktop/mouse input.*
 
@@ -245,6 +246,7 @@ npm run cap:open
 
 For in-depth architectural specifications and formulas, refer to the [`docs/`](./docs/README.md) directory:
 
+* 📑 **[Complete Project Context & Progress Report](./PROJECT_CONTEXT_AND_PROGRESS.md)**
 * 📖 **[Central Documentation Index](./docs/README.md)**
 * 🏗️ **[Architecture & Component Tree](./docs/ARCHITECTURE.md)**
 * 📐 **[3D Geometry & Perspective Engine](./docs/GEOMETRY_AND_PERSPECTIVE.md)**

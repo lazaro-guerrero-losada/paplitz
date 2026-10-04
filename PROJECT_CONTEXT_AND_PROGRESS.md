@@ -1,0 +1,399 @@
+# 📐 Paplitz — Contexto Integral del Proyecto, Arquitectura y Estado de Progreso
+
+> **Documento Maestro de Contexto para Continuidad y Desarrollo Multi-PC**  
+> **Fecha de Actualización:** Octubre 2026  
+> **Repositorio:** `lazaro-guerrero-losada/paplitz-drawing-lab` (Rama principal: `main`)  
+> **Licencia:** MIT (Open-Source)
+
+---
+
+## 📑 Índice de Contenidos
+
+1. [Resumen Ejecutivo & Visión del Proyecto](#1-resumen-ejecutivo--visión-del-proyecto)
+2. [Guía Rápida para Abrir y Trabajar en Otro PC (Quickstart)](#2-guía-rápida-para-abrir-y-trabajar-en-otro-pc-quickstart)
+3. [Estructura del Proyecto y Mapa de Archivos](#3-estructura-del-proyecto-y-mapa-de-archivos)
+4. [Catálogo Completo de Ejercicios (260 Retos)](#4-catálogo-completo-de-ejercicios-260-retos)
+   - [4.1 Calistenia Dinámica de Trazo Único (218 Retos)](#41-calistenia-dinámica-de-trazo-único-218-retos)
+   - [4.2 Espaciado y Carriles de Ritmo (E1.1 a E3.2)](#42-espaciado-y-carriles-de-ritmo-e11-a-e32)
+   - [4.3 Las 42 Páginas del Cuaderno Técnico (Bloques 1 al 8)](#43-las-42-páginas-del-cuaderno-técnico-bloques-1-al-8)
+5. [Motor de Generación Procedural y Geometría](#5-motor-de-generación-procedural-y-geometría)
+6. [Motor de Evaluación Analítica y Cinemática Biomecánica](#6-motor-de-evaluación-analítica-y-cinemática-biomecánica)
+   - [6.1 Métricas Geométricas](#61-métricas-geométricas)
+   - [6.2 Fases Cinemáticas (Precisión, Fluidez, Velocidad)](#62-fases-cinemáticas-precisión-fluidez-velocidad)
+   - [6.3 Detección de Dirección Invertida (0%)](#63-detección-de-dirección-invertida-0)
+   - [6.4 Algoritmo de Evaluación de Espaciado & Carriles](#64-algoritmo-de-evaluación-de-espaciado--carriles)
+7. [Interfaz de Usuario (UI/UX) y Experiencia en Tablet / PC](#7-interfaz-de-usuario-uiux-y-experiencia-en-tablet--pc)
+8. [Sistema de Depuración, Telemetría y Exportación](#8-sistema-de-depuración-telemetría-y-exportación)
+9. [Registro de Hitos y Mejoras Recientes](#9-registro-de-hitos-y-mejoras-recientes)
+10. [Próximos Pasos y Roadmap Sugerido](#10-próximos-pasos-y-roadmap-sugerido)
+
+---
+
+## 1. Resumen Ejecutivo & Visión del Proyecto
+
+**Paplitz** es un ecosistema pedagógico digital de código abierto para el entrenamiento acelerado de la memoria muscular y el control espacial del trazo en dibujo técnico, perspectiva y diseño industrial.
+
+### Pilares Fundamentales:
+1. **Cálculo 100% Client-Side:** Todo el análisis geométrico y cinemático corre en tiempo real en el navegador o app nativa en menos de 2 milisegundos, sin costes de servidores de IA ni problemas de latencia o privacidad.
+2. **Estética Paplitz (Tinta & Papel Técnico):** Lienzo blanco puro (`#FFFFFF`), trazos de tinta negra (`#000000`), trama milimétrica sutil y líneas discontinuas limpias.
+3. **Didáctica Basada en Fases:** Los ejercicios avanzan de forma natural:
+   - **Fase 1 (Precisión):** Control motor y puntería milimétrica a ritmo libre.
+   - **Fase 2 (Fluidez):** Ritmo continuo sin titubeos ni micro-frenazos.
+   - **Fase 3 (Velocidad):** Disparo balístico suelto superando la media adaptativa del usuario.
+4. **Multiplataforma:** Optimizado para pantallas táctiles con stylus activo (Apple Pencil, S-Pen, Wacom, Huion con sensibilidad a la presión), tablets y ratón en ordenadores de sobremesa.
+
+---
+
+## 2. Guía Rápida para Abrir y Trabajar en Otro PC (Quickstart)
+
+Si descargas o clonas este repositorio en un nuevo ordenador (Windows, Mac o Linux), sigue estos pasos exactos:
+
+### Requisitos Previos:
+- **Git:** [git-scm.com](https://git-scm.com/)
+- **Node.js:** Versión 18 o superior (recomendado Node.js 20 LTS o 22): [nodejs.org](https://nodejs.org/)
+
+### Paso a Paso en Terminal:
+
+```bash
+# 1. Clonar el repositorio
+git clone https://github.com/lazaro-guerrero-losada/paplitz-drawing-lab.git
+cd paplitz-drawing-lab
+
+# 2. Instalar dependencias
+npm install
+
+# 3. Lanzar servidor de desarrollo local
+npm run dev
+# Se abrirá en http://localhost:5173/
+
+# 4. Validar compilación TypeScript y empaquetado de producción
+npm run build
+
+# 5. Previsualizar la build de producción
+npm run preview
+```
+
+### Comandos de Utilidad Disponibles en `package.json`:
+- `npm run dev`: Inicia el servidor Vite en modo desarrollo con Hot Module Replacement (HMR).
+- `npm run build`: Ejecuta `tsc -b` (comprobación estricta de tipos TypeScript) y compila los assets optimizados en la carpeta `dist/`.
+- `npm run preview`: Sirve localmente la carpeta `dist/` para verificar el comportamiento de producción.
+- `npm run electron:dev`: Arranca la versión de escritorio con Electron.
+- `npm run cap:sync`: Sincroniza los assets web con el proyecto nativo de Android (Capacitor).
+
+---
+
+## 3. Estructura del Proyecto y Mapa de Archivos
+
+```
+Web dibujitos/ (paplitz-drawing-lab)
+│
+├── .github/                      # Workflows de CI/CD (si aplica)
+├── android/                      # Proyecto nativo Android (Capacitor)
+├── dist/                         # Artefactos compilados de producción (generados por Vite)
+├── docs/                         # Documentación técnica, pedagógica y láminas extraídas
+│   ├── ARCHITECTURE.md           # Arquitectura global y modelos
+│   ├── STROKE_EVALUATION_AND_SCORING.md # Fórmulas y ponderaciones de evaluación
+│   ├── ANALOG_WORKSHEETS_AND_QR.md      # Sistema de fichas impresas A4 con QR
+│   ├── GEOMETRY_AND_PERSPECTIVE.md      # Matrices de perspectiva y fuga
+│   ├── AVATAR_CUBITO.md                 # Especificación de la mascota reactiva
+│   └── GUIA_IMPLEMENTACION_TRAZOS_PAPLITZ.md # Referencia de las 42 páginas del cuaderno
+│
+├── public/                       # Assets estáticos (SVGs, logos, audio, láminas)
+│   ├── paplitz-logo.svg
+│   ├── cubito/
+│   └── extracted_pages/          # Imágenes de referencia de las 42 páginas
+│
+├── src/                          # Código fuente de la aplicación
+│   ├── App.tsx                   # Enrutador principal, barra de navegación y vistas
+│   ├── main.tsx                  # Punto de entrada de React 19
+│   ├── index.css                 # Estilos globales y utilidades Tailwind v4
+│   │
+│   ├── components/               # Componentes de interfaz de usuario
+│   │   ├── StrokeLabView.tsx     # ⭐ VISTA PRINCIPAL DEL LABORATORIO DE TRAZOS Y CALISTENIA
+│   │   │                         #    - Lienzo 600x540 adaptable sin scroll
+│   │   │                         #    - Drawer lateral de catálogo de 260 retos
+│   │   │                         #    - Selectores de fase didáctica (1, 2, 3)
+│   │   │                         #    - Controles de visualización (Mi Trazo / Solución)
+│   │   │                         #    - Modal de información de reto y fase
+│   │   │                         #    - Modal de reporte de depuración (JSON / Portapapeles)
+│   │   │
+│   │   ├── DrawingCanvas.tsx     # Lienzo de dibujo libre y perspectiva volumétrica
+│   │   ├── LearningPath.tsx      # Árbol de progreso curricular (The Path)
+│   │   ├── MinigamesView.tsx     # Minijuegos arcade (fuga rápida, ángulos, paralelas)
+│   │   ├── ProfileView.tsx       # Perfil del usuario, rachas, estadísticas e historial
+│   │   ├── AnalogDetailedView.tsx# Vista detallada de láminas imprimibles con QR
+│   │   ├── AnalogSheetsModal.tsx # Catálogo de láminas físicas
+│   │   ├── LevelGuideModal.tsx   # Modal de guía teórica de perspectiva
+│   │   ├── GuidebookModal.tsx    # Guía rápida para principiantes
+│   │   └── PlacementModal.tsx    # Prueba de nivel inicial
+│   │
+│   └── lib/                      # Núcleo analítico, generadores y tipos
+│       ├── strokeTypes.ts        # ⭐ Definiciones TypeScript completas:
+│       │                         #    - LabExerciseDef, ProceduralStrokeChallenge
+│       │                         #    - ALL_SINGLE_STROKE_EXERCISES (218 niveles)
+│       │                         #    - ALL_42_EXERCISES (42 páginas del cuaderno)
+│       │                         #    - ALL_LAB_EXERCISES (260 ejercicios totales)
+│       │                         #    - SpacingTrackConfig, SpacingTrackParams
+│       │                         #    - StrokeEvaluation, KeyPoint, TargetLineDef
+│       │
+│       ├── strokeProceduralGenerator.ts # ⭐ Generador procedural determinista con semilla:
+│       │                         #    - SeededRNG (Generador congruencial lineal)
+│       │                         #    - generateSingleStrokeChallenge (Líneas y curvas)
+│       │                         #    - generateMultiLineChallenge (2 o 3 líneas dispersas)
+│       │                         #    - generateRadialRosetteChallenge (Rosetas D11 y D12)
+│       │                         #    - generateSpacingTrackChallenge (Carriles E1.1 a E3.2)
+│       │                         #    - Generadores para las 42 páginas del cuaderno
+│       │
+│       ├── strokeEvaluator.ts    # ⭐ Evaluador analítico instantáneo y biomecánico:
+│       │                         #    - evaluateSingleStrokeSubmission
+│       │                         #    - evaluateMultiLineSubmission
+│       │                         #    - evaluateSpacingTrackSubmission (Espaciado & Carriles)
+│       │                         #    - Detección de trazo en dirección invertida (0%)
+│       │                         #    - buildStrokeDebugReport (Reporte técnico completo)
+│       │
+│       ├── strokeKinematics.ts   # ⭐ Análisis de derivadas físicas (velocidad, aceleración,
+│       │                         #    fluidez, micro-paradas, baseline adaptativo y fases)
+│       │
+│       ├── geometry.ts           # Utilidades matemáticas 2D y 3D (puntos, vectores, proyecciones)
+│       ├── debugReport.ts        # Funciones de exportación JSON y portapapeles
+│       ├── curriculumData.ts     # Lecciones del árbol de perspectiva
+│       ├── levelSystem.ts        # Sistema de experiencia (XP) y niveles
+│       ├── saveSystem.ts         # Persistencia en localStorage
+│       ├── cloudSync.ts          # Sincronización opcional con Supabase
+│       ├── pdfGenerator.ts       # Generación de PDFs para imprimir láminas
+│       ├── sheetScanner.ts       # Escaneo de láminas físicas con cámara/QR
+│       ├── avatarTypes.ts        # Estados anímicos de Cubito (Mascota)
+│       └── cubee.avatar.json     # Modelo procedural de la mascota
+│
+├── package.json                  # Dependencias y scripts
+├── tsconfig.json                 # Configuración del compilador TypeScript
+├── vite.config.ts                # Configuración de empaquetado Vite
+└── capacitor.config.ts           # Configuración de Capacitor para Android
+```
+
+---
+
+## 4. Catálogo Completo de Ejercicios (260 Retos)
+
+El catálogo unificado en `src/lib/strokeTypes.ts` combina **218 Calistenias Dinámicas** y las **42 Páginas del Cuaderno Técnico**, sumando un total de **260 ejercicios** agrupados por bloques temáticos.
+
+### 4.1 Calistenia Dinámica de Trazo Único (218 Retos)
+
+Entrenamiento biomecánico repetitivo con evaluación inmediata al levantar el lápiz:
+
+| Código | Bloque / Dirección | Orientación y Ángulo | Características y Variaciones |
+| :--- | :--- | :--- | :--- |
+| **D1** | ↗ Abajo-Arriba / Izq-Der | $35^\circ$ a $75^\circ$ | 19 subejercicios: Fijo, Longitud, Rotación, Posición, Sin Guía (Puntos), Multi-líneas (2 y 3). |
+| **D2** | ↙ Arriba-Abajo / Der-Izq | $215^\circ$ a $255^\circ$ | 19 subejercicios con todas las variaciones sobre la diagonal descendente inversa. |
+| **D3** | ↘ Arriba-Abajo / Izq-Der | $305^\circ$ a $345^\circ$ | 19 subejercicios: Diagonal descendente natural. |
+| **D4** | ↖ Abajo-Arriba / Der-Izq | $125^\circ$ a $165^\circ$ | 19 subejercicios: Diagonal ascendente inversa. |
+| **D5** | → Horizontal / Izq-Der | Estricto $0^\circ$ | 13 subejercicios: Estrictamente horizontal (sin variaciones de rotación), longitud, posición, puntos clave y multi-línea. |
+| **D6** | ← Horizontal / Der-Izq | Estricto $0^\circ$ | 13 subejercicios: Estrictamente horizontal de derecha a izquierda. |
+| **D7** | ↑ Vertical / Abajo-Arriba | Estricto $90^\circ$ | 13 subejercicios: Estrictamente vertical ascendente. |
+| **D8** | ↓ Vertical / Arriba-Abajo | Estricto $90^\circ$ | 13 subejercicios: Estrictamente vertical descendente. |
+| **D9** | ↗ Fuga Suave ~18° / Izq-Der | $15^\circ$ a $20^\circ$ | 19 subejercicios: Entrena líneas de fuga en cajas en perspectiva. |
+| **D10** | ↖ Fuga Suave ~18° / Der-Izq | $15^\circ$ a $20^\circ$ | 19 subejercicios: Fuga suave inversa para la otra cara del cubo. |
+| **D11** | ☼ Roseta Dentro-Fuera | $360^\circ$ Radial | 19 subejercicios: Conexión desde el centro hacia 8 y 12 dianas perimetrales. |
+| **D12** | ❂ Roseta Fuera-Dentro | $360^\circ$ Radial | 19 subejercicios: Conexión desde el perímetro convergiendo al centro común. |
+| **CC** | Trazos Curvos: Arcos en C | Parabólico | 10 subejercicios (CC.01 a CC.10): Curvatura sutil, media y pronunciada, cuerda variable y reto ciego a 3 puntos (①, ② vértice, ③ fin). |
+| **CS** | Trazos Curvos: Ondas en S | Sinusoidal | 10 subejercicios (CS.11 a CS.20): Ondas en S con amplitud y longitud variable, reto ciego a 5 puntos (① inicio, ② cresta, ③ inflexión, ④ valle, ⑤ fin). |
+
+---
+
+### 4.2 Espaciado y Carriles de Ritmo (E1.1 a E3.2)
+
+Inspirado en el Ejercicio 1.1 del cuaderno de dibujo (*"Making Strokes Consistent / Spacing"*). Se ubican en el bloque **`⚡ Calistenia: Espaciado & Carriles (Ritmo)`**:
+
+```
+[ MUESTRA (x) ]         [ CARRILES DE DIBUJO AL PASO x ]
++-------------+         ============================================= (Riel y=0)
+| | | | | | | |   --->    |   |   |   |   |   |   |   |   |   |   |   
++-------------+         ============================================= (Riel y=h)
+ (Siempre visible)       (El usuario traza hacia la derecha al paso x)
+```
+
+1. **E1.1 — Carril Único · Espaciado Base ($x$):**
+   - 1 franja de altura $y = 130$px.
+   - Muestra a la izquierda con paso $x = 16$px.
+   - Rieles horizontales en $y = 0$ y $y = 130$.
+2. **E1.2 — Carril Único · Espaciado Fino ($x/2$):**
+   - 1 franja de altura $y = 130$px con el doble de densidad ($x/2 = 8$px).
+3. **E2.1 — Doble Carril · Espaciado Base ($x$):**
+   - 2 franjas horizontales de altura $\approx y/2$ ($60$px cada una), separadas por un margen blanco intermedio de $24$px.
+   - Espaciado $x = 16$px.
+4. **E2.2 — Doble Carril · Espaciado Fino ($x/2$):**
+   - 2 franjas de altura $60$px con micro-espaciado fino $x/2 = 8$px.
+5. **E3.1 — Cuádruple Carril · Espaciado Base ($x$):**
+   - 4 franjas horizontales de altura $\approx y/4$ ($30$px cada una), separadas por márgenes blancos de $16$px.
+   - Espaciado $x = 16$px. Trazos cortos y de alta cadencia.
+6. **E3.2 — Cuádruple Carril · Espaciado Fino ($x/2$):**
+   - 4 franjas de altura $30$px con espaciado fino $x/2 = 8$px.
+
+**Reglas de diseño de estos ejercicios:**
+- **Muestra permanente:** El bloque izquierdo con la referencia nunca se oculta, permitiendo al usuario calibrar su ojo en todo momento.
+- **Longitud adaptable:** El carril se extiende a lo ancho de la pantalla; no hay un número rígido obligatorio de líneas (se evalúan todas las líneas trazadas, requiriendo un mínimo de 3 por franja).
+- **Soporte de Fases 1, 2 y 3:** Se evalúa precisión de espaciado, fluidez de ritmo y velocidad de ejecución.
+
+---
+
+### 4.3 Las 42 Páginas del Cuaderno Técnico (Bloques 1 al 8)
+
+Cada página cuenta con su lámina didáctica de referencia y un generador procedural para practicar sobre el lienzo digital:
+
+- **Bloque 1: Consistencia & Calistenia (Págs. 1 a 8):** Líneas paralelas, espaciado, contornos, rectas en 8 cuadrantes, quiebros/zigzags, curvas en C y S, rosetas radiales, escape de pluma (*flicks*) y espinas ortogonales.
+- **Bloque 2: Trazos Fundamentales & Trama (Págs. 9 a 13):** Los 7 estilos de tinta (Hatching, Cross-hatch, Uneven, Curved, Scribble, Stipple, Flowing) y variaciones de densidad.
+- **Bloque 3: Contornos Cruzados 3D (Págs. 14 a 17):** Secciones envolventes sobre formas orgánicas (*blobs*), láminas alabeadas y tubos curvados con eje rector.
+- **Bloque 4: Valor Plano & Gradación (Págs. 18 a 21):** Franjas tonales homogéneas, mapas topográficos y gradientes direccionales en formas complejas.
+- **Bloque 5: Planos, Facetas & Isometría (Págs. 22 a 24):** Deconstrucción low-poly de curvas, quiebro de planos y red isométrica (*rhombille tiling* a $0^\circ, 60^\circ, 120^\circ$).
+- **Bloque 6: Sombreado de Poliedros (Págs. 25 a 32):** Cálculo de caras bajo luz solar según la Ley de Lambert a 3 y 6 valores tonales, skylines de prismas y bodegones poliédricos dominantes.
+- **Bloque 7: Superficies Curvas, Cilindro, Esfera (Págs. 33 a 37):** Cinta curva, cilindros en perspectiva con sombra núcleo y trama esférica según meridianos y paralelos.
+- **Bloque 8: Composiciones & Síntesis (Págs. 38 a 42):** Bodegones geométricos avanzados, albedo y tono local, y ensamblaje de piezas compuestas (*compound forms*).
+
+---
+
+## 5. Motor de Generación Procedural y Geometría
+
+Ubicado en `src/lib/strokeProceduralGenerator.ts`.
+
+### Generador Pseudoaleatorio Determinado por Semilla (`SeededRNG`)
+Implementa un generador congruencial lineal (LCG) puro sin dependencias externas:
+$$X_{n+1} = (a \cdot X_n + c) \pmod m$$
+donde $a = 1103515245$, $c = 12345$, $m = 2^{31}$.
+- Permite reproducir exactamente el mismo reto pasando la misma semilla (`challengeSeed`).
+- El botón de dados genera una nueva semilla aleatoria entre `10000` y `99999`.
+
+---
+
+## 6. Motor de Evaluación Analítica y Cinemática Biomecánica
+
+Ubicado en `src/lib/strokeEvaluator.ts` y `src/lib/strokeKinematics.ts`.
+
+### 6.1 Métricas Geométricas
+Para cada trazo se calculan las siguientes propiedades discretas:
+1. **Puntería en Dianas (Boundary Score):**
+   Distancia euclídea del punto inicial al objetivo ① y del punto final al objetivo ②:
+   $$E_{\text{start}} = \sqrt{(x_{\text{inicio}} - x_①)^2 + (y_{\text{inicio}} - y_①)^2}$$
+2. **Rectitud (Straightness Score):**
+   Mide la desviación de sagita perpendicular respecto al segmento ideal $A \to B$.
+3. **Paralelismo y Orientación Angular (Parallelism Score):**
+   Compara el ángulo del vector del usuario respecto al ángulo ideal del reto, penalizando desviaciones angulares.
+4. **Densidad Óptica y Cobertura Tonal:**
+   Calculada mediante muestreo de píxeles entintados dentro de polígonos convexos.
+
+---
+
+### 6.2 Fases Cinemáticas (Precisión, Fluidez, Velocidad)
+
+El motor biomecánico registra el tiempo de cada punto `(x, y, time)` mediante la API de Pointer Events:
+- **Velocidad Media y Pico:** Longitud de arco dividida entre la duración en segundos ($px/s$).
+- **Índice de Fluidez ($0-100\%$):** Coeficiente de variación de la aceleración. Penaliza vacilaciones y micro-detenciones (velocidad $< 70$ px/s con duración $> 25$ ms).
+- **Línea Base Adaptativa (`UserSpeedProfile`):** Almacena en `localStorage` la velocidad media del usuario por cada dirección anatómica para comparar su rendimiento contra su propio historial.
+
+#### Criterios de Aprobación por Fase:
+- **Fase 1 (Precisión):** La nota geométrica debe ser $\ge 75\%$. El usuario puede trazar a la velocidad que desee.
+- **Fase 2 (Fluidez):** Requiere nota geométrica $\ge 75\%$ e índice de fluidez $\ge 70\%$ (trazo seguro sin temblor).
+- **Fase 3 (Velocidad):** Requiere nota geométrica $\ge 75\%$ y velocidad balística superior al umbral rápido de su perfil.
+
+---
+
+### 6.3 Detección de Dirección Invertida (0%)
+
+Si el usuario empieza a dibujar en el punto de llegada ② y termina en el punto de inicio ①:
+1. El motor calcula las distancias cruzadas:
+   $$E_{\text{normal}} = \text{dist}(P_{\text{inicio}}, ①) + \text{dist}(P_{\text{fin}}, ②)$$
+   $$E_{\text{invertida}} = \text{dist}(P_{\text{inicio}}, ②) + \text{dist}(P_{\text{fin}}, ①)$$
+2. Si $E_{\text{invertida}} + 15 < E_{\text{normal}}$, se activa la bandera `isReversed = true`.
+3. **Resultado:**
+   - Calificación instantánea de **$0\%$**.
+   - Mensaje de aviso explícito: *"⚠️ Dirección Invertida: Has trazado en sentido contrario (de ② hacia ①)"*.
+   - Banner informativo en el lienzo que se descarta automáticamente al iniciar el siguiente intento.
+
+---
+
+### 6.4 Algoritmo de Evaluación de Espaciado & Carriles
+
+En los ejercicios `E1.1` a `E3.2`:
+1. Se filtran los trazos situados en el carril de dibujo ($X \ge X_{\text{inicio}} - 15$).
+2. Se asigna cada trazo a su franja correspondiente según su centroide vertical $Y$.
+3. Para cada franja con $\ge 2$ líneas:
+   - Se ordenan de izquierda a derecha por $X$.
+   - Se calculan las distancias consecutivas $\Delta x_i = x_{i+1} - x_i$.
+   - Se obtiene la media $\mu_{\Delta x}$ y la desviación estándar $\sigma_{\Delta x}$.
+   - **Nota de espaciado:** $0.45 \times \text{FidelidadAlPasoObjetivo} + 0.55 \times \text{RegularidadInterna}$.
+   - **Nota de carriles:** Penaliza si los trazos no llegan o rebasan los rieles superior e inferior con tolerancia de $\pm 6$px.
+   - **Rectitud y verticalidad:** Se evalúa la proximidad a $90^\circ$ de cada trazo.
+
+---
+
+## 7. Interfaz de Usuario (UI/UX) y Experiencia en Tablet / PC
+
+Ubicada en `src/components/StrokeLabView.tsx`.
+
+### Principales Mejoras de Ergonomía Aplicadas:
+1. **Layout Compacto Sin Scroll:**
+   - La barra lateral izquierda y el lienzo caben simultáneamente en la pantalla en tablets y portátiles sin requerir scroll vertical.
+   - El lienzo mantiene su relación de aspecto técnica `600 / 540` con un margen inferior de respiración para que no quede pegado al borde.
+2. **Drawer Lateral Deslizante:**
+   - El catálogo completo de los 260 ejercicios se despliega mediante un panel lateral accesible con el botón de menú `☰`, con buscador y filtro por bloques.
+3. **Calificación Destacada y Telemetría:**
+   - El porcentaje de nota se muestra en tamaño grande (`text-3xl / text-4xl`) con badge de estado (`Superado ✓`, `Ajustar`, `Dirección ⚠️`).
+   - Muestra la duración en segundos y la velocidad en $px/s$.
+4. **Controles de Revisión Post-Evaluación:**
+   - **Botón `Mi Trazo`:** Permite ocultar o mostrar las líneas dibujadas por el usuario.
+   - **Botón `Solución`:** Permite activar o desactivar la solución ideal discontinua. Cuando está desactivado, el lienzo queda completamente limpio de líneas grises o fantasmas.
+   - Ambos botones solo están habilitados una vez que se ha corregido el ejercicio.
+5. **Botones de Información (`i`):**
+   - Icono `i` junto a **Reto Activo**: Abre un modal con la información técnica, instrucciones y la lámina del libro correspondiente.
+   - Icono `i` junto a **Fase Cinemática**: Explica qué mide cada fase y cómo superar el reto cinemático.
+
+---
+
+## 8. Sistema de Depuración, Telemetría y Exportación
+
+Junto al botón de reintentar (`R`), existe un botón de depuración (`⚠️`) que abre un modal con el reporte completo:
+- Permite escribir comentarios de prueba.
+- **Copiar al Portapapeles:** Copia un reporte estructurado en texto claro con todas las coordenadas, errores en píxeles, derivadas de velocidad y notas desglosadas.
+- **Descargar JSON:** Genera un archivo `.json` con el dump completo de la sesión, útil para auditoría y desarrollo.
+
+---
+
+## 9. Registro de Hitos y Mejoras Recientes
+
+A continuación se resumen los avances implementados en la última fase de trabajo:
+
+1. **Compactación Total de la Interfaz:**
+   - Eliminación de elementos redundantes para garantizar que la pantalla no requiera scroll en tablets o portátiles.
+2. **Reorganización de Modales Informativos:**
+   - Botones `i` minimalistas para Fases Cinemáticas y Reto Activo; eliminación del botón duplicado de guía técnica.
+3. **Ampliación de Direcciones de Trazo:**
+   - Creación de D5 (Horizontal →), D6 (Horizontal ←), D7 (Vertical ↑), D8 (Vertical ↓) exclusivamente rectos sin variaciones de giro.
+   - Creación de D9 (Fuga suave ascendente ↗) y D10 (Fuga suave ascendente ↖) a $15^\circ-20^\circ$.
+4. **Rosetas Radiales (D11 y D12):**
+   - D11: Roseta de dentro hacia afuera (8 y 12 radios).
+   - D12: Roseta de fuera hacia adentro (8 y 12 radios).
+   - Superposición de solución adaptada con confluencia central.
+5. **Control de Dirección Invertida (0% Score):**
+   - Detección precisa de trazos dibujados al revés con pop-up en el lienzo y penalización inmediata.
+6. **Familia de Carriles y Espaciado (E1.1 a E3.2):**
+   - 6 nuevos niveles de ritmo interlineal con muestra permanente en la izquierda y rieles horizontales.
+   - Soporte de longitud adaptable a la pantalla.
+   - Fases 1, 2 y 3 habilitadas para ritmo motor.
+
+---
+
+## 10. Próximos Pasos y Roadmap Sugerido
+
+Si retomas el proyecto en otro ordenador o deseas continuar ampliándolo, aquí tienes las tareas prioritarias:
+
+1. **Nuevos Modos de Ritmo y Densidad:**
+   - Ampliar la familia de carriles con tramas inclinadas (hatching a $45^\circ$) manteniendo el espaciado $x$ y $x/2$.
+2. **Integración con Modo Carrera / Gamificación:**
+   - Vincular los resultados del Laboratorio de Calistenia con la progresión global de niveles y recompensas del perfil (`ProfileView.tsx`).
+3. **Pruebas de Usabilidad con Stylus en Dispositivos Reales:**
+   - Probar en iPad (Safari/Chrome) y tablet Android (Samsung Tab S con S-Pen) para verificar la curva de presión y respuesta háptica.
+4. **Empaquetado de Nueva Release:**
+   - Generar el nuevo `.apk` para Android y `.exe` para Windows incorporando todo el catálogo de 260 ejercicios.
+
+---
+
+*Documento redactado y preservado para el repositorio de Paplitz. Todo el código correspondiente se encuentra versionado y sincronizado en la rama `main` de GitHub.*
