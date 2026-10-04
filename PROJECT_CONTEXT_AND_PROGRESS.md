@@ -12,9 +12,9 @@
 1. [Resumen Ejecutivo & Visión del Proyecto](#1-resumen-ejecutivo--visión-del-proyecto)
 2. [Guía Rápida para Abrir y Trabajar en Otro PC (Quickstart)](#2-guía-rápida-para-abrir-y-trabajar-en-otro-pc-quickstart)
 3. [Estructura del Proyecto y Mapa de Archivos](#3-estructura-del-proyecto-y-mapa-de-archivos)
-4. [Catálogo Completo de Ejercicios (266 Retos)](#4-catálogo-completo-de-ejercicios-266-retos)
-   - [4.1 Calistenia Dinámica de Trazo Único (218 Retos)](#41-calistenia-dinámica-de-trazo-único-218-retos)
-   - [4.2 Espaciado y Carriles de Ritmo (E1.1 a E5.2)](#42-espaciado-y-carriles-de-ritmo-e11-a-e52)
+4. [Catálogo Completo de Ejercicios (267 Retos)](#4-catálogo-completo-de-ejercicios-267-retos)
+   - [4.1 Calistenia Dinámica de Trazo Único (212 Retos)](#41-calistenia-dinámica-de-trazo-único-212-retos)
+   - [4.2 Espaciado y Carriles de Ritmo (E1.1 a E6.1)](#42-espaciado-y-carriles-de-ritmo-e11-a-e61)
    - [4.3 Las 42 Páginas del Cuaderno Técnico (Bloques 1 al 8)](#43-las-42-páginas-del-cuaderno-técnico-bloques-1-al-8)
 5. [Motor de Generación Procedural y Geometría](#5-motor-de-generación-procedural-y-geometría)
 6. [Motor de Evaluación Analítica y Cinemática Biomecánica](#6-motor-de-evaluación-analítica-y-cinemática-biomecánica)
@@ -130,9 +130,9 @@ Web dibujitos/ (paplitz-drawing-lab)
 │   └── lib/                      # Núcleo analítico, generadores y tipos
 │       ├── strokeTypes.ts        # ⭐ Definiciones TypeScript completas:
 │       │                         #    - LabExerciseDef, ProceduralStrokeChallenge
-│       │                         #    - ALL_SINGLE_STROKE_EXERCISES (224 niveles)
+│       │                         #    - ALL_SINGLE_STROKE_EXERCISES (225 niveles)
 │       │                         #    - ALL_42_EXERCISES (42 páginas del cuaderno)
-│       │                         #    - ALL_LAB_EXERCISES (266 ejercicios totales)
+│       │                         #    - ALL_LAB_EXERCISES (267 ejercicios totales)
 │       │                         #    - SpacingTrackConfig, SpacingTrackParams
 │       │                         #    - StrokeEvaluation, KeyPoint, TargetLineDef
 │       │
@@ -141,7 +141,7 @@ Web dibujitos/ (paplitz-drawing-lab)
 │       │                         #    - generateSingleStrokeChallenge (Líneas y curvas)
 │       │                         #    - generateMultiLineChallenge (2 o 3 líneas dispersas)
 │       │                         #    - generateRadialRosetteChallenge (Rosetas D11 y D12)
-│       │                         #    - generateSpacingTrackChallenge (Carriles E1.1 a E5.2)
+│       │                         #    - generateSpacingTrackChallenge (Carriles E1.1 a E6.1)
 │       │                         #    - Generadores para las 42 páginas del cuaderno
 │       │
 │       ├── strokeEvaluator.ts    # ⭐ Evaluador analítico instantáneo y biomecánico:
@@ -173,9 +173,9 @@ Web dibujitos/ (paplitz-drawing-lab)
 
 ---
 
-## 4. Catálogo Completo de Ejercicios (266 Retos)
+## 4. Catálogo Completo de Ejercicios (267 Retos)
 
-El catálogo unificado en `src/lib/strokeTypes.ts` combina **224 Calistenias Dinámicas** (212 de trazo único, curvas y rosetas + 12 de espaciado y carriles) y las **42 Páginas del Cuaderno Técnico**, sumando un total de **266 ejercicios** agrupados por bloques temáticos.
+El catálogo unificado en `src/lib/strokeTypes.ts` combina **225 Calistenias Dinámicas** (212 de trazo único, curvas y rosetas + 13 de espaciado y carriles) y las **42 Páginas del Cuaderno Técnico**, sumando un total de **267 ejercicios** agrupados por bloques temáticos.
 
 ### 4.1 Calistenia Dinámica de Trazo Único y Rosetas (212 Retos)
 
@@ -200,7 +200,7 @@ Entrenamiento biomecánico repetitivo con evaluación inmediata al levantar el l
 
 ---
 
-### 4.2 Espaciado y Carriles de Ritmo (E1.1 a E5.2)
+### 4.2 Espaciado y Carriles de Ritmo (E1.1 a E6.1)
 
 Inspirado en el Ejercicio 1.1 del cuaderno de dibujo (*"Making Strokes Consistent / Spacing"*). Se ubican en el bloque **`⚡ Calistenia: Espaciado & Carriles (Ritmo)`**:
 
@@ -253,11 +253,22 @@ Inspirado en el Ejercicio 1.1 del cuaderno de dibujo (*"Making Strokes Consisten
     - 1 franja de altura $y = 130$px, espaciado fino $x/2 = 8$px.
     - Quiebre triangular en espejo hacia la derecha (►) en el tercio inferior.
     - Misma estructura de bloques delimitados con líneas sólidas de **INICIO** y **FIN**, y zona intermedia de pausa.
+13. **E6.1 — Carril Quiebre en Chevron ◄ (Bloques & Pausas · x/2):**
+    - 1 franja de altura $y = 130$px, espaciado fino $x/2 = 8$px.
+    - Patrón geométrico en chevron (`<`) con vértice apuntando hacia la izquierda (◄) en el centro exacto de la franja ($y_{\text{apex}} \approx y_{\text{top}} + 0.49 \cdot h$, deflexión horizontal de $26$px).
+    - Los dos extremos (superior e inferior) caen en la misma vertical ($|X_{\text{start}} - X_{\text{end}}| \approx 0$), formando un ángulo obtuso de $\approx 130^\circ$.
+    - Longitud de arco total $\approx 140$px ($2 \times \sqrt{65^2 + 26^2}$).
+    - **Sin versión en espejo:** Diseñado estrictamente en orientación hacia la izquierda según las especificaciones didácticas del método.
+    - Distribución en 2 bloques discretos de ancho $\approx y$ ($128$px, $15$ líneas interiores por bloque) separados por un espacio de pausa de $48$px.
+    - Bloque 1 delimitado por líneas sólidas de **INICIO** ($X=188$) y **FIN** ($X=316$).
+    - Bloque 2 delimitado por líneas sólidas de **INICIO** ($X=364$) y **FIN** ($X=492$).
+    - Bloque de muestra con flecha sólida indicadora de sentido descendente en la rama inferior y punto de inicio (●) en el riel superior.
 
 **Reglas de diseño de estos ejercicios:**
-- **Muestra permanente:** El bloque izquierdo con la referencia nunca se oculta, permitiendo al usuario calibrar su ojo en todo momento. Muestra la dirección y ángulo exactos (`MUESTRA ↗ (~75°)`).
-- **Flecha indicadora de dirección en diagonales:** En los niveles diagonales (E4.1 a E4.4), una de las líneas del bloque de muestra cuenta con un icono de flecha sólida al final del trazo y un punto de origen (●) al inicio, indicando visualmente de manera inequívoca el sentido y dirección del movimiento biomecánico.
-- **Longitud adaptable:** El carril se extiende a lo ancho de la pantalla; no hay un número rígido obligatorio de líneas (se evalúan todas las líneas trazadas, requiriendo un mínimo de 3 por franja).
+- **Muestra permanente:** El bloque izquierdo con la referencia nunca se oculta, permitiendo al usuario calibrar su ojo en todo momento. Muestra la dirección y ángulo exactos (`MUESTRA ↗ (~75°)`, `MUESTRA CHEVRON ◄`).
+- **Flechas indicadoras de dirección:** En los niveles diagonales (E4.1 a E4.4) y con quiebre (E5 y E6), una de las líneas del bloque de muestra cuenta con un icono de flecha sólida al final del trazo y un punto de origen (●) al inicio, indicando visualmente de manera inequívoca el sentido y dirección del movimiento biomecánico.
+- **Lienzo limpio sin textos superfluos:** Se han eliminado los textos de ayuda flotantes redundantes dentro del lienzo para preservar la pureza visual y permitir que las líneas pre-dibujadas de inicio y fin guíen intuitivamente la ejecución.
+- **Longitud adaptable:** El carril se extiende a lo ancho de la pantalla; no hay un número rígido obligatorio de líneas (se evalúan todas las líneas trazadas, requiriendo un mínimo de 3 por franja en continuos y 10 en bloques).
 - **Verificación rigurosa de sentido y pendiente:** Trazar en dirección contraria otorga $0\%$ de calificación con advertencia visual inmediata. La inclinación de la pendiente se valida contra el cuadrante angular exacto.
 - **Soporte de Fases 1, 2 y 3:** Se evalúa precisión de espaciado, fluidez de ritmo y velocidad de ejecución.
 
@@ -350,19 +361,16 @@ Si el usuario empieza a dibujar en el punto de llegada ② y termina en el punto
    - **Nota de carriles:** Penaliza si los trazos no llegan o rebasan los rieles superior e inferior con tolerancia de $\pm 6$px.
    - **Rectitud y angularidad:** Se evalúa la proximidad al ángulo objetivo ($90^\circ$ vertical o $75^\circ$ diagonal con validación de cuadrante slash/backslash).
 
-#### Para carriles con quiebre triangular y bloques delimitados (`E5.1` y `E5.2`):
-1. **Fidelidad del Quiebre Triangular (`evaluateKinkFidelity`):**
-   - Se localiza la deflexión horizontal máxima respecto al eje superior de la línea.
-   - Se valida el sentido del quiebre: deflexión hacia la izquierda (◄ para E5.1) o hacia la derecha (► para E5.2).
-   - Se evalúa la cercanía de la deflexión al objetivo ($16$px).
-   - Se comprueba la altura vertical relativa del vértice ($y_{\text{apex}} \approx y_{\text{top}} + 0.67 \cdot h$, tolerancia en $[0.55, 0.80]$).
-   - Se verifica el retorno a la vertical en el extremo inferior.
-   - **Detección de líneas rectas sin quiebre:** Si el usuario dibuja líneas verticales rectas ordinarias ($\Delta X < 4$px), se penaliza la nota drásticamente ($\le 30\%$) con mensaje diagnóstico: *"¡Falta el Quiebre Triangular! ◄/►"*.
-2. **Partición por Bloques y Control de Pausas:**
-   - Los trazos se clasifican automáticamente en Bloque 1 ($X \in [160, 302]$) y Bloque 2 ($X \in [338, 480]$).
-   - Se evalúan los intervalos internos incluyendo la distancia desde la línea de **INICIO** pre-dibujada hasta el primer trazo, y desde el último trazo hasta la línea de **FIN**.
-   - Se detectan trazos indebidos en la zona central de pausa ($X \in (302, 338)$), aplicando penalización y retroalimentación para que el alumno descanse la mano sin dibujar en ese intervalo.
-   - Se exige completar ambos bloques (penalización si se deja uno en blanco).
+#### Para carriles con quiebre (Triangular E5.1/E5.2 y Chevron E6.1):
+1. **Fidelidad del Quiebre (`evaluateKinkFidelity`):**
+   - **Quiebre triangular (`triangle_left`, `triangle_right`):** Vértice a $2/3$ de la altura ($y_{\text{apex}} \approx y_{\text{top}} + 0.67 \cdot h$), deflexión de $16$px con retorno a la vertical.
+   - **Quiebre en chevron (`chevron_left`):** Vértice en el centro exacto ($y_{\text{apex}} \approx y_{\text{top}} + 0.49 \cdot h$), deflexión pronunciada de $26$px hacia la izquierda y alineación vertical estricta entre el punto inicial y final ($|X_{\text{start}} - X_{\text{end}}| \le 8$px).
+   - **Detección de líneas rectas sin quiebre:** Si el usuario traza líneas verticales rectas ordinarias sin realizar el ángulo solicitado, la nota geométrica se limita drásticamente ($\le 30\%$) con mensaje diagnóstico claro (*"¡Falta el Quiebre Triangular!"* o *"¡Falta el Quiebre en Chevron!"*).
+   - **Detección de quiebre en sentido opuesto:** Se valida el signo del quiebre (◄ vs ►) para asegurar la dirección correcta.
+2. **Partición Robusta por Bloques y Control de Pausas:**
+   - La clasificación y medición de espaciado se calcula con respecto al promedio geométrico real de los puntos de las líneas pre-dibujadas (`startAvgX` y `endAvgX`). Esto garantiza que trazos con formas complejas (como chevrons con deflexión de $26$px) se midan con total exactitud respecto a la línea de **INICIO** y de **FIN**.
+   - Los trazos se particionan en Bloque 1 y Bloque 2, exigiendo completar ambos.
+   - Se penalizan trazos indebidos en la zona central de pausa (`(PAUSA)`), educando al usuario para levantar la mano y relajar el pulso entre bloques.
 
 ---
 
@@ -375,7 +383,7 @@ Ubicada en `src/components/StrokeLabView.tsx`.
    - La barra lateral izquierda y el lienzo caben simultáneamente en la pantalla en tablets y portátiles sin requerir scroll vertical.
    - El lienzo mantiene su relación de aspecto técnica `600 / 540` con un margen inferior de respiración para que no quede pegado al borde.
 2. **Drawer Lateral Deslizante:**
-   - El catálogo completo de los 260 ejercicios se despliega mediante un panel lateral accesible con el botón de menú `☰`, con buscador y filtro por bloques.
+   - El catálogo completo de los 267 ejercicios se despliega mediante un panel lateral accesible con el botón de menú `☰`, con buscador y filtro por bloques.
 3. **Calificación Destacada y Telemetría:**
    - El porcentaje de nota se muestra en tamaño grande (`text-3xl / text-4xl`) con badge de estado (`Superado ✓`, `Ajustar`, `Dirección ⚠️`).
    - Muestra la duración en segundos y la velocidad en $px/s$.
@@ -427,6 +435,12 @@ A continuación se resumen los avances implementados en la última fase de traba
    - Bloques discretos de ancho $\approx y$ ($128$px) delimitados por líneas sólidas de **INICIO** y **FIN** pre-dibujadas.
    - Zona de pausa central para descansar la mano sin tocar el lienzo.
    - Motor analítico específico (`evaluateKinkFidelity`) que penaliza líneas rectas y verifica la altura, dirección y deflexión del vértice.
+9. **Carril Quiebre en Chevron ◄ (E6.1) y Limpieza Visual:**
+   - Creación del nivel E6.1 (`Carril Quiebre en Chevron ◄`) con patrón en `<` a media altura ($y_{\text{apex}} \approx y_{\text{top}} + 0.49 \cdot h$, deflexión de $26$px, longitud $140$px).
+   - Sin versión en espejo (diseñado exclusivamente orientado a la izquierda).
+   - Eliminación de textos flotantes redundantes en el lienzo para mantener la estética pura de dibujo técnico y calistenia.
+   - Líneas de muestra con icono de flecha direccional y dot de inicio en diagonales y quiebres.
+   - Catálogo ampliado a 267 retos totales (225 dinámicos + 42 páginas de cuaderno).
 
 ---
 
@@ -441,7 +455,7 @@ Si retomas el proyecto en otro ordenador o deseas continuar ampliándolo, aquí 
 3. **Pruebas de Usabilidad con Stylus en Dispositivos Reales:**
    - Probar en iPad (Safari/Chrome) y tablet Android (Samsung Tab S con S-Pen) para verificar la curva de presión y respuesta háptica.
 4. **Empaquetado de Nueva Release:**
-   - Generar el nuevo `.apk` para Android y `.exe` para Windows incorporando todo el catálogo de 260 ejercicios.
+   - Generar el nuevo `.apk` para Android y `.exe` para Windows incorporando todo el catálogo de 267 ejercicios.
 
 ---
 

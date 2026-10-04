@@ -1127,7 +1127,7 @@ function getStrokeSlopeAngle(stroke: RawStroke): { angleFromHorizontalDeg: numbe
  */
 function evaluateKinkFidelity(
   stroke: RawStroke,
-  kinkType: 'triangle_left' | 'triangle_right',
+  kinkType: 'triangle_left' | 'triangle_right' | 'chevron_left',
   yTop: number,
   yBottom: number
 ): {
@@ -1137,13 +1137,69 @@ function evaluateKinkFidelity(
   apexDeflection: number;
   apexYRel: number;
 } {
-  if (stroke.points.length < 4) {
+  if (stroke.points.length < 3) {
     return { score: 10, hasKink: false, isCorrectDirection: false, apexDeflection: 0, apexYRel: 0 };
   }
 
   const h = yBottom - yTop;
   const pStart = stroke.points[0];
   const pEnd = stroke.points[stroke.points.length - 1];
+
+  if (kinkType === 'chevron_left') {
+    // Para chevron: ambos extremos apoyan en la misma vertical x. Eje de referencia = (pStart.x + pEnd.x) / 2
+    const refX = (pStart.x + pEnd.x) / 2;
+    let maxTargetDeflection = 0; // hacia la izquierda (x < refX)
+    let maxOppositeDeflection = 0; // hacia la derecha (x > refX)
+    let apexPoint = stroke.points[0];
+
+    for (const p of stroke.points) {
+      const dx = refX - p.x; // positivo hacia la izquierda
+      if (dx > maxTargetDeflection) {
+        maxTargetDeflection = dx;
+        apexPoint = p;
+      }
+      if (-dx > maxOppositeDeflection) {
+        maxOppositeDeflection = -dx;
+      }
+    }
+
+    const hasKink = maxTargetDeflection >= 8.0;
+    const isCorrectDirection = maxTargetDeflection >= maxOppositeDeflection && hasKink;
+
+    if (!hasKink) {
+      return { score: 15, hasKink: false, isCorrectDirection: false, apexDeflection: maxTargetDeflection, apexYRel: 0 };
+    }
+    if (!isCorrectDirection) {
+      return { score: 25, hasKink: true, isCorrectDirection: false, apexDeflection: maxTargetDeflection, apexYRel: 0 };
+    }
+
+    // Objetivo de deflexión hacia la izquierda: 26px
+    const deflectionDiff = Math.abs(maxTargetDeflection - 26);
+    const deflectionScore = Math.max(0, 100 - deflectionDiff * 4.5);
+
+    // Altura del vértice: debe situarse cerca de la mitad del trazo (yRel ≈ 0.49)
+    const apexYRel = h > 0 ? (apexPoint.y - yTop) / h : 0.49;
+    const yRelDiff = Math.abs(apexYRel - 0.49);
+    const yLocationScore = Math.max(0, 100 - yRelDiff * 160);
+
+    // Alineación vertical de los dos extremos: inicio y fin en la misma vertical (|pEnd.x - pStart.x| cercano a 0)
+    const returnDiff = Math.abs(pEnd.x - pStart.x);
+    const returnScore = Math.max(0, 100 - returnDiff * 5);
+
+    const score = Math.round(
+      deflectionScore * 0.45 +
+      yLocationScore * 0.35 +
+      returnScore * 0.20
+    );
+
+    return {
+      score: Math.min(100, Math.max(0, score)),
+      hasKink,
+      isCorrectDirection,
+      apexDeflection: maxTargetDeflection,
+      apexYRel,
+    };
+  }
 
   // Eje de referencia X: promedio de X en el tercio superior
   const topPoints = stroke.points.filter((p) => p.y <= yTop + h * 0.45);
@@ -1350,24 +1406,32 @@ export function evaluateSpacingTrackSubmission(
     const b1 = blocks[0];
     const b2 = blocks[1];
 
+    const getPointsAvgX = (pts: { x: number; y: number }[]) =>
+      pts.reduce((acc, p) => acc + p.x, 0) / (pts.length || 1);
+
+    const b1StartAvgX = getPointsAvgX(b1.startLinePoints);
+    const b1EndAvgX = getPointsAvgX(b1.finalLinePoints);
+    const b2StartAvgX = b2 ? getPointsAvgX(b2.startLinePoints) : 0;
+    const b2EndAvgX = b2 ? getPointsAvgX(b2.finalLinePoints) : 0;
+
     // Clasificar trazos por bloque y detectar trazos en el gap de pausa
     const b1Strokes: typeof trackStrokes = [];
     const b2Strokes: typeof trackStrokes = [];
     const gapStrokes: typeof trackStrokes = [];
 
     for (const ts of trackStrokes) {
-      if (ts.avgX >= b1.xStart - 6 && ts.avgX <= b1.xEnd + 6) {
+      if (ts.avgX >= b1StartAvgX - 8 && ts.avgX <= b1EndAvgX + 8) {
         b1Strokes.push(ts);
-      } else if (b2 && ts.avgX >= b2.xStart - 6 && ts.avgX <= b2.xEnd + 6) {
+      } else if (b2 && ts.avgX >= b2StartAvgX - 8 && ts.avgX <= b2EndAvgX + 8) {
         b2Strokes.push(ts);
-      } else if (b2 && ts.avgX > b1.xEnd + 6 && ts.avgX < b2.xStart - 6) {
+      } else if (b2 && ts.avgX > b1EndAvgX + 8 && ts.avgX < b2StartAvgX - 8) {
         gapStrokes.push(ts);
       }
     }
 
     const blockList = [
-      { def: b1, strokes: b1Strokes },
-      ...(b2 ? [{ def: b2, strokes: b2Strokes }] : []),
+      { def: b1, startAvgX: b1StartAvgX, endAvgX: b1EndAvgX, strokes: b1Strokes },
+      ...(b2 ? [{ def: b2, startAvgX: b2StartAvgX, endAvgX: b2EndAvgX, strokes: b2Strokes }] : []),
     ];
 
     let totalBlockSpacingScore = 0;
@@ -1391,7 +1455,7 @@ export function evaluateSpacingTrackSubmission(
 
       // Espaciados en el bloque: incluyendo la distancia desde la línea inicial y hasta la línea final
       const spacings: number[] = [];
-      const dStart = bStrokes[0].avgX - blk.def.xStart;
+      const dStart = bStrokes[0].avgX - blk.startAvgX;
       if (dStart > 0) {
         spacings.push(dStart);
         allSpacings.push(dStart);
@@ -1401,7 +1465,7 @@ export function evaluateSpacingTrackSubmission(
         spacings.push(dx);
         allSpacings.push(dx);
       }
-      const dEnd = blk.def.xEnd - bStrokes[bStrokes.length - 1].avgX;
+      const dEnd = blk.endAvgX - bStrokes[bStrokes.length - 1].avgX;
       if (dEnd > 0) {
         spacings.push(dEnd);
         allSpacings.push(dEnd);
@@ -1433,7 +1497,7 @@ export function evaluateSpacingTrackSubmission(
       let blockKinkSum = 0;
       let blockAngleSum = 0;
       for (const s of bStrokes) {
-        const kinkEval = evaluateKinkFidelity(s.stroke, kinkType as 'triangle_left' | 'triangle_right', singleBand.yTop, singleBand.yBottom);
+        const kinkEval = evaluateKinkFidelity(s.stroke, kinkType as 'triangle_left' | 'triangle_right' | 'chevron_left', singleBand.yTop, singleBand.yBottom);
         blockKinkSum += kinkEval.score;
         if (!kinkEval.hasKink) missingKinkCount++;
         if (kinkEval.hasKink && !kinkEval.isCorrectDirection) wrongDirKinkCount++;
@@ -1534,12 +1598,20 @@ export function evaluateSpacingTrackSubmission(
       points: [],
       multiLines: challenge.ghostSolutionStrokes || [],
       color: '#000000',
-      label: `Paso Objetivo: ${targetSpacing}px con Quiebre`,
+      label: kinkType === 'chevron_left'
+        ? `Paso Objetivo: ${targetSpacing}px con Quiebre en Chevron ◄`
+        : `Paso Objetivo: ${targetSpacing}px con Quiebre`,
     };
 
-    let feedbackTitle = '¡Quiebres y Espaciado Logrados!';
-    let feedbackMessage = `Has conseguido un paso medio de ${measuredAvgSpacingPx}px (objetivo: ${targetSpacing}px) con buena reproducción del quiebre triangular.`;
-    let tipMessage = 'Mantén la altura del vértice alineada visualmente en todos los trazos.';
+    let feedbackTitle = kinkType === 'chevron_left'
+      ? '¡Quiebres en Chevron y Espaciado Logrados!'
+      : '¡Quiebres y Espaciado Logrados!';
+    let feedbackMessage = kinkType === 'chevron_left'
+      ? `Has conseguido un paso medio de ${measuredAvgSpacingPx}px (objetivo: ${targetSpacing}px) con buena reproducción del patrón chevron ◄.`
+      : `Has conseguido un paso medio de ${measuredAvgSpacingPx}px (objetivo: ${targetSpacing}px) con buena reproducción del quiebre triangular.`;
+    let tipMessage = kinkType === 'chevron_left'
+      ? 'Mantén los vértices del chevron alineados al centro de la franja.'
+      : 'Mantén la altura del vértice alineada visualmente en todos los trazos.';
     let avatarMood: AvatarMood = 'wink';
     let directionWarning: string | undefined;
 
@@ -1553,18 +1625,30 @@ export function evaluateSpacingTrackSubmission(
       tipMessage = 'Traza de arriba a abajo (↓): empieza en el carril superior y desciende hacia el inferior realizando el quiebre.';
       avatarMood = 'fail-spiral';
     } else if (isMissingKinks) {
-      const dirText = kinkType === 'triangle_left' ? 'hacia la izquierda (◄)' : 'hacia la derecha (►)';
-      feedbackTitle = kinkType === 'triangle_left' ? '¡Falta el Quiebre Triangular! ◄' : '¡Falta el Quiebre Triangular! ►';
-      feedbackMessage = `Has trazado líneas verticales rectas. Este ejercicio requiere realizar el quiebre triangular ${dirText} en la zona inferior de cada línea, idéntico a las líneas de INICIO y FIN.`;
-      tipMessage = `Baja verticalmente, desvíate en triángulo ${dirText} a 2/3 de la altura, y retorna a la vertical.`;
+      if (kinkType === 'chevron_left') {
+        feedbackTitle = '¡Falta el Quiebre en Chevron! ◄';
+        feedbackMessage = 'Has trazado líneas verticales rectas. Este ejercicio requiere realizar el quiebre en chevron (ángulo <) hacia la izquierda en el centro del trazo, idéntico a las líneas de INICIO y FIN.';
+        tipMessage = 'Traza en diagonal hacia la izquierda hasta el centro (~26px) y regresa en diagonal hacia la derecha hasta el carril inferior.';
+      } else {
+        const dirText = kinkType === 'triangle_left' ? 'hacia la izquierda (◄)' : 'hacia la derecha (►)';
+        feedbackTitle = kinkType === 'triangle_left' ? '¡Falta el Quiebre Triangular! ◄' : '¡Falta el Quiebre Triangular! ►';
+        feedbackMessage = `Has trazado líneas verticales rectas. Este ejercicio requiere realizar el quiebre triangular ${dirText} en la zona inferior de cada línea, idéntico a las líneas de INICIO y FIN.`;
+        tipMessage = `Baja verticalmente, desvíate en triángulo ${dirText} a 2/3 de la altura, y retorna a la vertical.`;
+      }
       avatarMood = 'curious';
       passed = false;
       phasePassed = false;
     } else if (isWrongDirKinks) {
-      const expectedDir = kinkType === 'triangle_left' ? 'izquierda ◄' : 'derecha ►';
-      feedbackTitle = '¡Quiebre en Sentido Opuesto!';
-      feedbackMessage = `Has dirigido el vértice hacia el lado contrario. El quiebre debe apuntar hacia la ${expectedDir}.`;
-      tipMessage = `Compara con el patrón de muestra a la izquierda antes de trazar.`;
+      if (kinkType === 'chevron_left') {
+        feedbackTitle = '¡Chevron en Sentido Opuesto!';
+        feedbackMessage = 'Has dirigido el vértice hacia la derecha. El quiebre en chevron debe apuntar hacia la izquierda (◄).';
+        tipMessage = 'Compara con el patrón de muestra a la izquierda antes de trazar.';
+      } else {
+        const expectedDir = kinkType === 'triangle_left' ? 'izquierda ◄' : 'derecha ►';
+        feedbackTitle = '¡Quiebre en Sentido Opuesto!';
+        feedbackMessage = `Has dirigido el vértice hacia el lado contrario. El quiebre debe apuntar hacia la ${expectedDir}.`;
+        tipMessage = `Compara con el patrón de muestra a la izquierda antes de trazar.`;
+      }
       avatarMood = 'curious';
       passed = false;
       phasePassed = false;

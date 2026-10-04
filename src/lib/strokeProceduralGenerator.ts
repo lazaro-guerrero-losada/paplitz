@@ -489,17 +489,26 @@ export function generateRadialRosetteChallenge(
 }
 
 /**
- * Genera la polilínea de un trazo vertical con quiebre triangular (◄ o ►)
+ * Genera la polilínea de un trazo vertical con quiebre triangular (◄ o ►) o chevron (◄)
  */
 export function generateKinkStrokePoints(
   x: number,
   yTop: number,
   yBottom: number,
-  kinkType: 'triangle_left' | 'triangle_right' = 'triangle_left',
-  apexOffset = 16
+  kinkType: 'triangle_left' | 'triangle_right' | 'chevron_left' = 'triangle_left',
+  apexOffset?: number
 ): { x: number; y: number }[] {
   const h = yBottom - yTop;
-  const dx = kinkType === 'triangle_left' ? -apexOffset : apexOffset;
+  if (kinkType === 'chevron_left') {
+    const defl = apexOffset ?? 26;
+    return [
+      { x: Math.round(x * 10) / 10, y: yTop },
+      { x: Math.round((x - defl) * 10) / 10, y: Math.round(yTop + h * 0.49) },
+      { x: Math.round(x * 10) / 10, y: yBottom },
+    ];
+  }
+  const offset = apexOffset ?? 16;
+  const dx = kinkType === 'triangle_left' ? -offset : offset;
   return [
     { x: Math.round(x * 10) / 10, y: yTop },
     { x: Math.round(x * 10) / 10, y: Math.round(yTop + h * 0.50) },
@@ -584,20 +593,26 @@ export function generateSpacingTrackChallenge(
   const dxOffset = isDiagonal ? Math.round(bandHeight / Math.tan(radAngle)) : 0;
   const isKink = cfg.kinkType && cfg.kinkType !== 'none';
   const kinkType = cfg.kinkType || 'none';
+  const isChevron = kinkType === 'chevron_left';
 
   // 2. Patrón de muestra (izquierda)
-  const sampleXStart = isDiagonal || isKink ? 28 : 35;
-  const sampleWidth = isDiagonal || isKink ? 80 : 96;
+  const sampleXStart = isChevron ? 44 : isDiagonal || isKink ? 28 : 35;
+  const sampleWidth = isChevron ? 72 : isDiagonal || isKink ? 80 : 96;
   const sampleXEnd = sampleXStart + sampleWidth;
   const sampleLines: { x1?: number; y1: number; x2?: number; y2: number; points?: { x: number; y: number }[]; hasArrow?: boolean }[] = [];
 
   if (isKink) {
-    for (let x = sampleXStart + 8; x <= sampleXEnd; x += targetSpacingPx) {
+    const stepStart = isChevron ? sampleXStart + 4 : sampleXStart + 8;
+    for (let x = stepStart; x <= sampleXEnd; x += targetSpacingPx) {
       sampleLines.push({
         points: generateKinkStrokePoints(Math.round(x), bands[0].yTop, bands[0].yBottom, kinkType as any),
         y1: bands[0].yTop,
         y2: bands[0].yBottom,
       });
+    }
+    if (sampleLines.length > 0) {
+      const midIdx = Math.floor(sampleLines.length / 2);
+      sampleLines[midIdx].hasArrow = true;
     }
   } else {
     for (let x = sampleXStart; x <= sampleXEnd + 0.1; x += targetSpacingPx) {
@@ -650,43 +665,81 @@ export function generateSpacingTrackChallenge(
   let blocks: SpacingTrackBlock[] | undefined = undefined;
   if (isKink) {
     const b = bands[0];
-    blocks = [
-      {
-        id: 'b1',
-        xStart: 168,
-        xEnd: 296,
-        width: 128,
-        startLinePoints: generateKinkStrokePoints(168, b.yTop, b.yBottom, kinkType as any),
-        finalLinePoints: generateKinkStrokePoints(296, b.yTop, b.yBottom, kinkType as any),
-        targetInteriorLineCount: 15,
-      },
-      {
-        id: 'b2',
-        xStart: 344,
-        xEnd: 472,
-        width: 128,
-        startLinePoints: generateKinkStrokePoints(344, b.yTop, b.yBottom, kinkType as any),
-        finalLinePoints: generateKinkStrokePoints(472, b.yTop, b.yBottom, kinkType as any),
-        targetInteriorLineCount: 15,
-      },
-    ];
+    if (isChevron) {
+      blocks = [
+        {
+          id: 'b1',
+          xStart: 188,
+          xEnd: 316,
+          width: 128,
+          startLinePoints: generateKinkStrokePoints(188, b.yTop, b.yBottom, 'chevron_left'),
+          finalLinePoints: generateKinkStrokePoints(316, b.yTop, b.yBottom, 'chevron_left'),
+          targetInteriorLineCount: 15,
+        },
+        {
+          id: 'b2',
+          xStart: 364,
+          xEnd: 492,
+          width: 128,
+          startLinePoints: generateKinkStrokePoints(364, b.yTop, b.yBottom, 'chevron_left'),
+          finalLinePoints: generateKinkStrokePoints(492, b.yTop, b.yBottom, 'chevron_left'),
+          targetInteriorLineCount: 15,
+        },
+      ];
+    } else {
+      blocks = [
+        {
+          id: 'b1',
+          xStart: 168,
+          xEnd: 296,
+          width: 128,
+          startLinePoints: generateKinkStrokePoints(168, b.yTop, b.yBottom, kinkType as any),
+          finalLinePoints: generateKinkStrokePoints(296, b.yTop, b.yBottom, kinkType as any),
+          targetInteriorLineCount: 15,
+        },
+        {
+          id: 'b2',
+          xStart: 344,
+          xEnd: 472,
+          width: 128,
+          startLinePoints: generateKinkStrokePoints(344, b.yTop, b.yBottom, kinkType as any),
+          finalLinePoints: generateKinkStrokePoints(472, b.yTop, b.yBottom, kinkType as any),
+          targetInteriorLineCount: 15,
+        },
+      ];
+    }
   }
 
   // 4. Solución fantasma
   const ghostSolutionStrokes: { points: { x: number; y: number }[] }[] = [];
   if (isKink) {
     const b = bands[0];
-    // Bloque 1 (entre 168 y 296)
-    for (let x = 168 + targetSpacingPx; x < 296 - 0.1; x += targetSpacingPx) {
-      ghostSolutionStrokes.push({
-        points: generateKinkStrokePoints(Math.round(x), b.yTop, b.yBottom, kinkType as any),
-      });
-    }
-    // Bloque 2 (entre 344 y 472)
-    for (let x = 344 + targetSpacingPx; x < 472 - 0.1; x += targetSpacingPx) {
-      ghostSolutionStrokes.push({
-        points: generateKinkStrokePoints(Math.round(x), b.yTop, b.yBottom, kinkType as any),
-      });
+    if (isChevron) {
+      // Bloque 1 (entre 188 y 316)
+      for (let x = 188 + targetSpacingPx; x < 316 - 0.1; x += targetSpacingPx) {
+        ghostSolutionStrokes.push({
+          points: generateKinkStrokePoints(Math.round(x), b.yTop, b.yBottom, 'chevron_left'),
+        });
+      }
+      // Bloque 2 (entre 364 y 492)
+      for (let x = 364 + targetSpacingPx; x < 492 - 0.1; x += targetSpacingPx) {
+        ghostSolutionStrokes.push({
+          points: generateKinkStrokePoints(Math.round(x), b.yTop, b.yBottom, 'chevron_left'),
+        });
+      }
+    } else {
+      // Bloque 1 (entre 168 y 296)
+      for (let x = 168 + targetSpacingPx; x < 296 - 0.1; x += targetSpacingPx) {
+        ghostSolutionStrokes.push({
+          points: generateKinkStrokePoints(Math.round(x), b.yTop, b.yBottom, kinkType as any),
+        });
+      }
+      // Bloque 2 (entre 344 y 472)
+      for (let x = 344 + targetSpacingPx; x < 472 - 0.1; x += targetSpacingPx) {
+        ghostSolutionStrokes.push({
+          points: generateKinkStrokePoints(Math.round(x), b.yTop, b.yBottom, kinkType as any),
+        });
+      }
     }
   } else {
     for (const band of bands) {
@@ -744,8 +797,15 @@ export function generateSpacingTrackChallenge(
 
   let subtitle = '';
   if (isKink) {
-    const sym = kinkType === 'triangle_left' ? '◄' : '►';
-    subtitle = `2 Bloques (Ancho y) · Paso ${subdivLabel} (${targetSpacingPx}px) · Quiebre Triangular (${sym})`;
+    let sym = '◄';
+    let kinkName = 'Quiebre Triangular';
+    if (kinkType === 'triangle_right') {
+      sym = '►';
+    } else if (kinkType === 'chevron_left') {
+      sym = '◄';
+      kinkName = 'Quiebre en Chevron';
+    }
+    subtitle = `2 Bloques (Ancho y) · Paso ${subdivLabel} (${targetSpacingPx}px) · ${kinkName} (${sym})`;
   } else if (isDiagonal) {
     subtitle = `${subdivLabel} (${targetSpacingPx}px) · Diagonal ~${angleDeg}° (${dirArrow})`;
   } else {
@@ -767,7 +827,7 @@ export function generateSpacingTrackChallenge(
     targetMetricsText: exercise.metrics,
     targetAngleDeg: angleDeg,
     targetSpacingPx,
-    targetLengthPx: isKink ? 141 : Math.hypot(dxOffset, bands[0].height),
+    targetLengthPx: isKink ? (isChevron ? 140 : 141) : Math.hypot(dxOffset, bands[0].height),
     minRequiredStrokes,
     directionKey: direction,
     guideMode: 'gray_line',

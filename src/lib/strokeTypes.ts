@@ -77,7 +77,7 @@ export interface SpacingTrackConfig {
   baseHeightPx: number;       // ej: 130px
   angleDeg?: number;          // 90 (vertical) o ~75 (diagonal)
   direction?: StrokeDirection;
-  kinkType?: 'none' | 'triangle_left' | 'triangle_right';
+  kinkType?: 'none' | 'triangle_left' | 'triangle_right' | 'chevron_left';
   hasBlocksWithGaps?: boolean;
 }
 
@@ -214,7 +214,7 @@ export interface ProceduralStrokeChallenge {
     angleDeg?: number;
     direction?: StrokeDirection;
     dxOffset?: number;
-    kinkType?: 'none' | 'triangle_left' | 'triangle_right';
+    kinkType?: 'none' | 'triangle_left' | 'triangle_right' | 'chevron_left';
     blocks?: SpacingTrackBlock[];
   };
 }
@@ -320,13 +320,16 @@ function buildSpacingTrackLevel(
   baseHeightPx = 130,
   direction: StrokeDirection = 'vertical_top_down',
   angleDeg = 90,
-  kinkType: 'none' | 'triangle_left' | 'triangle_right' = 'none',
+  kinkType: 'none' | 'triangle_left' | 'triangle_right' | 'chevron_left' = 'none',
   hasBlocksWithGaps = false
 ): LabExerciseDef {
   const stepLabel = spacingMultiplier === 1 ? 'x' : 'x/2';
   const isDiagonal = angleDeg !== 90;
   const isKink = kinkType !== 'none';
-  const metrics = isKink
+  const isChevron = kinkType === 'chevron_left';
+  const metrics = isChevron
+    ? `Espaciado constante (${stepLabel} = ${baseSpacingPx * spacingMultiplier}px), contención en carriles y quiebre en chevron ◄`
+    : isKink
     ? `Espaciado constante (${stepLabel} = ${baseSpacingPx * spacingMultiplier}px), contención en carriles y quiebre triangular`
     : isDiagonal
     ? `Espaciado constante (${stepLabel} = ${baseSpacingPx * spacingMultiplier}px), contención en carriles y ángulo ~${angleDeg}°`
@@ -596,6 +599,7 @@ export const ALL_SINGLE_STROKE_EXERCISES: LabExerciseDef[] = [
   buildSpacingTrackLevel('sp_10', 'E4.4', 'Carril Diagonal ↖ D4 (Abajo-Arriba / Der-Izq · 75°)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 1, 0.5, 'Media', 'Franja de altura y con diagonales ascendentes inversas a ~75° (espejo D4). Traza de abajo hacia arriba y de derecha a izquierda al paso x/2.', 'Traza líneas diagonales ascendentes (↖) de abajo a arriba al paso fino x/2.', 16, 130, 'bottom_up_right_left', 75),
   buildSpacingTrackLevel('sp_11', 'E5.1', 'Carril Quiebre Triangular ◄ (Bloques & Gaps · x/2)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 1, 0.5, 'Difícil', 'Líneas verticales con quiebre triangular a la izquierda (◄). Bloques de ancho y separados por pausas. Rellena cada bloque entre la línea de inicio y final.', 'Dibuja líneas con quiebre triangular hacia la izquierda (◄) al paso fino x/2 rellenando cada bloque entre la línea de inicio y final.', 16, 130, 'vertical_top_down', 90, 'triangle_left', true),
   buildSpacingTrackLevel('sp_12', 'E5.2', 'Carril Quiebre Triangular ► (Bloques & Gaps · x/2)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 1, 0.5, 'Difícil', 'Líneas verticales con quiebre triangular hacia la derecha (►, espejo). Bloques de ancho y separados por pausas y líneas de inicio y final.', 'Dibuja líneas con quiebre triangular hacia la derecha (►) al paso fino x/2 rellenando cada bloque entre la línea de inicio y final.', 16, 130, 'vertical_top_down', 90, 'triangle_right', true),
+  buildSpacingTrackLevel('sp_13', 'E6.1', 'Carril Quiebre en Chevron ◄ (Bloques & Pausas · x/2)', '⚡ Calistenia: Espaciado & Carriles (Ritmo)', 1, 0.5, 'Difícil', 'Líneas en ángulo chevron con quiebre hacia la izquierda (◄). Bloques de ancho y separados por pausas. Rellena cada bloque entre la línea de inicio y final.', 'Dibuja líneas en chevron hacia la izquierda (◄) al paso fino x/2 rellenando cada bloque entre la línea de inicio y final.', 16, 130, 'vertical_top_down', 90, 'chevron_left', true),
 
   // CURVAS Y ARCOS (C & S)
   buildSingleStrokeLevel('cc_01', 'CC.01', 'Arco en C Fijo (Guía Gris)', '⚡ Calistenia: Trazos Curvos & Arcos (C & S)', 'curve_c', 'fixed', 'gray_line', 'Fácil', 'Curva suave en arco de parábola con guía gris visible.', 'Sigue la trayectoria curvada desde ① hasta ②.', 'subtle'),
@@ -670,7 +674,7 @@ export const ALL_42_EXERCISES: WorkbookExerciseDef[] = [
 ];
 
 /**
- * Catálogo Maestro Completo: 224 Calistenias Dinámicas + 42 Páginas del Cuaderno (266 Ejercicios)
+ * Catálogo Maestro Completo: 225 Calistenias Dinámicas + 42 Páginas del Cuaderno (267 Ejercicios)
  */
 export const ALL_LAB_EXERCISES: LabExerciseDef[] = [
   ...ALL_SINGLE_STROKE_EXERCISES,

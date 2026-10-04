@@ -478,8 +478,15 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
       // 1. ZONA DE MUESTRA (Izquierda) — PERMANENTEMENTE VISIBLE
       const sampleTop = Math.min(...bands.map(b => b.yTop)) - 22;
       const sampleBot = Math.max(...bands.map(b => b.yBottom)) + 12;
-      const sampleBoxW = (samplePattern.xEnd - samplePattern.xStart) + 16;
-      const sampleBoxX = samplePattern.xStart - 8;
+      let sampleBoxW = (samplePattern.xEnd - samplePattern.xStart) + 16;
+      let sampleBoxX = samplePattern.xStart - 8;
+      if (sp.kinkType === 'chevron_left') {
+        sampleBoxX -= 26;
+        sampleBoxW += 26;
+      } else if (sp.kinkType === 'triangle_left') {
+        sampleBoxX -= 16;
+        sampleBoxW += 16;
+      }
 
       // Fondo sutil del bloque de muestra
       ctx.fillStyle = 'rgba(0, 0, 0, 0.03)';
@@ -495,6 +502,8 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
         sampleLabel = `MUESTRA ◄ (x/2 = ${targetSpacingPx}px)`;
       } else if (sp.kinkType === 'triangle_right') {
         sampleLabel = `MUESTRA ► (x/2 = ${targetSpacingPx}px)`;
+      } else if (sp.kinkType === 'chevron_left') {
+        sampleLabel = `MUESTRA CHEVRON ◄ (x/2 = ${targetSpacingPx}px)`;
       } else if (sp.angleDeg && sp.direction) {
         const arrowMap: Record<string, string> = {
           bottom_up_left_right: '↗',
@@ -539,6 +548,35 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
             ctx.lineTo(sLine.points[pIdx].x, sLine.points[pIdx].y);
           }
           ctx.stroke();
+
+          // Flecha indicadora de dirección en la línea muestra con quiebre (p. ej. chevron / triángulo)
+          if (sLine.hasArrow) {
+            const pStart = sLine.points[0];
+            const pLast2 = sLine.points[sLine.points.length - 2];
+            const pEnd = sLine.points[sLine.points.length - 1];
+            const th = Math.atan2(pEnd.y - pLast2.y, pEnd.x - pLast2.x);
+            const arrowLen = 11;
+            const arrowHalfAngle = 0.42;
+
+            ctx.fillStyle = '#000000';
+            ctx.beginPath();
+            ctx.moveTo(pEnd.x, pEnd.y);
+            ctx.lineTo(
+              pEnd.x - arrowLen * Math.cos(th - arrowHalfAngle),
+              pEnd.y - arrowLen * Math.sin(th - arrowHalfAngle)
+            );
+            ctx.lineTo(
+              pEnd.x - arrowLen * Math.cos(th + arrowHalfAngle),
+              pEnd.y - arrowLen * Math.sin(th + arrowHalfAngle)
+            );
+            ctx.closePath();
+            ctx.fill();
+
+            // Dot de inicio (●)
+            ctx.beginPath();
+            ctx.arc(pStart.x, pStart.y, 2.8, 0, Math.PI * 2);
+            ctx.fill();
+          }
         } else {
           const x1 = sLine.x1 ?? (sLine as any).x ?? 0;
           const x2 = sLine.x2 ?? (sLine as any).x ?? 0;
