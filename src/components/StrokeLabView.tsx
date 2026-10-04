@@ -501,7 +501,9 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
 
       // Etiqueta superior de muestra
       let sampleLabel = `MUESTRA (${subdivisionLabel})`;
-      if (sp.kinkType === 'v_concentric') {
+      if (sp.kinkType === 'zigzag_zn') {
+        sampleLabel = `MUESTRA RELÁMPAGO Z/N ↗↘↗ (x/2 = ${targetSpacingPx}px)`;
+      } else if (sp.kinkType === 'v_concentric') {
         sampleLabel = `MUESTRA VÉRTICES EN V ∨ (x/2 = ${targetSpacingPx}px)`;
       } else if (sp.kinkType === 'v_inverted') {
         sampleLabel = `MUESTRA VÉRTICES EN ∧ (x/2 = ${targetSpacingPx}px)`;
@@ -728,23 +730,37 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
           ctx.fillStyle = '#000000';
           ctx.font = 'bold 8px monospace';
           ctx.textAlign = 'center';
-          ctx.textBaseline = 'bottom';
-          ctx.fillText('INICIO', blk.xStart, b.yTop - 4);
-          if (!isVFamily) {
-            ctx.fillText('FIN', blk.xEnd, b.yTop - 4);
+          if (sp.kinkType === 'zigzag_zn') {
+            ctx.textBaseline = 'bottom';
+            ctx.fillText('INICIO', (blk.xStart + blk.xEnd) / 2, b.yTop - 4);
+            ctx.textBaseline = 'top';
+            ctx.fillText('FIN', (blk.xStart + blk.xEnd) / 2, b.yBottom + 4);
+          } else {
+            ctx.textBaseline = 'bottom';
+            ctx.fillText('INICIO', blk.xStart, b.yTop - 4);
+            if (!isVFamily) {
+              ctx.fillText('FIN', blk.xEnd, b.yTop - 4);
+            }
           }
 
           // Ticks verticales adicionales en inicio y fin
-          ctx.strokeStyle = '#000000';
-          ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.moveTo(blk.xStart, b.yTop - 3);
-          ctx.lineTo(blk.xStart, b.yTop + 3);
-          if (!isVFamily) {
+          if (!isVFamily && sp.kinkType !== 'zigzag_zn') {
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(blk.xStart, b.yTop - 3);
+            ctx.lineTo(blk.xStart, b.yTop + 3);
             ctx.moveTo(blk.xEnd, b.yTop - 3);
             ctx.lineTo(blk.xEnd, b.yTop + 3);
+            ctx.stroke();
+          } else if (isVFamily) {
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(blk.xStart, b.yTop - 3);
+            ctx.lineTo(blk.xStart, b.yTop + 3);
+            ctx.stroke();
           }
-          ctx.stroke();
 
           // Título de Bloque
           ctx.fillStyle = '#000000';

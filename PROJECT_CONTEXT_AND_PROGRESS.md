@@ -12,9 +12,9 @@
 1. [Resumen Ejecutivo & Visión del Proyecto](#1-resumen-ejecutivo--visión-del-proyecto)
 2. [Guía Rápida para Abrir y Trabajar en Otro PC (Quickstart)](#2-guía-rápida-para-abrir-y-trabajar-en-otro-pc-quickstart)
 3. [Estructura del Proyecto y Mapa de Archivos](#3-estructura-del-proyecto-y-mapa-de-archivos)
-4. [Catálogo Completo de Ejercicios (270 Retos)](#4-catálogo-completo-de-ejercicios-270-retos)
+4. [Catálogo Completo de Ejercicios (271 Retos)](#4-catálogo-completo-de-ejercicios-271-retos)
    - [4.1 Calistenia Dinámica de Trazo Único (212 Retos)](#41-calistenia-dinámica-de-trazo-único-212-retos)
-   - [4.2 Espaciado y Carriles de Ritmo (E1.1 a E8.1)](#42-espaciado-y-carriles-de-ritmo-e11-a-e81)
+   - [4.2 Espaciado y Carriles de Ritmo (E1.1 a E9.1)](#42-espaciado-y-carriles-de-ritmo-e11-a-e91)
    - [4.3 Las 42 Páginas del Cuaderno Técnico (Bloques 1 al 8)](#43-las-42-páginas-del-cuaderno-técnico-bloques-1-al-8)
 5. [Motor de Generación Procedural y Geometría](#5-motor-de-generación-procedural-y-geometría)
 6. [Motor de Evaluación Analítica y Cinemática Biomecánica](#6-motor-de-evaluación-analítica-y-cinemática-biomecánica)
@@ -132,7 +132,7 @@ Web dibujitos/ (paplitz-drawing-lab)
 │       │                         #    - LabExerciseDef, ProceduralStrokeChallenge
 │       │                         #    - ALL_SINGLE_STROKE_EXERCISES (227 niveles)
 │       │                         #    - ALL_42_EXERCISES (42 páginas del cuaderno)
-│       │                         #    - ALL_LAB_EXERCISES (269 ejercicios totales)
+│       │                         #    - ALL_LAB_EXERCISES (271 ejercicios totales)
 │       │                         #    - SpacingTrackConfig, SpacingTrackParams
 │       │                         #    - StrokeEvaluation, KeyPoint, TargetLineDef
 │       │
@@ -141,7 +141,7 @@ Web dibujitos/ (paplitz-drawing-lab)
 │       │                         #    - generateSingleStrokeChallenge (Líneas y curvas)
 │       │                         #    - generateMultiLineChallenge (2 o 3 líneas dispersas)
 │       │                         #    - generateRadialRosetteChallenge (Rosetas D11 y D12)
-│       │                         #    - generateSpacingTrackChallenge (Carriles E1.1 a E7.2)
+│       │                         #    - generateSpacingTrackChallenge (Carriles E1.1 a E9.1)
 │       │                         #    - Generadores para las 42 páginas del cuaderno
 │       │
 │       ├── strokeEvaluator.ts    # ⭐ Evaluador analítico instantáneo y biomecánico:
@@ -173,9 +173,9 @@ Web dibujitos/ (paplitz-drawing-lab)
 
 ---
 
-## 4. Catálogo Completo de Ejercicios (270 Retos)
+## 4. Catálogo Completo de Ejercicios (271 Retos)
 
-El catálogo unificado en `src/lib/strokeTypes.ts` combina **228 Calistenias Dinámicas** (212 de trazo único, curvas y rosetas + 16 de espaciado y carriles) y las **42 Páginas del Cuaderno Técnico**, sumando un total de **270 ejercicios** agrupados por bloques temáticos.
+El catálogo unificado en `src/lib/strokeTypes.ts` combina **229 Calistenias Dinámicas** (212 de trazo único, curvas y rosetas + 17 de espaciado y carriles) y las **42 Páginas del Cuaderno Técnico**, sumando un total de **271 ejercicios** agrupados por bloques temáticos.
 
 ### 4.1 Calistenia Dinámica de Trazo Único y Rosetas (212 Retos)
 
@@ -200,7 +200,7 @@ Entrenamiento biomecánico repetitivo con evaluación inmediata al levantar el l
 
 ---
 
-### 4.2 Espaciado y Carriles de Ritmo (E1.1 a E8.1)
+### 4.2 Espaciado y Carriles de Ritmo (E1.1 a E9.1)
 
 Inspirado en el Ejercicio 1.1 del cuaderno de dibujo (*"Making Strokes Consistent / Spacing"*). Se ubican en el bloque **`⚡ Calistenia: Espaciado & Carriles (Ritmo)`**:
 
@@ -286,10 +286,19 @@ Inspirado en el Ejercicio 1.1 del cuaderno de dibujo (*"Making Strokes Consisten
     - **2 bloques independientes con pausa central:** Bloque 1 ($X \in [188, 316]$) y Bloque 2 ($X \in [364, 492]$), cada uno de ancho $y = 128$px, separados por un espacio de pausa de $48$px con etiqueta `(PAUSA)`.
     - **Relleno paralelo uniforme:** El alumno dibuja 15 trazos paralelos por bloque al paso fino $x/2 = 8$px de izquierda a derecha sin levantar el lápiz durante cada trazo.
     - Muestra permanente a la izquierda (`MUESTRA ZIGZAG ◄►◄ (x/2 = 8px)`) con flecha direccional en el extremo final y dot de inicio (●) en el riel superior.
+17. **E9.1 — Carril Relámpago Z/N ↗↘↗ (Bloques & Pausas · x/2):**
+    - 1 franja de altura $y = 130$px ($y_{\text{top}} = 205, y_{\text{bottom}} = 335$), espaciado fino vertical $x/2 = 8$px.
+    - Patrón geométrico de líneas paralelas continuas en relámpago horizontal Z/N (`↗↘↗`) (Fila 7 del Ejercicio 1.4 del cuaderno técnico: *Pen Control — Angles & Zigzags*).
+    - **Trazo horizontal continuo de izquierda a derecha (→):** Se inicia en $(X_{\text{start}}, y_{\text{base}})$, se asciende en diagonal hacia arriba-derecha (↗) hasta el Pico 1 a $1/3$ de ancho ($X_{\text{start}} + W/3, y_{\text{base}} - 34$px), se desciende en diagonal hacia abajo-derecha (↘) hasta el Valle a $2/3$ de ancho ($X_{\text{start}} + 2W/3, y_{\text{base}}$), y se vuelve a ascender en diagonal hacia arriba-derecha (↗) hasta el extremo final ($X_{\text{end}}, y_{\text{base}} - 34$px). Longitud nominal del trazo: $164$px.
+    - **Líneas pre-dibujadas de INICIO y FIN:** En cada bloque, la línea superior está pre-dibujada como guía sólida de **INICIO** en $y_{\text{base}} = y_{\text{top}} + 34 = 239$px (con su cresta tocando el riel superior $y_{\text{top}} = 205$px), y la línea inferior está pre-dibujada como guía sólida de **FIN** en $y_{\text{base}} = y_{\text{bottom}} = 335$px (apoyando su valle y comienzo en el riel inferior).
+    - **2 bloques independientes con pausa central:** Bloque 1 ($X \in [188, 316]$) y Bloque 2 ($X \in [364, 492]$), cada uno de ancho $y = 128$px, separados por un espacio de pausa de $48$px con etiqueta `(PAUSA)`.
+    - **Relleno paralelo uniforme:** El alumno dibuja 11 trazos interiores por bloque espaciados verticalmente a paso fino $x/2 = 8$px ($y_{\text{base}} \in [247, 255, \dots, 327]$px) trazando de izquierda a derecha sin levantar el lápiz.
+    - **Muestra permanente:** Bloque de muestra a la izquierda (`MUESTRA RELÁMPAGO Z/N ↗↘↗ (x/2 = 8px)`) con flecha direccional en el extremo final y dot de inicio (●) en el extremo izquierdo.
+    - **Sin versión en espejo:** Diseñado exclusivamente en orientación directa izquierda a derecha.
 
 **Reglas de diseño de estos ejercicios:**
-- **Muestra permanente:** El bloque izquierdo con la referencia nunca se oculta, permitiendo al usuario calibrar su ojo en todo momento. Muestra la dirección y ángulo exactos (`MUESTRA ↗ (~75°)`, `MUESTRA CHEVRON ◄`, `MUESTRA VÉRTICES EN V ∨`, `MUESTRA VÉRTICES EN ∧`, `MUESTRA ZIGZAG ◄►◄`).
-- **Flechas indicadoras de dirección:** En los niveles diagonales (E4.1 a E4.4) y con quiebre/vértice (E5, E6, E7 y E8), una de las líneas del bloque de muestra cuenta con un icono de flecha sólida al final del trazo y un punto de origen (●) al inicio, indicando visualmente de manera inequívoca el sentido y dirección del movimiento biomecánico.
+- **Muestra permanente:** El bloque izquierdo con la referencia nunca se oculta, permitiendo al usuario calibrar su ojo en todo momento. Muestra la dirección y ángulo exactos (`MUESTRA ↗ (~75°)`, `MUESTRA CHEVRON ◄`, `MUESTRA VÉRTICES EN V ∨`, `MUESTRA VÉRTICES EN ∧`, `MUESTRA ZIGZAG ◄►◄`, `MUESTRA RELÁMPAGO Z/N ↗↘↗`).
+- **Flechas indicadoras de dirección:** En los niveles diagonales (E4.1 a E4.4) y con quiebre/vértice/relámpago (E5, E6, E7, E8 y E9), una de las líneas del bloque de muestra cuenta con un icono de flecha sólida al final del trazo y un punto de origen (●) al inicio, indicando visualmente de manera inequívoca el sentido y dirección del movimiento biomecánico.
 - **Lienzo limpio sin textos superfluos:** Se han eliminado los textos de ayuda flotantes redundantes dentro del lienzo para preservar la pureza visual y permitir que las líneas pre-dibujadas de inicio guíen intuitivamente la ejecución.
 - **Longitud adaptable:** El carril se extiende a lo ancho de la pantalla; no hay un número rígido obligatorio de líneas (se evalúan todas las líneas trazadas, requiriendo un mínimo de 3 por franja en continuos y 10 en bloques).
 - **Verificación rigurosa de sentido y pendiente:** Trazar en dirección contraria otorga $0\%$ de calificación con advertencia visual inmediata. La inclinación de la pendiente se valida contra el cuadrante angular exacto.
@@ -408,6 +417,16 @@ Si el usuario empieza a dibujar en el punto de llegada ② y termina en el punto
    - Se mide la distancia $\Delta x$ desde la figura exterior pre-dibujada ($hw=64$px) hacia la primera interior, y entre cada par consecutivo hacia el núcleo (objetivo: $x/2 = 8$px).
    - Se penaliza la falta de ángulos/vértices (si se trazan líneas rectas) limitando la nota a $\le 30\%$ con advertencia visual diagnóstica.
 
+#### Para carriles de Relámpago Horizontal en Z/N (E9.1):
+1. **Fidelidad del Relámpago Z/N (`evaluateZNWaveFidelity`):**
+   - **Forma en Z/N continua (↗↘↗):** Validación de Pico 1 a $1/3$ de ancho ($x \approx x_{\text{start}} + W/3$) con deflexión hacia arriba de $34$px, Valle a $2/3$ de ancho ($x \approx x_{\text{start}} + 2W/3$) con retorno al nivel de la base, y ascenso final al nivel del pico en $x_{\text{end}}$.
+   - **Sentido horizontal estricto:** Debe trazarse de izquierda a derecha ($p_{\text{end}}.x - p_{\text{start}}.x \ge 30$px). Trazar de derecha a izquierda se detecta y penaliza.
+   - **Detección de líneas rectas sin relámpago:** Si el alumno traza líneas horizontales ordinarias, la nota geométrica se limita drásticamente ($\le 30\%$) con mensaje diagnóstico explicativo (*"¡Falta el Relámpago en Z/N! ↗↘↗"*).
+2. **Medición del Espaciado Interlineal Vertical ($\Delta y$):**
+   - Los trazos de cada bloque se ordenan verticalmente de arriba hacia abajo por su línea base $y_{\text{base}}$.
+   - Se mide la distancia $\Delta y$ desde la línea de **INICIO** pre-dibujada ($y_{\text{base}} = 239$px) hasta la primera trazada por el alumno, entre cada par consecutivo (objetivo: $x/2 = 8$px), y hasta la línea de **FIN** pre-dibujada ($y_{\text{base}} = 335$px).
+   - Partición independiente en Bloque 1 y Bloque 2, exigiendo completar ambos bloques y penalizando trazos en el espacio de pausa central.
+
 ---
 
 ## 7. Interfaz de Usuario (UI/UX) y Experiencia en Tablet / PC
@@ -419,7 +438,7 @@ Ubicada en `src/components/StrokeLabView.tsx`.
    - La barra lateral izquierda y el lienzo caben simultáneamente en la pantalla en tablets y portátiles sin requerir scroll vertical.
    - El lienzo mantiene su relación de aspecto técnica `600 / 540` con un margen inferior de respiración para que no quede pegado al borde.
 2. **Drawer Lateral Deslizante:**
-   - El catálogo completo de los 270 ejercicios se despliega mediante un panel lateral accesible con el botón de menú `☰`, con buscador y filtro por bloques.
+   - El catálogo completo de los 271 ejercicios se despliega mediante un panel lateral accesible con el botón de menú `☰`, con buscador y filtro por bloques.
 3. **Calificación Destacada y Telemetría:**
    - El porcentaje de nota se muestra en tamaño grande (`text-3xl / text-4xl`) con badge de estado (`Superado ✓`, `Ajustar`, `Dirección ⚠️`).
    - Muestra la duración en segundos y la velocidad en $px/s$.
@@ -493,7 +512,12 @@ A continuación se resumen los avances implementados en la última fase de traba
     - Líneas sólidas pre-dibujadas completas de **INICIO** y **FIN** para cada bloque.
     - 2 bloques independientes de ancho $y$ separados por una pausa de descanso de mano de $48$px con 15 líneas interiores por bloque a paso $x/2 = 8$px.
     - Motor evaluador específico `evaluateZigzagWaveFidelity` con validación de deflexión de picos (◄), retorno de hendidura central, contención en rieles y verticalidad de extremos.
-    - Catálogo ampliado a 270 retos totales (228 dinámicos + 42 páginas de cuaderno).
+13. **Carril Relámpago Z/N ↗↘↗ (E9.1):**
+    - Creación del nivel E9.1 (`Carril Relámpago Z/N ↗↘↗`, Fila 7 del Ejercicio 1.4 del cuaderno técnico) con patrón de líneas paralelas continuas en relámpago horizontal Z/N (↗↘↗).
+    - Líneas guía sólidas pre-dibujadas de **INICIO** (en $y_{\text{base}} = 239$px) y **FIN** (en $y_{\text{base}} = 335$px).
+    - 2 bloques independientes de ancho $y = 128$px con espacio de pausa de $48$px `(PAUSA)` y 11 líneas interiores por bloque trazadas horizontalmente de izquierda a derecha con espaciado vertical $x/2 = 8$px.
+    - Motor evaluador específico `evaluateZNWaveFidelity` con control de amplitud y posición de pico (↗ a $W/3$), valle (↘ a $2W/3$) y remate (↗ al final), sentido izquierda a derecha y cálculo de espaciado vertical $\Delta y$.
+    - Catálogo ampliado a 271 retos totales (229 dinámicos + 42 páginas de cuaderno).
 
 ---
 
@@ -508,7 +532,7 @@ Si retomas el proyecto en otro ordenador o deseas continuar ampliándolo, aquí 
 3. **Pruebas de Usabilidad con Stylus en Dispositivos Reales:**
    - Probar en iPad (Safari/Chrome) y tablet Android (Samsung Tab S con S-Pen) para verificar la curva de presión y respuesta háptica.
 4. **Empaquetado de Nueva Release:**
-   - Generar el nuevo `.apk` para Android y `.exe` para Windows incorporando todo el catálogo de 270 ejercicios.
+   - Generar el nuevo `.apk` para Android y `.exe` para Windows incorporando todo el catálogo de 271 ejercicios.
 
 ---
 

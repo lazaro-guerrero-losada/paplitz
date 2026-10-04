@@ -1271,6 +1271,153 @@ function evaluateZigzagWaveFidelity(
   };
 }
 
+/**
+ * Evalúa la fidelidad de un trazo relámpago en Z/N horizontal (↗↘↗):
+ * - Comienza en xStart, yBase
+ * - Asciende en diagonal (↗) hasta el Pico 1 (x ≈ xStart + w/3, y ≈ yBase - 34)
+ * - Desciende en diagonal (↘) hasta el Valle (x ≈ xStart + 2w/3, y ≈ yBase)
+ * - Asciende en diagonal (↗) hasta el Fin (x ≈ xEnd, y ≈ yBase - 34)
+ * - Trazado continuo de izquierda a derecha
+ */
+function evaluateZNWaveFidelity(
+  stroke: RawStroke,
+  xStart: number,
+  xEnd: number,
+  yTop: number,
+  yBottom: number
+): {
+  score: number;
+  hasZN: boolean;
+  isCorrectDirection: boolean;
+  yBase: number;
+  ampPeak: number;
+  ampValley: number;
+} {
+  if (stroke.points.length < 4) {
+    return {
+      score: 10,
+      hasZN: false,
+      isCorrectDirection: false,
+      yBase: (yTop + yBottom) / 2,
+      ampPeak: 0,
+      ampValley: 0,
+    };
+  }
+
+  const pStart = stroke.points[0];
+  const pEnd = stroke.points[stroke.points.length - 1];
+  const w = xEnd - xStart;
+
+  // 1. Dirección: debe trazarse de izquierda a derecha (pEnd.x > pStart.x)
+  const isCorrectDirection = (pEnd.x - pStart.x) >= 30;
+
+  // 2. Cobertura horizontal de bloque
+  let minX = Infinity;
+  let maxX = -Infinity;
+  for (const p of stroke.points) {
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+  }
+  const spanX = maxX - minX;
+  const spanDiff = Math.abs(spanX - w);
+  const spanScore = Math.max(0, 100 - spanDiff * 2.5);
+
+  // 3. Buscar Pico 1 (zona primer tercio: x <= xStart + w * 0.55) -> mínimo Y (más alto)
+  let peak1 = stroke.points[0];
+  let peak1Idx = 0;
+  for (let i = 0; i < stroke.points.length; i++) {
+    const p = stroke.points[i];
+    if (p.x <= xStart + w * 0.55) {
+      if (p.y < peak1.y) {
+        peak1 = p;
+        peak1Idx = i;
+      }
+    }
+  }
+
+  // 4. Buscar Valle 1 (zona segundo tercio: x >= xStart + w * 0.40 && x <= xStart + w * 0.85) -> máximo Y (más bajo)
+  let valley1 = stroke.points[Math.min(peak1Idx + 1, stroke.points.length - 1)];
+  for (let i = 0; i < stroke.points.length; i++) {
+    const p = stroke.points[i];
+    if (p.x >= xStart + w * 0.40 && p.x <= xStart + w * 0.85) {
+      if (p.y > valley1.y) {
+        valley1 = p;
+      }
+    }
+  }
+
+  // 5. Punto final del trazo (extremo derecho)
+  const endPoint = pEnd;
+
+  // 6. Estimación de línea base del trazo: promedio entre pStart.y y valley1.y
+  const yBase = (pStart.y + valley1.y) / 2;
+
+  // Amplitudes
+  const ampPeak = yBase - peak1.y; // debe ser positivo y cercano a 34px
+  const ampValley = valley1.y - peak1.y; // debe ser positivo y cercano a 34px
+  const ampEnd = yBase - endPoint.y; // debe ser positivo y cercano a 34px
+
+  // Presencia de forma en Z/N (no línea recta ni garabato sin cresta)
+  const hasZN = ampPeak >= 12 && ampValley >= 12 && ampEnd >= 10;
+
+  if (!hasZN) {
+    return {
+      score: 15,
+      hasZN: false,
+      isCorrectDirection,
+      yBase,
+      ampPeak,
+      ampValley,
+    };
+  }
+
+  if (!isCorrectDirection) {
+    return {
+      score: 25,
+      hasZN: true,
+      isCorrectDirection: false,
+      yBase,
+      ampPeak,
+      ampValley,
+    };
+  }
+
+  // Puntuación geométrica:
+  // a) Amplitud de Pico 1 vs 34px
+  const peakDefScore = Math.max(0, 100 - Math.abs(ampPeak - 34) * 3.5);
+  // b) Posición X de Pico 1 vs xStart + w/3
+  const targetPeakX = xStart + w / 3;
+  const peakXScore = Math.max(0, 100 - Math.abs(peak1.x - targetPeakX) * 4.0);
+
+  // c) Amplitud de Valle vs 34px
+  const valleyDefScore = Math.max(0, 100 - Math.abs(ampValley - 34) * 3.5);
+  // d) Posición X de Valle vs xStart + 2w/3
+  const targetValleyX = xStart + (2 * w) / 3;
+  const valleyXScore = Math.max(0, 100 - Math.abs(valley1.x - targetValleyX) * 4.0);
+
+  // e) Altura del extremo final: debe ascender de nuevo al nivel del pico (endPoint.y ≈ peak1.y)
+  const endLevelDiff = Math.abs(endPoint.y - peak1.y);
+  const endLevelScore = Math.max(0, 100 - endLevelDiff * 3.5);
+
+  const score = Math.round(
+    peakDefScore * 0.20 +
+    peakXScore * 0.15 +
+    valleyDefScore * 0.20 +
+    valleyXScore * 0.15 +
+    endLevelScore * 0.15 +
+    spanScore * 0.15
+  );
+
+  return {
+    score: Math.min(100, Math.max(0, score)),
+    hasZN,
+    isCorrectDirection,
+    yBase,
+    ampPeak,
+    ampValley,
+  };
+}
+
 function evaluateKinkFidelity(
   stroke: RawStroke,
   kinkType: 'triangle_left' | 'triangle_right' | 'chevron_left' | 'zigzag_wave',
@@ -2299,6 +2446,281 @@ export function evaluateSpacingTrackSubmission(
         spacingVariance: measuredSpacingVariance,
         measuredAvgAngleDeg: 64,
         measuredOpticalDensityPct: Math.min(100, Math.round((trackStrokes.length / (7 * blockList.length)) * 100)),
+      },
+      feedbackTitle,
+      feedbackMessage,
+      tipMessage,
+      avatarMood,
+      solutionOverlay,
+    };
+  }
+
+  // 1.78 Rama de evaluación específica para carriles de Relámpago Z/N horizontal (E9.1)
+  if (kinkType === 'zigzag_zn' && blocks && blocks.length > 0) {
+    const singleBand = bands[0];
+    const b1 = blocks[0];
+    const b2 = blocks[1];
+
+    // Clasificar trazos por bloque y detectar trazos en el gap de pausa
+    const b1Strokes: { stroke: RawStroke; ts: typeof trackStrokes[0]; fidelity: ReturnType<typeof evaluateZNWaveFidelity> }[] = [];
+    const b2Strokes: { stroke: RawStroke; ts: typeof trackStrokes[0]; fidelity: ReturnType<typeof evaluateZNWaveFidelity> }[] = [];
+    const gapStrokes: RawStroke[] = [];
+
+    for (const ts of trackStrokes) {
+      const pts = ts.stroke.points;
+      let minX = Infinity;
+      let maxX = -Infinity;
+      for (const p of pts) {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+      }
+      const midX = (minX + maxX) / 2;
+
+      if (midX >= 170 && midX <= 330) {
+        const fidelity = evaluateZNWaveFidelity(ts.stroke, b1.xStart, b1.xEnd, singleBand.yTop, singleBand.yBottom);
+        b1Strokes.push({ stroke: ts.stroke, ts, fidelity });
+      } else if (b2 && midX >= 346 && midX <= 510) {
+        const fidelity = evaluateZNWaveFidelity(ts.stroke, b2.xStart, b2.xEnd, singleBand.yTop, singleBand.yBottom);
+        b2Strokes.push({ stroke: ts.stroke, ts, fidelity });
+      } else if (b2 && midX > 322 && midX < 358) {
+        gapStrokes.push(ts.stroke);
+      }
+    }
+
+    const blockList = [
+      { def: b1, strokes: b1Strokes },
+      ...(b2 ? [{ def: b2, strokes: b2Strokes }] : []),
+    ];
+
+    let totalBlockSpacingScore = 0;
+    let totalBlockZNFidelityScore = 0;
+    let totalBlockBoundaryScore = 0;
+    let blocksDrawnCount = 0;
+    let missingZNCount = 0;
+    let wrongDirCount = 0;
+    const allSpacings: number[] = [];
+
+    for (const blk of blockList) {
+      const bItems = blk.strokes;
+      if (bItems.length < 2) {
+        continue;
+      }
+      blocksDrawnCount++;
+
+      // Ordenar trazos de arriba a abajo por su baseline yBase
+      bItems.sort((a, b) => a.fidelity.yBase - b.fidelity.yBase);
+
+      // Espaciados en el bloque: distancia desde la línea de inicio superior (yBase = yTop + 34 = 239)
+      // y distancia entre trazos consecutivos, y hasta la línea final inferior (yBase = yBottom = 335)
+      const spacings: number[] = [];
+      const startBaseY = singleBand.yTop + 34; // 239
+      const finalBaseY = singleBand.yBottom; // 335
+
+      const dStart = bItems[0].fidelity.yBase - startBaseY;
+      if (dStart > 0) {
+        spacings.push(dStart);
+        allSpacings.push(dStart);
+      }
+
+      for (let i = 0; i < bItems.length - 1; i++) {
+        const dy = bItems[i + 1].fidelity.yBase - bItems[i].fidelity.yBase;
+        if (dy > 0) {
+          spacings.push(dy);
+          allSpacings.push(dy);
+        }
+      }
+
+      const dEnd = finalBaseY - bItems[bItems.length - 1].fidelity.yBase;
+      if (dEnd > 0) {
+        spacings.push(dEnd);
+        allSpacings.push(dEnd);
+      }
+
+      const meanDy = spacings.reduce((a, b) => a + b, 0) / (spacings.length || 1);
+      let varDy = 0;
+      for (const d of spacings) {
+        varDy += (d - meanDy) * (d - meanDy);
+      }
+      const stdDy = Math.sqrt(varDy / (spacings.length || 1));
+
+      const accuracyVsTarget = Math.max(0, 100 - Math.abs(meanDy - targetSpacing) * 8);
+      const regularity = Math.max(0, 100 - stdDy * 12);
+      const blockSpacingScore = accuracyVsTarget * 0.45 + regularity * 0.55;
+      totalBlockSpacingScore += blockSpacingScore;
+
+      // Fidelidad del relámpago Z/N y contención vertical en carriles
+      let blockZNFidelitySum = 0;
+      let blockBoundarySum = 0;
+      for (const item of bItems) {
+        blockZNFidelitySum += item.fidelity.score;
+        if (!item.fidelity.hasZN) missingZNCount++;
+        if (item.fidelity.hasZN && !item.fidelity.isCorrectDirection) wrongDirCount++;
+
+        const topErr = Math.max(0, singleBand.yTop - item.ts.topY);
+        const botErr = Math.max(0, item.ts.botY - singleBand.yBottom);
+        const strokeBoundary = Math.max(0, 100 - (topErr + botErr) * 4);
+        blockBoundarySum += strokeBoundary;
+      }
+      totalBlockZNFidelityScore += blockZNFidelitySum / bItems.length;
+      totalBlockBoundaryScore += blockBoundarySum / bItems.length;
+    }
+
+    const coverageRatio = blocksDrawnCount / blockList.length;
+    const avgSpacingScore = blocksDrawnCount > 0 ? (totalBlockSpacingScore / blocksDrawnCount) * coverageRatio : 0;
+    const avgZNFidelityScore = blocksDrawnCount > 0 ? (totalBlockZNFidelityScore / blocksDrawnCount) : 0;
+    const avgBoundaryScore = blocksDrawnCount > 0 ? (totalBlockBoundaryScore / blocksDrawnCount) * coverageRatio : 0;
+
+    const measuredAvgSpacingPx = allSpacings.length > 0 ? Math.round((allSpacings.reduce((a, b) => a + b, 0) / allSpacings.length) * 10) / 10 : 0;
+    let allVar = 0;
+    if (allSpacings.length > 0) {
+      for (const d of allSpacings) allVar += (d - measuredAvgSpacingPx) * (d - measuredAvgSpacingPx);
+    }
+    const measuredSpacingVariance = allSpacings.length > 0 ? Math.round(Math.sqrt(allVar / allSpacings.length) * 10) / 10 : 0;
+
+    const strokeCountPenalty = trackStrokes.length < challenge.minRequiredStrokes
+      ? Math.min(30, (challenge.minRequiredStrokes - trackStrokes.length) * 4)
+      : 0;
+
+    const gapPenalty = Math.min(20, gapStrokes.length * 5);
+
+    // Cinemática
+    const activePhase = challenge.activePhase || 1;
+    const kinematicsList = trackStrokes.map((ts) =>
+      analyzeStrokeKinematics(ts.stroke, targetDir, activePhase, challenge.targetLengthPx || 164)
+    );
+    const avgSpeed = Math.round(
+      kinematicsList.reduce((acc, k) => acc + k.avgSpeedPxPerSec, 0) / (kinematicsList.length || 1)
+    );
+    const avgFluency = Math.round(
+      kinematicsList.reduce((acc, k) => acc + k.fluencyScore, 0) / (kinematicsList.length || 1)
+    );
+    const avgDuration = Math.round(
+      kinematicsList.reduce((acc, k) => acc + k.durationMs, 0) / (kinematicsList.length || 1)
+    );
+    const allPhasePassed = kinematicsList.length > 0 && kinematicsList.every((k) => k.phasePassed);
+    const kinematics = kinematicsList[0]
+      ? {
+          ...kinematicsList[0],
+          durationMs: avgDuration,
+          avgSpeedPxPerSec: avgSpeed,
+          fluencyScore: avgFluency,
+          phasePassed: allPhasePassed,
+        }
+      : undefined;
+
+    // Ponderación geométrica
+    let geometricScore =
+      avgSpacingScore * 0.40 +
+      avgZNFidelityScore * 0.35 +
+      avgBoundaryScore * 0.25 -
+      strokeCountPenalty -
+      gapPenalty;
+
+    geometricScore = Math.max(0, Math.min(100, Math.round(geometricScore)));
+
+    const isMissingZNs = trackStrokes.length > 0 && missingZNCount >= Math.max(2, Math.ceil(trackStrokes.length * 0.4));
+    const isWrongDirZNs = trackStrokes.length > 0 && wrongDirCount >= Math.max(2, Math.ceil(trackStrokes.length * 0.4));
+
+    if (isMissingZNs) {
+      geometricScore = Math.min(geometricScore, 30);
+    } else if (isWrongDirZNs) {
+      geometricScore = Math.min(geometricScore, 40);
+    }
+
+    let overallScore = geometricScore;
+    let phasePassed = false;
+    if (activePhase === 1) {
+      overallScore = geometricScore;
+      phasePassed = overallScore >= 75;
+    } else if (activePhase === 2) {
+      const fluency = kinematics?.fluencyScore || 80;
+      overallScore = Math.round(geometricScore * 0.80 + fluency * 0.20);
+      phasePassed = overallScore >= 75 && fluency >= 70;
+    } else {
+      const speedPassed = kinematics?.phasePassed ?? true;
+      const speedScore = speedPassed ? 100 : 50;
+      overallScore = Math.round(geometricScore * 0.70 + speedScore * 0.30);
+      phasePassed = overallScore >= 75 && speedPassed;
+    }
+
+    let passed = overallScore >= 75;
+
+    const solutionOverlay = {
+      points: [],
+      multiLines: challenge.ghostSolutionStrokes || [],
+      color: '#000000',
+      label: `Paso Objetivo: ${targetSpacing}px con Relámpago Z/N ↗↘↗`,
+    };
+
+    let feedbackTitle = '¡Relámpagos Z/N y Espaciado Logrados!';
+    let feedbackMessage = `Has conseguido un paso medio de ${measuredAvgSpacingPx}px (objetivo: ${targetSpacing}px) con buena reproducción del relámpago horizontal Z/N ↗↘↗.`;
+    let tipMessage = 'Mantén los picos a 1/3 y los valles a 2/3 del ancho del bloque, con espaciado constante.';
+    let avatarMood: AvatarMood = 'wink';
+
+    if (isMissingZNs) {
+      feedbackTitle = '¡Falta el Relámpago en Z/N! ↗↘↗';
+      feedbackMessage = 'Has trazado líneas horizontales rectas. Este ejercicio consiste en trazar el patrón continuo de relámpago en Z/N (↗↘↗) con 2 quiebres angulares, idéntico a las líneas de INICIO y FIN.';
+      tipMessage = 'Asciende en diagonal (↗) al primer tercio, baja en diagonal (↘) al segundo tercio, y vuelve a ascender (↗) hasta el final sin levantar el lápiz.';
+      avatarMood = 'curious';
+      passed = false;
+      phasePassed = false;
+    } else if (isWrongDirZNs) {
+      feedbackTitle = 'Dirección Invertida en Z/N 🔄';
+      feedbackMessage = 'Has comenzado por la derecha. Debes trazar de izquierda a derecha: ascender (↗), descender (↘) y ascender (↗).';
+      tipMessage = 'Observa la flecha en la muestra: inicia a la izquierda y termina a la derecha.';
+      avatarMood = 'curious';
+      passed = false;
+      phasePassed = false;
+    } else if (blocksDrawnCount < blockList.length) {
+      feedbackTitle = 'Bloques Incompletos';
+      feedbackMessage = `Has completado ${blocksDrawnCount} de los ${blockList.length} bloques requeridos. Rellena tanto el Bloque 1 como el Bloque 2 con el relámpago Z/N, respetando la pausa central.`;
+      tipMessage = 'Usa la pausa entre bloques para descansar la mano sin tocar el lienzo.';
+      avatarMood = 'curious';
+      passed = false;
+      phasePassed = false;
+    } else if (gapStrokes.length > 2) {
+      feedbackTitle = 'Trazos en Zona de Pausa ⚠️';
+      feedbackMessage = `Has dibujado ${gapStrokes.length} líneas en la zona de separación central. Los bloques deben estar separados por un espacio vacío de pausa.`;
+      tipMessage = 'Respeta la zona de separación entre el Bloque 1 y el Bloque 2.';
+      avatarMood = 'curious';
+    } else if (overallScore >= 90) {
+      feedbackTitle = '¡Relámpagos Z/N Impecables! 🌟';
+      feedbackMessage = `Paso medio de ${measuredAvgSpacingPx}px (objetivo: ${targetSpacing}px) con excelente paralelismo y ritmo en ambos bloques.`;
+      tipMessage = 'Excelente control y ritmo. Pasa ahora a las fases de fluidez y velocidad.';
+      avatarMood = 'success-stars';
+    } else if (overallScore >= 75) {
+      feedbackTitle = '¡Nivel Superado! ✅';
+      feedbackMessage = `Buen control de los relámpagos Z/N (${overallScore}%). El espaciado de ${targetSpacing}px se mantiene regular en vertical.`;
+      tipMessage = 'Intenta que cada pico y valle queden alineados a 1/3 y 2/3 de ancho.';
+      avatarMood = 'wink';
+    } else {
+      feedbackTitle = 'Falta de Consistencia 💨';
+      feedbackMessage = trackStrokes.length < challenge.minRequiredStrokes
+        ? `Has trazado muy pocas líneas (${trackStrokes.length} de al menos ${challenge.minRequiredStrokes}). Rellena ambos bloques con los relámpagos Z/N.`
+        : `La regularidad del paso (${measuredAvgSpacingPx}px) o la fidelidad del relámpago no alcanzan el 75%.`;
+      tipMessage = 'Mantén la velocidad constante en todo el recorrido de la onda.';
+      avatarMood = 'fail-spiral';
+    }
+
+    return {
+      overallScore,
+      passed,
+      phasePassed,
+      currentPhase: activePhase as (1 | 2 | 3),
+      kinematics,
+      metrics: {
+        parallelismScore: Math.round(avgZNFidelityScore),
+        spacingScore: Math.round(avgSpacingScore),
+        straightnessScore: Math.round(avgZNFidelityScore),
+        tonalDensityScore: Math.round(avgBoundaryScore),
+        boundaryScore: Math.round(avgBoundaryScore),
+      },
+      detectedStats: {
+        strokeCount: trackStrokes.length,
+        measuredAvgSpacingPx,
+        spacingVariance: measuredSpacingVariance,
+        measuredAvgAngleDeg: 0,
+        measuredOpticalDensityPct: Math.min(100, Math.round((trackStrokes.length / (11 * blockList.length)) * 100)),
       },
       feedbackTitle,
       feedbackMessage,

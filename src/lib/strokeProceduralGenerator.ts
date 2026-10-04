@@ -566,6 +566,23 @@ export function generateKinkStrokePoints(
   ];
 }
 
+export function generateZNStrokePoints(
+  xStart: number,
+  xEnd: number,
+  yBase: number,
+  amplitude = 34
+): { x: number; y: number }[] {
+  const w = xEnd - xStart;
+  const p1X = xStart + w / 3;
+  const p2X = xStart + (2 * w) / 3;
+  return [
+    { x: Math.round(xStart * 10) / 10, y: Math.round(yBase * 10) / 10 },
+    { x: Math.round(p1X * 10) / 10, y: Math.round((yBase - amplitude) * 10) / 10 },
+    { x: Math.round(p2X * 10) / 10, y: Math.round(yBase * 10) / 10 },
+    { x: Math.round(xEnd * 10) / 10, y: Math.round((yBase - amplitude) * 10) / 10 },
+  ];
+}
+
 /**
  * Genera un reto de Carriles y Espaciado Rítmico (Ejercicio 1.1 Workbook: Consistencia en franjas x, x/2)
  */
@@ -645,10 +662,11 @@ export function generateSpacingTrackChallenge(
   const isV = kinkType === 'v_concentric';
   const isVInverted = kinkType === 'v_inverted';
   const isZigzagWave = kinkType === 'zigzag_wave';
+  const isZigzagZN = kinkType === 'zigzag_zn';
 
   // 2. Patrón de muestra (izquierda)
-  const sampleXStart = (isV || isVInverted) ? 24 : (isChevron || isZigzagWave) ? 44 : isDiagonal || isKink ? 28 : 35;
-  const sampleWidth = (isV || isVInverted) ? 100 : (isChevron || isZigzagWave) ? 72 : isDiagonal || isKink ? 80 : 96;
+  const sampleXStart = (isV || isVInverted || isZigzagZN) ? 24 : (isChevron || isZigzagWave) ? 44 : isDiagonal || isKink ? 28 : 35;
+  const sampleWidth = (isV || isVInverted || isZigzagZN) ? 100 : (isChevron || isZigzagWave) ? 72 : isDiagonal || isKink ? 80 : 96;
   const sampleXEnd = sampleXStart + sampleWidth;
   const sampleLines: { x1?: number; y1: number; x2?: number; y2: number; points?: { x: number; y: number }[]; hasArrow?: boolean }[] = [];
 
@@ -688,6 +706,22 @@ export function generateSpacingTrackChallenge(
           y2: b.yBottom,
           hasArrow: i === 1,
         });
+      }
+    } else if (isZigzagZN) {
+      // Líneas de muestra en Z/N con flecha indicadora
+      const b = bands[0];
+      const amp = 28;
+      const startBaseY = b.yTop + amp + 4;
+      const endBaseY = b.yBottom - 4;
+      let lineIdx = 0;
+      for (let yb = startBaseY; yb <= endBaseY + 0.1; yb += targetSpacingPx) {
+        sampleLines.push({
+          points: generateZNStrokePoints(sampleXStart, sampleXEnd, Math.round(yb), amp),
+          y1: b.yTop,
+          y2: b.yBottom,
+          hasArrow: lineIdx === 4,
+        });
+        lineIdx++;
       }
     } else {
       const stepStart = (isChevron || isZigzagWave) ? sampleXStart + 4 : sampleXStart + 8;
@@ -828,6 +862,28 @@ export function generateSpacingTrackChallenge(
           targetInteriorLineCount: 7,
         },
       ];
+    } else if (isZigzagZN) {
+      const amp = 34;
+      blocks = [
+        {
+          id: 'b1',
+          xStart: 188,
+          xEnd: 316,
+          width: 128,
+          startLinePoints: generateZNStrokePoints(188, 316, b.yTop + amp, amp),
+          finalLinePoints: generateZNStrokePoints(188, 316, b.yBottom, amp),
+          targetInteriorLineCount: 11,
+        },
+        {
+          id: 'b2',
+          xStart: 364,
+          xEnd: 492,
+          width: 128,
+          startLinePoints: generateZNStrokePoints(364, 492, b.yTop + amp, amp),
+          finalLinePoints: generateZNStrokePoints(364, 492, b.yBottom, amp),
+          targetInteriorLineCount: 11,
+        },
+      ];
     } else if (isChevron || isZigzagWave) {
       blocks = [
         {
@@ -925,6 +981,20 @@ export function generateSpacingTrackChallenge(
             { x: 428, y: Math.round(apexY) },
             { x: 428 + hw, y: b.yTop },
           ],
+        });
+      }
+    } else if (isZigzagZN) {
+      const amp = 34;
+      // Bloque 1 (entre 188 y 316)
+      for (let y = b.yTop + amp + targetSpacingPx; y < b.yBottom - 0.1; y += targetSpacingPx) {
+        ghostSolutionStrokes.push({
+          points: generateZNStrokePoints(188, 316, y, amp),
+        });
+      }
+      // Bloque 2 (entre 364 y 492)
+      for (let y = b.yTop + amp + targetSpacingPx; y < b.yBottom - 0.1; y += targetSpacingPx) {
+        ghostSolutionStrokes.push({
+          points: generateZNStrokePoints(364, 492, y, amp),
         });
       }
     } else if (isChevron || isZigzagWave) {
@@ -1026,6 +1096,9 @@ export function generateSpacingTrackChallenge(
     } else if (kinkType === 'v_inverted') {
       sym = '∧';
       kinkName = 'Vértices en V Invertida';
+    } else if (kinkType === 'zigzag_zn') {
+      sym = '↗↘↗';
+      kinkName = 'Relámpago en Z/N';
     }
     subtitle = `2 Bloques (Ancho y) · Paso ${subdivLabel} (${targetSpacingPx}px) · ${kinkName} (${sym})`;
   } else if (isDiagonal) {
@@ -1034,7 +1107,7 @@ export function generateSpacingTrackChallenge(
     subtitle = `${cfg.bandCount} Franja${cfg.bandCount > 1 ? 's' : ''} (Alt: ${bands[0].height}px) · ${subdivLabel} (${targetSpacingPx}px)`;
   }
 
-  const minRequiredStrokes = (isV || isVInverted) ? 7 : isKink ? 10 : Math.max(3, 3 * cfg.bandCount);
+  const minRequiredStrokes = (isV || isVInverted) ? 7 : isZigzagZN ? 10 : isKink ? 10 : Math.max(3, 3 * cfg.bandCount);
 
   return {
     id: `track-${exercise.code}-${seed}`,
@@ -1049,7 +1122,7 @@ export function generateSpacingTrackChallenge(
     targetMetricsText: exercise.metrics,
     targetAngleDeg: angleDeg,
     targetSpacingPx,
-    targetLengthPx: isKink ? ((isV || isVInverted) ? 145 : isZigzagWave ? 145 : isChevron ? 140 : 141) : Math.hypot(dxOffset, bands[0].height),
+    targetLengthPx: isKink ? (isZigzagZN ? 164 : (isV || isVInverted) ? 145 : isZigzagWave ? 145 : isChevron ? 140 : 141) : Math.hypot(dxOffset, bands[0].height),
     minRequiredStrokes,
     directionKey: direction,
     guideMode: 'gray_line',
