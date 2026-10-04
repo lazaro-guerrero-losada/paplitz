@@ -1380,6 +1380,105 @@ function evaluateVConcentricFidelity(
 }
 
 /**
+ * Evalúa la fidelidad de un trazo en V invertida / pico concéntrico (∧):
+ * - Comienza en el riel inferior (ala izquierda)
+ * - Asciende al vértice superior (ápice en la zona de yTop)
+ * - Desciende al riel inferior (ala derecha)
+ * - Simetría respecto al eje central del bloque
+ */
+function evaluateVInvertedFidelity(
+  stroke: RawStroke,
+  centerX: number,
+  yTop: number,
+  yBottom: number
+): {
+  score: number;
+  hasV: boolean;
+  isCorrectDirection: boolean;
+  apexX: number;
+  apexY: number;
+  leftX: number;
+  rightX: number;
+  halfWidth: number;
+  symmetryDiff: number;
+} {
+  if (stroke.points.length < 3) {
+    return {
+      score: 10,
+      hasV: false,
+      isCorrectDirection: false,
+      apexX: centerX,
+      apexY: yTop,
+      leftX: centerX,
+      rightX: centerX,
+      halfWidth: 0,
+      symmetryDiff: 99,
+    };
+  }
+
+  const pStart = stroke.points[0];
+  const pEnd = stroke.points[stroke.points.length - 1];
+
+  // Encontrar el punto de menor Y (vértice superior / ápice de la V invertida)
+  let minPoint = stroke.points[0];
+  let minIdx = 0;
+  for (let i = 0; i < stroke.points.length; i++) {
+    const p = stroke.points[i];
+    if (p.y < minPoint.y) {
+      minPoint = p;
+      minIdx = i;
+    }
+  }
+
+  const apexX = minPoint.x;
+  const apexY = minPoint.y;
+
+  // Un trazo en V invertida genuino asciende significativamente desde los extremos inferiores
+  const climbLeft = pStart.y - apexY;
+  const climbRight = pEnd.y - apexY;
+  const hasV = climbLeft >= 18 && climbRight >= 18 && minIdx > 0 && minIdx < stroke.points.length - 1;
+
+  // Dirección esperada: comenzar en el ala izquierda (pStart.x < apexX) y terminar en la derecha (pEnd.x > apexX)
+  const isCorrectDirection = pStart.x < apexX && pEnd.x > apexX;
+
+  const leftX = Math.min(pStart.x, pEnd.x);
+  const rightX = Math.max(pStart.x, pEnd.x);
+  const halfWidth = (rightX - leftX) / 2;
+
+  // Simetría respecto a centerX
+  const leftDist = centerX - leftX;
+  const rightDist = rightX - centerX;
+  const symmetryDiff = Math.abs(leftDist - rightDist);
+  const apexCenterDiff = Math.abs(apexX - centerX);
+
+  // Puntuación de forma:
+  // 1. Alineación del vértice con el eje vertical central (hasta 14px de tolerancia)
+  const apexAlignmentScore = Math.max(0, 100 - apexCenterDiff * 6);
+  // 2. Simetría de las dos alas respecto a centerX (hasta 12px de tolerancia)
+  const symmetryScore = Math.max(0, 100 - symmetryDiff * 7);
+  // 3. Los dos extremos descansan cerca del riel inferior (yBottom)
+  const botDiffStart = Math.abs(pStart.y - yBottom);
+  const botDiffEnd = Math.abs(pEnd.y - yBottom);
+  const botAnchorScore = Math.max(0, 100 - (botDiffStart + botDiffEnd) * 4);
+
+  const score = hasV
+    ? Math.round(apexAlignmentScore * 0.40 + symmetryScore * 0.35 + botAnchorScore * 0.25)
+    : 15;
+
+  return {
+    score,
+    hasV,
+    isCorrectDirection,
+    apexX,
+    apexY,
+    leftX,
+    rightX,
+    halfWidth,
+    symmetryDiff,
+  };
+}
+
+/**
  * Evalúa el reto de Carriles y Espaciado Rítmico (Consistencia 1.1)
  */
 export function evaluateSpacingTrackSubmission(
@@ -1748,6 +1847,286 @@ export function evaluateSpacingTrackSubmission(
         ? `Has trazado muy pocas líneas (${trackStrokes.length} de al menos ${challenge.minRequiredStrokes}). Rellena ambos bloques con las V concéntricas.`
         : `La regularidad del paso (${measuredAvgSpacingPx}px) o la simetría de las V no alcanzan el 75%.`;
       tipMessage = 'Mantén la velocidad constante en ambas alas de la V.';
+      avatarMood = 'fail-spiral';
+    }
+
+    return {
+      overallScore,
+      passed,
+      phasePassed,
+      currentPhase: activePhase as (1 | 2 | 3),
+      kinematics,
+      metrics: {
+        parallelismScore: Math.round(avgVFidelityScore),
+        spacingScore: Math.round(avgSpacingScore),
+        straightnessScore: Math.round(avgVFidelityScore),
+        tonalDensityScore: Math.round(avgBoundaryScore),
+        boundaryScore: Math.round(avgBoundaryScore),
+      },
+      detectedStats: {
+        strokeCount: trackStrokes.length,
+        measuredAvgSpacingPx,
+        spacingVariance: measuredSpacingVariance,
+        measuredAvgAngleDeg: 64,
+        measuredOpticalDensityPct: Math.min(100, Math.round((trackStrokes.length / (7 * blockList.length)) * 100)),
+      },
+      feedbackTitle,
+      feedbackMessage,
+      tipMessage,
+      avatarMood,
+      solutionOverlay,
+    };
+  }
+
+  // 1.75 Rama de evaluación específica para carriles de Vértices en V Invertida Concéntricos (E7.2)
+  if (kinkType === 'v_inverted' && blocks && blocks.length > 0) {
+    const singleBand = bands[0];
+    const b1 = blocks[0];
+    const b2 = blocks[1];
+
+    const b1CenterX = 252;
+    const b2CenterX = b2 ? 428 : 0;
+
+    // Clasificar trazos por bloque y detectar trazos en el gap de pausa
+    const b1Strokes: { stroke: RawStroke; fidelity: ReturnType<typeof evaluateVInvertedFidelity> }[] = [];
+    const b2Strokes: { stroke: RawStroke; fidelity: ReturnType<typeof evaluateVInvertedFidelity> }[] = [];
+    const gapStrokes: RawStroke[] = [];
+
+    for (const ts of trackStrokes) {
+      const pts = ts.stroke.points;
+      let minX = Infinity;
+      let maxX = -Infinity;
+      for (const p of pts) {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+      }
+      const midX = (minX + maxX) / 2;
+
+      if (midX >= 180 && midX <= 322) {
+        const fidelity = evaluateVInvertedFidelity(ts.stroke, b1CenterX, singleBand.yTop, singleBand.yBottom);
+        b1Strokes.push({ stroke: ts.stroke, fidelity });
+      } else if (b2 && midX >= 358 && midX <= 500) {
+        const fidelity = evaluateVInvertedFidelity(ts.stroke, b2CenterX, singleBand.yTop, singleBand.yBottom);
+        b2Strokes.push({ stroke: ts.stroke, fidelity });
+      } else if (b2 && midX > 322 && midX < 358) {
+        gapStrokes.push(ts.stroke);
+      }
+    }
+
+    const blockList = [
+      { def: b1, centerX: b1CenterX, strokes: b1Strokes },
+      ...(b2 ? [{ def: b2, centerX: b2CenterX, strokes: b2Strokes }] : []),
+    ];
+
+    let totalBlockSpacingScore = 0;
+    let totalBlockVFidelityScore = 0;
+    let totalBlockBoundaryScore = 0;
+    let blocksDrawnCount = 0;
+    let missingVCount = 0;
+    let wrongDirCount = 0;
+    const allSpacings: number[] = [];
+
+    for (const blk of blockList) {
+      const bItems = blk.strokes;
+      if (bItems.length < 2) {
+        continue;
+      }
+      blocksDrawnCount++;
+
+      // Ordenar trazos de exterior a interior (por halfWidth descendente)
+      bItems.sort((a, b) => b.fidelity.halfWidth - a.fidelity.halfWidth);
+
+      // Espaciados en el bloque: distancia desde la V invertida exterior (hw = 64) y entre trazos consecutivos
+      const spacings: number[] = [];
+      const outerLeft = blk.centerX - 64;
+      const outerRight = blk.centerX + 64;
+
+      const firstItem = bItems[0];
+      const dStartLeft = firstItem.fidelity.leftX - outerLeft;
+      const dStartRight = outerRight - firstItem.fidelity.rightX;
+      const dStart = (dStartLeft + dStartRight) / 2;
+      if (dStart > 0) {
+        spacings.push(dStart);
+        allSpacings.push(dStart);
+      }
+
+      for (let i = 0; i < bItems.length - 1; i++) {
+        const curr = bItems[i];
+        const next = bItems[i + 1];
+        const dLeft = next.fidelity.leftX - curr.fidelity.leftX;
+        const dRight = curr.fidelity.rightX - next.fidelity.rightX;
+        const step = (dLeft + dRight) / 2;
+        if (step > 0) {
+          spacings.push(step);
+          allSpacings.push(step);
+        }
+      }
+
+      const meanDx = spacings.reduce((a, b) => a + b, 0) / (spacings.length || 1);
+      let varDx = 0;
+      for (const d of spacings) {
+        varDx += (d - meanDx) * (d - meanDx);
+      }
+      const stdDx = Math.sqrt(varDx / (spacings.length || 1));
+
+      const accuracyVsTarget = Math.max(0, 100 - Math.abs(meanDx - targetSpacing) * 8);
+      const regularity = Math.max(0, 100 - stdDx * 12);
+      const blockSpacingScore = accuracyVsTarget * 0.45 + regularity * 0.55;
+      totalBlockSpacingScore += blockSpacingScore;
+
+      // Fidelidad de la V invertida y contención en carriles
+      let blockVFidelitySum = 0;
+      let blockBoundarySum = 0;
+      for (const item of bItems) {
+        blockVFidelitySum += item.fidelity.score;
+        if (!item.fidelity.hasV) missingVCount++;
+        if (item.fidelity.hasV && !item.fidelity.isCorrectDirection) wrongDirCount++;
+
+        const pStart = item.stroke.points[0];
+        const pEnd = item.stroke.points[item.stroke.points.length - 1];
+        const botErr = Math.abs(pStart.y - singleBand.yBottom) + Math.abs(pEnd.y - singleBand.yBottom);
+        const apexErr = Math.max(0, singleBand.yTop - item.fidelity.apexY) + Math.max(0, item.fidelity.apexY - singleBand.yBottom);
+        const strokeBoundary = Math.max(0, 100 - botErr * 3.5 - apexErr * 4);
+        blockBoundarySum += strokeBoundary;
+      }
+      totalBlockVFidelityScore += blockVFidelitySum / bItems.length;
+      totalBlockBoundaryScore += blockBoundarySum / bItems.length;
+    }
+
+    const coverageRatio = blocksDrawnCount / blockList.length;
+    const avgSpacingScore = blocksDrawnCount > 0 ? (totalBlockSpacingScore / blocksDrawnCount) * coverageRatio : 0;
+    const avgVFidelityScore = blocksDrawnCount > 0 ? (totalBlockVFidelityScore / blocksDrawnCount) : 0;
+    const avgBoundaryScore = blocksDrawnCount > 0 ? (totalBlockBoundaryScore / blocksDrawnCount) * coverageRatio : 0;
+
+    const measuredAvgSpacingPx = allSpacings.length > 0 ? Math.round((allSpacings.reduce((a, b) => a + b, 0) / allSpacings.length) * 10) / 10 : 0;
+    let allVar = 0;
+    if (allSpacings.length > 0) {
+      for (const d of allSpacings) allVar += (d - measuredAvgSpacingPx) * (d - measuredAvgSpacingPx);
+    }
+    const measuredSpacingVariance = allSpacings.length > 0 ? Math.round(Math.sqrt(allVar / allSpacings.length) * 10) / 10 : 0;
+
+    const strokeCountPenalty = trackStrokes.length < challenge.minRequiredStrokes
+      ? Math.min(30, (challenge.minRequiredStrokes - trackStrokes.length) * 4)
+      : 0;
+
+    const gapPenalty = Math.min(20, gapStrokes.length * 5);
+
+    // Cinemática
+    const activePhase = challenge.activePhase || 1;
+    const kinematicsList = trackStrokes.map((ts) =>
+      analyzeStrokeKinematics(ts.stroke, targetDir, activePhase, challenge.targetLengthPx || 145)
+    );
+    const avgSpeed = Math.round(
+      kinematicsList.reduce((acc, k) => acc + k.avgSpeedPxPerSec, 0) / (kinematicsList.length || 1)
+    );
+    const avgFluency = Math.round(
+      kinematicsList.reduce((acc, k) => acc + k.fluencyScore, 0) / (kinematicsList.length || 1)
+    );
+    const avgDuration = Math.round(
+      kinematicsList.reduce((acc, k) => acc + k.durationMs, 0) / (kinematicsList.length || 1)
+    );
+    const allPhasePassed = kinematicsList.length > 0 && kinematicsList.every((k) => k.phasePassed);
+    const kinematics = kinematicsList[0]
+      ? {
+          ...kinematicsList[0],
+          durationMs: avgDuration,
+          avgSpeedPxPerSec: avgSpeed,
+          fluencyScore: avgFluency,
+          phasePassed: allPhasePassed,
+        }
+      : undefined;
+
+    // Ponderación geométrica
+    let geometricScore =
+      avgSpacingScore * 0.40 +
+      avgVFidelityScore * 0.35 +
+      avgBoundaryScore * 0.25 -
+      strokeCountPenalty -
+      gapPenalty;
+
+    geometricScore = Math.max(0, Math.min(100, Math.round(geometricScore)));
+
+    const isMissingVs = trackStrokes.length > 0 && missingVCount >= Math.max(2, Math.ceil(trackStrokes.length * 0.4));
+    const isWrongDirVs = trackStrokes.length > 0 && wrongDirCount >= Math.max(2, Math.ceil(trackStrokes.length * 0.4));
+
+    if (isMissingVs) {
+      geometricScore = Math.min(geometricScore, 30);
+    } else if (isWrongDirVs) {
+      geometricScore = Math.min(geometricScore, 40);
+    }
+
+    let overallScore = geometricScore;
+    let phasePassed = false;
+    if (activePhase === 1) {
+      overallScore = geometricScore;
+      phasePassed = overallScore >= 75;
+    } else if (activePhase === 2) {
+      const fluency = kinematics?.fluencyScore || 80;
+      overallScore = Math.round(geometricScore * 0.80 + fluency * 0.20);
+      phasePassed = overallScore >= 75 && fluency >= 70;
+    } else {
+      const speedPassed = kinematics?.phasePassed ?? true;
+      const speedScore = speedPassed ? 100 : 50;
+      overallScore = Math.round(geometricScore * 0.70 + speedScore * 0.30);
+      phasePassed = overallScore >= 75 && speedPassed;
+    }
+
+    let passed = overallScore >= 75;
+
+    const solutionOverlay = {
+      points: [],
+      multiLines: challenge.ghostSolutionStrokes || [],
+      color: '#000000',
+      label: `Paso Objetivo: ${targetSpacing}px con Vértices en V Invertida ∧`,
+    };
+
+    let feedbackTitle = '¡Vértices en ∧ y Espaciado Logrados!';
+    let feedbackMessage = `Has conseguido un paso medio de ${measuredAvgSpacingPx}px (objetivo: ${targetSpacing}px) con buena reproducción de los vértices en V invertida ∧.`;
+    let tipMessage = 'Mantén los vértices superiores alineados verticalmente al centro de cada bloque.';
+    let avatarMood: AvatarMood = 'wink';
+
+    if (isMissingVs) {
+      feedbackTitle = '¡Faltan los Vértices en V Invertida! ∧';
+      feedbackMessage = 'Has trazado líneas rectas. Este ejercicio consiste en trazar vértices continuos en V invertida (∧) anidados hacia el centro, partiendo desde la V invertida exterior pre-dibujada (INICIO).';
+      tipMessage = 'Asciende por el ala izquierda hasta el vértice superior y desciende por el ala derecha sin levantar el lápiz.';
+      avatarMood = 'curious';
+      passed = false;
+      phasePassed = false;
+    } else if (isWrongDirVs) {
+      feedbackTitle = 'Dirección Invertida en ∧ 🔄';
+      feedbackMessage = 'Has comenzado por el ala derecha. Debes trazar de izquierda a derecha: ascender por el ala izquierda (↗), hacer vértice superior y descender por el ala derecha (↘).';
+      tipMessage = 'Observa la flecha en la muestra: inicia abajo a la izquierda y termina abajo a la derecha.';
+      avatarMood = 'curious';
+      passed = false;
+      phasePassed = false;
+    } else if (blocksDrawnCount < blockList.length) {
+      feedbackTitle = 'Bloques Incompletos';
+      feedbackMessage = `Has completado ${blocksDrawnCount} de los ${blockList.length} bloques requeridos. Rellena tanto el Bloque 1 como el Bloque 2 con Vértices en V invertida concéntricos, respetando la pausa central.`;
+      tipMessage = 'Usa la pausa entre bloques para descansar la mano sin tocar el lienzo.';
+      avatarMood = 'curious';
+      passed = false;
+      phasePassed = false;
+    } else if (gapStrokes.length > 2) {
+      feedbackTitle = 'Trazos en Zona de Pausa ⚠️';
+      feedbackMessage = `Has dibujado ${gapStrokes.length} líneas en la zona de separación central. Los bloques deben estar separados por un espacio vacío de pausa.`;
+      tipMessage = 'Respeta la zona de separación entre el Bloque 1 y el Bloque 2.';
+      avatarMood = 'curious';
+    } else if (overallScore >= 90) {
+      feedbackTitle = '¡Vértices en ∧ Impecables! 🌟';
+      feedbackMessage = `Paso medio de ${measuredAvgSpacingPx}px (objetivo: ${targetSpacing}px) con excelente simetría y convergencia al centro en ambos bloques.`;
+      tipMessage = 'Excelente control y ritmo. Pasa ahora a las fases de fluidez y velocidad.';
+      avatarMood = 'success-stars';
+    } else if (overallScore >= 75) {
+      feedbackTitle = '¡Nivel Superado! ✅';
+      feedbackMessage = `Buen control de los vértices en ∧ (${overallScore}%). El espaciado de ${targetSpacing}px se mantiene regular hacia el centro.`;
+      tipMessage = 'Intenta que cada vértice quede exactamente sobre el eje vertical central.';
+      avatarMood = 'wink';
+    } else {
+      feedbackTitle = 'Falta de Consistencia 💨';
+      feedbackMessage = trackStrokes.length < challenge.minRequiredStrokes
+        ? `Has trazado muy pocas líneas (${trackStrokes.length} de al menos ${challenge.minRequiredStrokes}). Rellena ambos bloques con las V invertidas concéntricas.`
+        : `La regularidad del paso (${measuredAvgSpacingPx}px) o la simetría de las ∧ no alcanzan el 75%.`;
+      tipMessage = 'Mantén la velocidad constante en ambas alas de la ∧.';
       avatarMood = 'fail-spiral';
     }
 

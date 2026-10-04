@@ -500,6 +500,8 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
       let sampleLabel = `MUESTRA (${subdivisionLabel})`;
       if (sp.kinkType === 'v_concentric') {
         sampleLabel = `MUESTRA VÉRTICES EN V ∨ (x/2 = ${targetSpacingPx}px)`;
+      } else if (sp.kinkType === 'v_inverted') {
+        sampleLabel = `MUESTRA VÉRTICES EN ∧ (x/2 = ${targetSpacingPx}px)`;
       } else if (sp.kinkType === 'triangle_left') {
         sampleLabel = `MUESTRA ◄ (x/2 = ${targetSpacingPx}px)`;
       } else if (sp.kinkType === 'triangle_right') {
@@ -706,8 +708,9 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
           }
           ctx.stroke();
 
-          // 2. Línea Final del bloque (Final Line) pre-dibujada sólida (salvo en V concéntrica que converge al centro)
-          if (sp.kinkType !== 'v_concentric') {
+          // 2. Línea Final del bloque (Final Line) pre-dibujada sólida (salvo en familias de V concéntrica que convergen al centro)
+          const isVFamily = sp.kinkType === 'v_concentric' || sp.kinkType === 'v_inverted';
+          if (!isVFamily) {
             ctx.beginPath();
             ctx.moveTo(blk.finalLinePoints[0].x, blk.finalLinePoints[0].y);
             for (let pIdx = 1; pIdx < blk.finalLinePoints.length; pIdx++) {
@@ -722,7 +725,7 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
           ctx.textAlign = 'center';
           ctx.textBaseline = 'bottom';
           ctx.fillText('INICIO', blk.xStart, b.yTop - 4);
-          if (sp.kinkType !== 'v_concentric') {
+          if (!isVFamily) {
             ctx.fillText('FIN', blk.xEnd, b.yTop - 4);
           }
 
@@ -732,7 +735,7 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
           ctx.beginPath();
           ctx.moveTo(blk.xStart, b.yTop - 3);
           ctx.lineTo(blk.xStart, b.yTop + 3);
-          if (sp.kinkType !== 'v_concentric') {
+          if (!isVFamily) {
             ctx.moveTo(blk.xEnd, b.yTop - 3);
             ctx.lineTo(blk.xEnd, b.yTop + 3);
           }

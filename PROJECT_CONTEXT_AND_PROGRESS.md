@@ -12,9 +12,9 @@
 1. [Resumen Ejecutivo & Visión del Proyecto](#1-resumen-ejecutivo--visión-del-proyecto)
 2. [Guía Rápida para Abrir y Trabajar en Otro PC (Quickstart)](#2-guía-rápida-para-abrir-y-trabajar-en-otro-pc-quickstart)
 3. [Estructura del Proyecto y Mapa de Archivos](#3-estructura-del-proyecto-y-mapa-de-archivos)
-4. [Catálogo Completo de Ejercicios (268 Retos)](#4-catálogo-completo-de-ejercicios-268-retos)
+4. [Catálogo Completo de Ejercicios (269 Retos)](#4-catálogo-completo-de-ejercicios-269-retos)
    - [4.1 Calistenia Dinámica de Trazo Único (212 Retos)](#41-calistenia-dinámica-de-trazo-único-212-retos)
-   - [4.2 Espaciado y Carriles de Ritmo (E1.1 a E7.1)](#42-espaciado-y-carriles-de-ritmo-e11-a-e71)
+   - [4.2 Espaciado y Carriles de Ritmo (E1.1 a E7.2)](#42-espaciado-y-carriles-de-ritmo-e11-a-e72)
    - [4.3 Las 42 Páginas del Cuaderno Técnico (Bloques 1 al 8)](#43-las-42-páginas-del-cuaderno-técnico-bloques-1-al-8)
 5. [Motor de Generación Procedural y Geometría](#5-motor-de-generación-procedural-y-geometría)
 6. [Motor de Evaluación Analítica y Cinemática Biomecánica](#6-motor-de-evaluación-analítica-y-cinemática-biomecánica)
@@ -130,9 +130,9 @@ Web dibujitos/ (paplitz-drawing-lab)
 │   └── lib/                      # Núcleo analítico, generadores y tipos
 │       ├── strokeTypes.ts        # ⭐ Definiciones TypeScript completas:
 │       │                         #    - LabExerciseDef, ProceduralStrokeChallenge
-│       │                         #    - ALL_SINGLE_STROKE_EXERCISES (226 niveles)
+│       │                         #    - ALL_SINGLE_STROKE_EXERCISES (227 niveles)
 │       │                         #    - ALL_42_EXERCISES (42 páginas del cuaderno)
-│       │                         #    - ALL_LAB_EXERCISES (268 ejercicios totales)
+│       │                         #    - ALL_LAB_EXERCISES (269 ejercicios totales)
 │       │                         #    - SpacingTrackConfig, SpacingTrackParams
 │       │                         #    - StrokeEvaluation, KeyPoint, TargetLineDef
 │       │
@@ -141,7 +141,7 @@ Web dibujitos/ (paplitz-drawing-lab)
 │       │                         #    - generateSingleStrokeChallenge (Líneas y curvas)
 │       │                         #    - generateMultiLineChallenge (2 o 3 líneas dispersas)
 │       │                         #    - generateRadialRosetteChallenge (Rosetas D11 y D12)
-│       │                         #    - generateSpacingTrackChallenge (Carriles E1.1 a E7.1)
+│       │                         #    - generateSpacingTrackChallenge (Carriles E1.1 a E7.2)
 │       │                         #    - Generadores para las 42 páginas del cuaderno
 │       │
 │       ├── strokeEvaluator.ts    # ⭐ Evaluador analítico instantáneo y biomecánico:
@@ -173,9 +173,9 @@ Web dibujitos/ (paplitz-drawing-lab)
 
 ---
 
-## 4. Catálogo Completo de Ejercicios (268 Retos)
+## 4. Catálogo Completo de Ejercicios (269 Retos)
 
-El catálogo unificado en `src/lib/strokeTypes.ts` combina **226 Calistenias Dinámicas** (212 de trazo único, curvas y rosetas + 14 de espaciado y carriles) y las **42 Páginas del Cuaderno Técnico**, sumando un total de **268 ejercicios** agrupados por bloques temáticos.
+El catálogo unificado en `src/lib/strokeTypes.ts` combina **227 Calistenias Dinámicas** (212 de trazo único, curvas y rosetas + 15 de espaciado y carriles) y las **42 Páginas del Cuaderno Técnico**, sumando un total de **269 ejercicios** agrupados por bloques temáticos.
 
 ### 4.1 Calistenia Dinámica de Trazo Único y Rosetas (212 Retos)
 
@@ -200,7 +200,7 @@ Entrenamiento biomecánico repetitivo con evaluación inmediata al levantar el l
 
 ---
 
-### 4.2 Espaciado y Carriles de Ritmo (E1.1 a E7.1)
+### 4.2 Espaciado y Carriles de Ritmo (E1.1 a E7.2)
 
 Inspirado en el Ejercicio 1.1 del cuaderno de dibujo (*"Making Strokes Consistent / Spacing"*). Se ubican en el bloque **`⚡ Calistenia: Espaciado & Carriles (Ritmo)`**:
 
@@ -271,9 +271,17 @@ Inspirado en el Ejercicio 1.1 del cuaderno de dibujo (*"Making Strokes Consisten
     - **Relleno concéntrico hacia el núcleo:** El usuario traza las V interiores reduciendo el semi-ancho a paso fino $x/2 = 8$px ($7$ V interiores por bloque: $hw \in [56, 48, 40, 32, 24, 16, 8]$px, con el ápice subiendo progresivamente $\approx 16.25$px por trazo).
     - Distribución en 2 bloques independientes (Bloque 1 con centro en $X=252$ y Bloque 2 con centro en $X=428$) separados por un espacio de pausa de descanso de mano de $48$px.
     - Muestra permanente con 6 V concéntricas y flecha indicadora en el ala derecha con punto de inicio (●) en el ala izquierda.
+15. **E7.2 — Carril Vértices en V Invertida ∧ (Bloques & Pausas · x/2):**
+    - 1 franja de altura $y = 130$px, espaciado fino $x/2 = 8$px.
+    - Patrón geométrico de vértices concéntricos en V invertida / pico / tienda (`∧`) anidados hacia el centro común de cada bloque (Fila 4 del Ejercicio 1.4 del cuaderno técnico).
+    - **Trazo continuo sin levantar el lápiz:** Se asciende desde el riel inferior por el ala izquierda (↗), se realiza un frenado y pivote nítido en el vértice superior (ápice en el eje vertical central), y se desciende por el ala derecha (↘) hasta el riel inferior.
+    - **V invertida exterior pre-dibujada como guía sólida de INICIO:** En cada bloque, la V invertida más exterior está pre-dibujada ($hw = 64$px, base de $128$px de ancho apoyando en el riel inferior y altura $130$px con el vértice tocando el riel superior).
+    - **Relleno concéntrico hacia el núcleo:** El usuario traza las V invertidas interiores reduciendo el semi-ancho a paso fino $x/2 = 8$px ($7$ V invertidas interiores por bloque: $hw \in [56, 48, 40, 32, 24, 16, 8]$px, con el ápice descendiendo progresivamente $\approx 16.25$px por trazo).
+    - Distribución en 2 bloques independientes (Bloque 1 con centro en $X=252$ y Bloque 2 con centro en $X=428$) separados por un espacio de pausa de descanso de mano de $48$px.
+    - Muestra permanente con 6 V invertidas concéntricas y flecha indicadora en el ala derecha (↘) con punto de inicio (●) en el ala izquierda (en el riel inferior).
 
 **Reglas de diseño de estos ejercicios:**
-- **Muestra permanente:** El bloque izquierdo con la referencia nunca se oculta, permitiendo al usuario calibrar su ojo en todo momento. Muestra la dirección y ángulo exactos (`MUESTRA ↗ (~75°)`, `MUESTRA CHEVRON ◄`, `MUESTRA VÉRTICES EN V ∨`).
+- **Muestra permanente:** El bloque izquierdo con la referencia nunca se oculta, permitiendo al usuario calibrar su ojo en todo momento. Muestra la dirección y ángulo exactos (`MUESTRA ↗ (~75°)`, `MUESTRA CHEVRON ◄`, `MUESTRA VÉRTICES EN V ∨`, `MUESTRA VÉRTICES EN ∧`).
 - **Flechas indicadoras de dirección:** En los niveles diagonales (E4.1 a E4.4) y con quiebre/vértice (E5, E6 y E7), una de las líneas del bloque de muestra cuenta con un icono de flecha sólida al final del trazo y un punto de origen (●) al inicio, indicando visualmente de manera inequívoca el sentido y dirección del movimiento biomecánico.
 - **Lienzo limpio sin textos superfluos:** Se han eliminado los textos de ayuda flotantes redundantes dentro del lienzo para preservar la pureza visual y permitir que las líneas pre-dibujadas de inicio guíen intuitivamente la ejecución.
 - **Longitud adaptable:** El carril se extiende a lo ancho de la pantalla; no hay un número rígido obligatorio de líneas (se evalúan todas las líneas trazadas, requiriendo un mínimo de 3 por franja en continuos y 10 en bloques).
@@ -380,17 +388,17 @@ Si el usuario empieza a dibujar en el punto de llegada ② y termina en el punto
    - Los trazos se particionan en Bloque 1 y Bloque 2, exigiendo completar ambos.
    - Se penalizan trazos indebidos en la zona central de pausa (`(PAUSA)`), educando al usuario para levantar la mano y relajar el pulso entre bloques.
 
-#### Para carriles de Vértices en V Concéntricos (E7.1):
-1. **Fidelidad de V Concéntrica (`evaluateVConcentricFidelity`):**
-   - **Forma genuina de V (∨):** Se detecta el punto de profundidad máxima (ápice en $y_{\text{max}}$) y se verifica que descienda significativamente desde el extremo izquierdo y ascienda hacia el derecho ($\ge 18$px).
-   - **Alineación con el eje central:** El vértice inferior debe situarse sobre el eje vertical central del bloque ($X_c = 252$ para Bloque 1, $X_c = 428$ para Bloque 2) con tolerancia de hasta $14$px.
-   - **Simetría bilateral:** Se compara la distancia del ala izquierda y del ala derecha respecto al eje ($|(X_c - x_{\text{left}}) - (x_{\text{right}} - X_c)| \le 12$px).
-   - **Anclaje en riel superior:** Ambos extremos (inicio y fin) deben apoyarse en el riel superior $y_{\text{top}}$.
-   - **Dirección obligatoria:** Trazo continuo de izquierda a derecha (↘ vértice ↗).
+#### Para carriles de Vértices en V y V Invertida (E7.1 y E7.2):
+1. **Fidelidad de V Concéntrica (`evaluateVConcentricFidelity` y `evaluateVInvertedFidelity`):**
+   - **V Concéntrica en V (∨, E7.1):** Vértice en riel inferior ($y_{\text{bottom}}$), dos extremos en riel superior ($y_{\text{top}}$), sentido continuo ↘ vértice ↗.
+   - **V Invertida en Pico (∧, E7.2):** Vértice en riel superior ($y_{\text{top}}$), dos extremos en riel inferior ($y_{\text{bottom}}$), sentido continuo ↗ vértice ↘ (Fila 4 del Ejercicio 1.4 del cuaderno).
+   - **Alineación con el eje central:** El vértice debe situarse sobre el eje vertical central del bloque ($X_c = 252$ para Bloque 1, $X_c = 428$ para Bloque 2) con tolerancia de hasta $14$px.
+   - **Simetría bilateral:** Se compara la distancia del ala izquierda y del ala derecha respecto al eje central ($|(X_c - x_{\text{left}}) - (x_{\text{right}} - X_c)| \le 12$px).
+   - **Anclaje en rieles guía:** Apoyo riguroso de las dos patas en los rieles correspondientes ($y_{\text{top}}$ en E7.1, $y_{\text{bottom}}$ en E7.2).
 2. **Medición del Espaciado Interlineal Radial/Concéntrico:**
    - Los trazos se ordenan de exterior a interior por su semi-ancho $hw$.
-   - Se mide la distancia $\Delta x$ desde la V exterior pre-dibujada ($hw=64$px) hacia la primera V interior, y entre cada par de V consecutivas (objetivo: $x/2 = 8$px).
-   - Se penaliza la falta de V's (si se trazan líneas rectas) limitando la nota a $\le 30\%$ con advertencia *"¡Faltan los Vértices en V! ∨"*.
+   - Se mide la distancia $\Delta x$ desde la figura exterior pre-dibujada ($hw=64$px) hacia la primera interior, y entre cada par consecutivo hacia el núcleo (objetivo: $x/2 = 8$px).
+   - Se penaliza la falta de ángulos/vértices (si se trazan líneas rectas) limitando la nota a $\le 30\%$ con advertencia visual diagnóstica.
 
 ---
 
@@ -403,7 +411,7 @@ Ubicada en `src/components/StrokeLabView.tsx`.
    - La barra lateral izquierda y el lienzo caben simultáneamente en la pantalla en tablets y portátiles sin requerir scroll vertical.
    - El lienzo mantiene su relación de aspecto técnica `600 / 540` con un margen inferior de respiración para que no quede pegado al borde.
 2. **Drawer Lateral Deslizante:**
-   - El catálogo completo de los 268 ejercicios se despliega mediante un panel lateral accesible con el botón de menú `☰`, con buscador y filtro por bloques.
+   - El catálogo completo de los 269 ejercicios se despliega mediante un panel lateral accesible con el botón de menú `☰`, con buscador y filtro por bloques.
 3. **Calificación Destacada y Telemetría:**
    - El porcentaje de nota se muestra en tamaño grande (`text-3xl / text-4xl`) con badge de estado (`Superado ✓`, `Ajustar`, `Dirección ⚠️`).
    - Muestra la duración en segundos y la velocidad en $px/s$.
@@ -461,12 +469,18 @@ A continuación se resumen los avances implementados en la última fase de traba
    - Eliminación de textos flotantes redundantes en el lienzo para mantener la estética pura de dibujo técnico y calistenia.
    - Líneas de muestra con icono de flecha direccional y dot de inicio en diagonales y quiebres.
 10. **Carril Vértices en V Concéntricos ∨ (E7.1):**
-   - Creación del nivel E7.1 (`Carril Vértices en V ∨`) con patrón de V anidadas hacia el centro común de cada bloque.
-   - La V exterior de cada bloque ($128$px de ancho) está pre-dibujada como guía sólida de **INICIO**.
-   - El alumno rellena hacia el interior a paso fino $x/2 = 8$px en un único trazo continuo (ala izquierda ↘, vértice en el eje central, ala derecha ↗).
-   - 2 bloques independientes separados por una pausa de descanso central de $48$px.
-   - Motor evaluador específico `evaluateVConcentricFidelity` con control de alineación del vértice, simetría bilateral, apoyo en riel superior y detección de dirección.
-   - Catálogo ampliado a 268 retos totales (226 dinámicos + 42 páginas de cuaderno).
+    - Creación del nivel E7.1 (`Carril Vértices en V ∨`) con patrón de V anidadas hacia el centro común de cada bloque.
+    - La V exterior de cada bloque ($128$px de ancho) está pre-dibujada como guía sólida de **INICIO**.
+    - El alumno rellena hacia el interior a paso fino $x/2 = 8$px en un único trazo continuo (ala izquierda ↘, vértice en el eje central, ala derecha ↗).
+    - 2 bloques independientes separados por una pausa de descanso central de $48$px.
+    - Motor evaluador específico `evaluateVConcentricFidelity` con control de alineación del vértice, simetría bilateral, apoyo en riel superior y detección de dirección.
+11. **Carril Vértices en V Invertida ∧ (E7.2):**
+    - Creación del nivel E7.2 (`Carril Vértices en V Invertida ∧`, Fila 4 del Ejercicio 1.4 del cuaderno técnico) con patrón de picos/tiendas anidados hacia el centro de cada bloque.
+    - La V invertida exterior ($128$px de ancho) está pre-dibujada como guía sólida de **INICIO**.
+    - El alumno rellena hacia el interior a paso fino $x/2 = 8$px en un único trazo continuo (ala izquierda ↗ desde el riel inferior, vértice superior en el eje central, ala derecha ↘ hasta el riel inferior).
+    - 2 bloques independientes separados por una pausa de descanso central de $48$px.
+    - Motor evaluador específico `evaluateVInvertedFidelity` con validación de vértice superior en $y_{\text{top}}$, simetría de alas y anclaje en riel inferior.
+    - Catálogo ampliado a 269 retos totales (227 dinámicos + 42 páginas de cuaderno).
 
 ---
 
@@ -481,7 +495,7 @@ Si retomas el proyecto en otro ordenador o deseas continuar ampliándolo, aquí 
 3. **Pruebas de Usabilidad con Stylus en Dispositivos Reales:**
    - Probar en iPad (Safari/Chrome) y tablet Android (Samsung Tab S con S-Pen) para verificar la curva de presión y respuesta háptica.
 4. **Empaquetado de Nueva Release:**
-   - Generar el nuevo `.apk` para Android y `.exe` para Windows incorporando todo el catálogo de 268 ejercicios.
+   - Generar el nuevo `.apk` para Android y `.exe` para Windows incorporando todo el catálogo de 269 ejercicios.
 
 ---
 
