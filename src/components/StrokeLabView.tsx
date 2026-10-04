@@ -515,6 +515,8 @@ export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
         sampleLabel = `MUESTRA CHEVRON ◄ (x/2 = ${targetSpacingPx}px)`;
       } else if (sp.kinkType === 'zigzag_wave') {
         sampleLabel = `MUESTRA ZIGZAG ◄►◄ (x/2 = ${targetSpacingPx}px)`;
+      } else if (sp.kinkType === 'bracket_left') {
+        sampleLabel = `MUESTRA CORCHETE [ (x/2 = ${targetSpacingPx}px)`;
       } else if (sp.angleDeg && sp.direction) {
         const arrowMap: Record<string, string> = {
           bottom_up_left_right: '↗',

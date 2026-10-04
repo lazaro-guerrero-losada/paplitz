@@ -525,10 +525,19 @@ export function generateKinkStrokePoints(
   x: number,
   yTop: number,
   yBottom: number,
-  kinkType: 'triangle_left' | 'triangle_right' | 'chevron_left' | 'v_concentric' | 'v_inverted' | 'zigzag_wave' = 'triangle_left',
+  kinkType: 'triangle_left' | 'triangle_right' | 'chevron_left' | 'v_concentric' | 'v_inverted' | 'zigzag_wave' | 'bracket_left' = 'triangle_left',
   apexOffset?: number
 ): { x: number; y: number }[] {
   const h = yBottom - yTop;
+  if (kinkType === 'bracket_left') {
+    const defl = apexOffset ?? 26;
+    return [
+      { x: Math.round(x * 10) / 10, y: Math.round(yTop * 10) / 10 },
+      { x: Math.round((x - defl) * 10) / 10, y: Math.round((yTop + h * 0.33) * 10) / 10 },
+      { x: Math.round((x - defl) * 10) / 10, y: Math.round((yTop + h * 0.67) * 10) / 10 },
+      { x: Math.round(x * 10) / 10, y: Math.round(yBottom * 10) / 10 },
+    ];
+  }
   if (kinkType === 'zigzag_wave') {
     const defl = apexOffset ?? 16;
     return [
@@ -663,10 +672,11 @@ export function generateSpacingTrackChallenge(
   const isVInverted = kinkType === 'v_inverted';
   const isZigzagWave = kinkType === 'zigzag_wave';
   const isZigzagZN = kinkType === 'zigzag_zn';
+  const isBracket = kinkType === 'bracket_left';
 
   // 2. Patrón de muestra (izquierda)
-  const sampleXStart = (isV || isVInverted || isZigzagZN) ? 24 : (isChevron || isZigzagWave) ? 44 : isDiagonal || isKink ? 28 : 35;
-  const sampleWidth = (isV || isVInverted || isZigzagZN) ? 100 : (isChevron || isZigzagWave) ? 72 : isDiagonal || isKink ? 80 : 96;
+  const sampleXStart = (isV || isVInverted || isZigzagZN) ? 24 : (isChevron || isZigzagWave || isBracket) ? 44 : isDiagonal || isKink ? 28 : 35;
+  const sampleWidth = (isV || isVInverted || isZigzagZN) ? 100 : (isChevron || isZigzagWave || isBracket) ? 72 : isDiagonal || isKink ? 80 : 96;
   const sampleXEnd = sampleXStart + sampleWidth;
   const sampleLines: { x1?: number; y1: number; x2?: number; y2: number; points?: { x: number; y: number }[]; hasArrow?: boolean }[] = [];
 
@@ -724,7 +734,7 @@ export function generateSpacingTrackChallenge(
         lineIdx++;
       }
     } else {
-      const stepStart = (isChevron || isZigzagWave) ? sampleXStart + 4 : sampleXStart + 8;
+      const stepStart = (isChevron || isZigzagWave || isBracket) ? sampleXStart + 4 : sampleXStart + 8;
       for (let x = stepStart; x <= sampleXEnd; x += targetSpacingPx) {
         sampleLines.push({
           points: generateKinkStrokePoints(Math.round(x), bands[0].yTop, bands[0].yBottom, kinkType as any),
@@ -884,7 +894,7 @@ export function generateSpacingTrackChallenge(
           targetInteriorLineCount: 11,
         },
       ];
-    } else if (isChevron || isZigzagWave) {
+    } else if (isChevron || isZigzagWave || isBracket) {
       blocks = [
         {
           id: 'b1',
@@ -997,7 +1007,7 @@ export function generateSpacingTrackChallenge(
           points: generateZNStrokePoints(364, 492, y, amp),
         });
       }
-    } else if (isChevron || isZigzagWave) {
+    } else if (isChevron || isZigzagWave || isBracket) {
       // Bloque 1 (entre 188 y 316)
       for (let x = 188 + targetSpacingPx; x < 316 - 0.1; x += targetSpacingPx) {
         ghostSolutionStrokes.push({
@@ -1099,6 +1109,9 @@ export function generateSpacingTrackChallenge(
     } else if (kinkType === 'zigzag_zn') {
       sym = '↗↘↗';
       kinkName = 'Relámpago en Z/N';
+    } else if (kinkType === 'bracket_left') {
+      sym = '[';
+      kinkName = 'Quiebre en Corchete';
     }
     subtitle = `2 Bloques (Ancho y) · Paso ${subdivLabel} (${targetSpacingPx}px) · ${kinkName} (${sym})`;
   } else if (isDiagonal) {
@@ -1122,7 +1135,7 @@ export function generateSpacingTrackChallenge(
     targetMetricsText: exercise.metrics,
     targetAngleDeg: angleDeg,
     targetSpacingPx,
-    targetLengthPx: isKink ? (isZigzagZN ? 164 : (isV || isVInverted) ? 145 : isZigzagWave ? 145 : isChevron ? 140 : 141) : Math.hypot(dxOffset, bands[0].height),
+    targetLengthPx: isKink ? (isZigzagZN ? 164 : (isV || isVInverted) ? 145 : isZigzagWave ? 145 : isBracket ? 144 : isChevron ? 140 : 141) : Math.hypot(dxOffset, bands[0].height),
     minRequiredStrokes,
     directionKey: direction,
     guideMode: 'gray_line',

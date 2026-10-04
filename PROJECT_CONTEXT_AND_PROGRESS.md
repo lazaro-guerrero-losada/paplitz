@@ -12,9 +12,9 @@
 1. [Resumen Ejecutivo & Visión del Proyecto](#1-resumen-ejecutivo--visión-del-proyecto)
 2. [Guía Rápida para Abrir y Trabajar en Otro PC (Quickstart)](#2-guía-rápida-para-abrir-y-trabajar-en-otro-pc-quickstart)
 3. [Estructura del Proyecto y Mapa de Archivos](#3-estructura-del-proyecto-y-mapa-de-archivos)
-4. [Catálogo Completo de Ejercicios (271 Retos)](#4-catálogo-completo-de-ejercicios-271-retos)
+4. [Catálogo Completo de Ejercicios (272 Retos)](#4-catálogo-completo-de-ejercicios-272-retos)
    - [4.1 Calistenia Dinámica de Trazo Único (212 Retos)](#41-calistenia-dinámica-de-trazo-único-212-retos)
-   - [4.2 Espaciado y Carriles de Ritmo (E1.1 a E9.1)](#42-espaciado-y-carriles-de-ritmo-e11-a-e91)
+   - [4.2 Espaciado y Carriles de Ritmo (E1.1 a E10.1)](#42-espaciado-y-carriles-de-ritmo-e11-a-e101)
    - [4.3 Las 42 Páginas del Cuaderno Técnico (Bloques 1 al 8)](#43-las-42-páginas-del-cuaderno-técnico-bloques-1-al-8)
 5. [Motor de Generación Procedural y Geometría](#5-motor-de-generación-procedural-y-geometría)
 6. [Motor de Evaluación Analítica y Cinemática Biomecánica](#6-motor-de-evaluación-analítica-y-cinemática-biomecánica)
@@ -132,7 +132,7 @@ Web dibujitos/ (paplitz-drawing-lab)
 │       │                         #    - LabExerciseDef, ProceduralStrokeChallenge
 │       │                         #    - ALL_SINGLE_STROKE_EXERCISES (227 niveles)
 │       │                         #    - ALL_42_EXERCISES (42 páginas del cuaderno)
-│       │                         #    - ALL_LAB_EXERCISES (271 ejercicios totales)
+│       │                         #    - ALL_LAB_EXERCISES (272 ejercicios totales)
 │       │                         #    - SpacingTrackConfig, SpacingTrackParams
 │       │                         #    - StrokeEvaluation, KeyPoint, TargetLineDef
 │       │
@@ -141,7 +141,7 @@ Web dibujitos/ (paplitz-drawing-lab)
 │       │                         #    - generateSingleStrokeChallenge (Líneas y curvas)
 │       │                         #    - generateMultiLineChallenge (2 o 3 líneas dispersas)
 │       │                         #    - generateRadialRosetteChallenge (Rosetas D11 y D12)
-│       │                         #    - generateSpacingTrackChallenge (Carriles E1.1 a E9.1)
+│       │                         #    - generateSpacingTrackChallenge (Carriles E1.1 a E10.1)
 │       │                         #    - Generadores para las 42 páginas del cuaderno
 │       │
 │       ├── strokeEvaluator.ts    # ⭐ Evaluador analítico instantáneo y biomecánico:
@@ -173,9 +173,9 @@ Web dibujitos/ (paplitz-drawing-lab)
 
 ---
 
-## 4. Catálogo Completo de Ejercicios (271 Retos)
+## 4. Catálogo Completo de Ejercicios (272 Retos)
 
-El catálogo unificado en `src/lib/strokeTypes.ts` combina **229 Calistenias Dinámicas** (212 de trazo único, curvas y rosetas + 17 de espaciado y carriles) y las **42 Páginas del Cuaderno Técnico**, sumando un total de **271 ejercicios** agrupados por bloques temáticos.
+El catálogo unificado en `src/lib/strokeTypes.ts` combina **230 Calistenias Dinámicas** (212 de trazo único, curvas y rosetas + 18 de espaciado y carriles) y las **42 Páginas del Cuaderno Técnico**, sumando un total de **272 ejercicios** agrupados por bloques temáticos.
 
 ### 4.1 Calistenia Dinámica de Trazo Único y Rosetas (212 Retos)
 
@@ -200,7 +200,7 @@ Entrenamiento biomecánico repetitivo con evaluación inmediata al levantar el l
 
 ---
 
-### 4.2 Espaciado y Carriles de Ritmo (E1.1 a E9.1)
+### 4.2 Espaciado y Carriles de Ritmo (E1.1 a E10.1)
 
 Inspirado en el Ejercicio 1.1 del cuaderno de dibujo (*"Making Strokes Consistent / Spacing"*). Se ubican en el bloque **`⚡ Calistenia: Espaciado & Carriles (Ritmo)`**:
 
@@ -295,10 +295,19 @@ Inspirado en el Ejercicio 1.1 del cuaderno de dibujo (*"Making Strokes Consisten
     - **Relleno paralelo uniforme:** El alumno dibuja 11 trazos interiores por bloque espaciados verticalmente a paso fino $x/2 = 8$px ($y_{\text{base}} \in [247, 255, \dots, 327]$px) trazando de izquierda a derecha sin levantar el lápiz.
     - **Muestra permanente:** Bloque de muestra a la izquierda (`MUESTRA RELÁMPAGO Z/N ↗↘↗ (x/2 = 8px)`) con flecha direccional en el extremo final y dot de inicio (●) en el extremo izquierdo.
     - **Sin versión en espejo:** Diseñado exclusivamente en orientación directa izquierda a derecha.
+18. **E10.1 — Carril Quiebre en Corchete [ (Bloques & Pausas · x/2):**
+    - 1 franja de altura $y = 130$px ($y_{\text{top}} = 205, y_{\text{bottom}} = 335$), espaciado fino $x/2 = 8$px.
+    - Patrón geométrico de líneas paralelas continuas con doble quiebre en corchete / canal / C (`[`) (Fila 8 del Ejercicio 1.4 del cuaderno técnico: *Pen Control — Angles & Zigzags*).
+    - **Trazo continuo con doble quiebre y columna vertical intermedia:** Se inicia en el riel superior $(X, y_{\text{top}})$, se desciende en diagonal hacia abajo-izquierda (↙) hasta el Vértice 1 a $1/3$ de altura ($X - 26$px, $y_{\text{top}} + 0.33h$), se desciende recto vertical hacia abajo (↓) formando la columna o lomo del corchete hasta el Vértice 2 a $2/3$ de altura ($X - 26$px, $y_{\text{top}} + 0.67h$), y se desciende en diagonal hacia abajo-derecha (↘) retornando exactamente a la vertical de origen en el riel inferior $(X, y_{\text{bottom}})$. Longitud de arco nominal: $\approx 144$px.
+    - **Líneas pre-dibujadas de INICIO y FIN:** Cada bloque cuenta con líneas guía sólidas completas con la geometría en corchete pre-dibujadas en su inicio ($X_{\text{start}} = 188$ y $364$) y su final ($X_{\text{end}} = 316$ y $492$).
+    - **2 bloques independientes con pausa central:** Bloque 1 ($X \in [188, 316]$) y Bloque 2 ($X \in [364, 492]$), cada uno de ancho $y = 128$px, separados por un espacio de pausa de $48$px con etiqueta `(PAUSA)`.
+    - **Relleno paralelo uniforme:** El alumno dibuja 15 trazos interiores por bloque espaciados a paso fino $x/2 = 8$px trazando de arriba hacia abajo sin levantar el lápiz durante cada trazo.
+    - **Muestra permanente:** Bloque de muestra a la izquierda (`MUESTRA CORCHETE [ (x/2 = 8px)`) con flecha direccional en el extremo inferior y dot de inicio (●) en el riel superior.
+    - **Sin versión en espejo:** Diseñado exclusivamente en orientación hacia la izquierda según las especificaciones didácticas del método.
 
 **Reglas de diseño de estos ejercicios:**
-- **Muestra permanente:** El bloque izquierdo con la referencia nunca se oculta, permitiendo al usuario calibrar su ojo en todo momento. Muestra la dirección y ángulo exactos (`MUESTRA ↗ (~75°)`, `MUESTRA CHEVRON ◄`, `MUESTRA VÉRTICES EN V ∨`, `MUESTRA VÉRTICES EN ∧`, `MUESTRA ZIGZAG ◄►◄`, `MUESTRA RELÁMPAGO Z/N ↗↘↗`).
-- **Flechas indicadoras de dirección:** En los niveles diagonales (E4.1 a E4.4) y con quiebre/vértice/relámpago (E5, E6, E7, E8 y E9), una de las líneas del bloque de muestra cuenta con un icono de flecha sólida al final del trazo y un punto de origen (●) al inicio, indicando visualmente de manera inequívoca el sentido y dirección del movimiento biomecánico.
+- **Muestra permanente:** El bloque izquierdo con la referencia nunca se oculta, permitiendo al usuario calibrar su ojo en todo momento. Muestra la dirección y ángulo exactos (`MUESTRA ↗ (~75°)`, `MUESTRA CHEVRON ◄`, `MUESTRA VÉRTICES EN V ∨`, `MUESTRA VÉRTICES EN ∧`, `MUESTRA ZIGZAG ◄►◄`, `MUESTRA RELÁMPAGO Z/N ↗↘↗`, `MUESTRA CORCHETE [`).
+- **Flechas indicadoras de dirección:** En los niveles diagonales (E4.1 a E4.4) y con quiebre/vértice/relámpago/corchete (E5, E6, E7, E8, E9 y E10), una de las líneas del bloque de muestra cuenta con un icono de flecha sólida al final del trazo y un punto de origen (●) al inicio, indicando visualmente de manera inequívoca el sentido y dirección del movimiento biomecánico.
 - **Lienzo limpio sin textos superfluos:** Se han eliminado los textos de ayuda flotantes redundantes dentro del lienzo para preservar la pureza visual y permitir que las líneas pre-dibujadas de inicio guíen intuitivamente la ejecución.
 - **Longitud adaptable:** El carril se extiende a lo ancho de la pantalla; no hay un número rígido obligatorio de líneas (se evalúan todas las líneas trazadas, requiriendo un mínimo de 3 por franja en continuos y 10 en bloques).
 - **Verificación rigurosa de sentido y pendiente:** Trazar en dirección contraria otorga $0\%$ de calificación con advertencia visual inmediata. La inclinación de la pendiente se valida contra el cuadrante angular exacto.
@@ -393,12 +402,13 @@ Si el usuario empieza a dibujar en el punto de llegada ② y termina en el punto
    - **Nota de carriles:** Penaliza si los trazos no llegan o rebasan los rieles superior e inferior con tolerancia de $\pm 6$px.
    - **Rectitud y angularidad:** Se evalúa la proximidad al ángulo objetivo ($90^\circ$ vertical o $75^\circ$ diagonal con validación de cuadrante slash/backslash).
 
-#### Para carriles con quiebre (Triangular E5.1/E5.2, Chevron E6.1 y Zigzag en Onda E8.1):
-1. **Fidelidad del Quiebre (`evaluateKinkFidelity` y `evaluateZigzagWaveFidelity`):**
+#### Para carriles con quiebre (Triangular E5.1/E5.2, Chevron E6.1, Zigzag en Onda E8.1 y Corchete E10.1):
+1. **Fidelidad del Quiebre (`evaluateKinkFidelity`, `evaluateZigzagWaveFidelity` y `evaluateBracketFidelity`):**
    - **Quiebre triangular (`triangle_left`, `triangle_right`):** Vértice a $2/3$ de la altura ($y_{\text{apex}} \approx y_{\text{top}} + 0.67 \cdot h$), deflexión de $16$px con retorno a la vertical.
    - **Quiebre en chevron (`chevron_left`):** Vértice en el centro exacto ($y_{\text{apex}} \approx y_{\text{top}} + 0.49 \cdot h$), deflexión pronunciada de $26$px hacia la izquierda y alineación vertical estricta entre el punto inicial y final ($|X_{\text{start}} - X_{\text{end}}| \le 8$px).
    - **Zigzag en onda (`zigzag_wave`, E8.1):** Evaluación de 3 quiebres alternados con segmentación en 3 zonas verticales. Detección y validación de deflexión hacia la izquierda en Vértice 1 ($y \approx 0.25h$) y Vértice 3 ($y \approx 0.75h$) con objetivo de $16$px, hendidura de retorno a la vertical en Vértice 2 ($y \approx 0.50h$), y alineación vertical estricta entre el punto inicial y final en rieles superior e inferior ($|X_{\text{start}} - X_{\text{end}}| \le 8$px).
-   - **Detección de líneas rectas sin quiebre:** Si el usuario traza líneas verticales rectas ordinarias sin realizar el ángulo solicitado, la nota geométrica se limita drásticamente ($\le 30\%$) con mensaje diagnóstico claro (*"¡Falta el Quiebre Triangular!"*, *"¡Falta el Quiebre en Chevron!"* o *"¡Falta el Zigzag en Onda!"*).
+   - **Quiebre en corchete (`bracket_left`, E10.1):** Doble quiebre a $1/3$ y $2/3$ de la altura ($y \approx 0.33h$ y $0.67h$) con deflexión lateral de $26$px hacia la izquierda, columna vertical recta intermedia ($|\text{defl}_1 - \text{defl}_2| \le 6$px) y alineación estricta entre punto inicial y final en rieles superior e inferior ($|X_{\text{start}} - X_{\text{end}}| \le 8$px).
+   - **Detección de líneas rectas sin quiebre:** Si el usuario traza líneas verticales rectas ordinarias sin realizar el ángulo solicitado, la nota geométrica se limita drásticamente ($\le 30\%$) con mensaje diagnóstico claro (*"¡Falta el Quiebre Triangular!"*, *"¡Falta el Quiebre en Chevron!"*, *"¡Falta el Zigzag en Onda!"* o *"¡Falta el Quiebre en Corchete! ["*).
    - **Detección de quiebre en sentido opuesto:** Se valida el signo del quiebre (◄ vs ►) para asegurar la dirección correcta.
 2. **Partición Robusta por Bloques y Control de Pausas:**
    - La clasificación y medición de espaciado se calcula con respecto al promedio geométrico real de los puntos de las líneas pre-dibujadas (`startAvgX` y `endAvgX`). Esto garantiza que trazos con formas complejas (como chevrons con deflexión de $26$px) se midan con total exactitud respecto a la línea de **INICIO** y de **FIN**.
@@ -438,7 +448,7 @@ Ubicada en `src/components/StrokeLabView.tsx`.
    - La barra lateral izquierda y el lienzo caben simultáneamente en la pantalla en tablets y portátiles sin requerir scroll vertical.
    - El lienzo mantiene su relación de aspecto técnica `600 / 540` con un margen inferior de respiración para que no quede pegado al borde.
 2. **Drawer Lateral Deslizante:**
-   - El catálogo completo de los 271 ejercicios se despliega mediante un panel lateral accesible con el botón de menú `☰`, con buscador y filtro por bloques.
+   - El catálogo completo de los 272 ejercicios se despliega mediante un panel lateral accesible con el botón de menú `☰`, con buscador y filtro por bloques.
 3. **Calificación Destacada y Telemetría:**
    - El porcentaje de nota se muestra en tamaño grande (`text-3xl / text-4xl`) con badge de estado (`Superado ✓`, `Ajustar`, `Dirección ⚠️`).
    - Muestra la duración en segundos y la velocidad en $px/s$.
@@ -517,7 +527,12 @@ A continuación se resumen los avances implementados en la última fase de traba
     - Líneas guía sólidas pre-dibujadas de **INICIO** (en $y_{\text{base}} = 239$px) y **FIN** (en $y_{\text{base}} = 335$px).
     - 2 bloques independientes de ancho $y = 128$px con espacio de pausa de $48$px `(PAUSA)` y 11 líneas interiores por bloque trazadas horizontalmente de izquierda a derecha con espaciado vertical $x/2 = 8$px.
     - Motor evaluador específico `evaluateZNWaveFidelity` con control de amplitud y posición de pico (↗ a $W/3$), valle (↘ a $2W/3$) y remate (↗ al final), sentido izquierda a derecha y cálculo de espaciado vertical $\Delta y$.
-    - Catálogo ampliado a 271 retos totales (229 dinámicos + 42 páginas de cuaderno).
+14. **Carril Quiebre en Corchete [ (E10.1):**
+    - Creación del nivel E10.1 (`Carril Quiebre en Corchete [`, Fila 8 del Ejercicio 1.4 del cuaderno técnico: *Pen Control — Angles & Zigzags*) con patrón de líneas paralelas continuas en corchete (`[`): diagonal down-left ↙, columna vertical ↓ a $26$px de deflexión entre $0.33h$ y $0.67h$, y diagonal down-right ↘ retornando a la vertical original ($144$px de recorrido).
+    - Líneas sólidas pre-dibujadas completas de **INICIO** y **FIN** para cada bloque.
+    - 2 bloques independientes de ancho $y = 128$px separados por una pausa de descanso de mano de $48$px con 15 líneas interiores por bloque a paso $x/2 = 8$px.
+    - Motor evaluador específico `evaluateBracketFidelity` con validación de deflexión lateral en ambos vértices, rectitud de columna vertical, alineación vertical de extremos y detección de sentido.
+    - Catálogo ampliado a 272 retos totales (230 dinámicos + 42 páginas de cuaderno).
 
 ---
 
@@ -532,7 +547,7 @@ Si retomas el proyecto en otro ordenador o deseas continuar ampliándolo, aquí 
 3. **Pruebas de Usabilidad con Stylus en Dispositivos Reales:**
    - Probar en iPad (Safari/Chrome) y tablet Android (Samsung Tab S con S-Pen) para verificar la curva de presión y respuesta háptica.
 4. **Empaquetado de Nueva Release:**
-   - Generar el nuevo `.apk` para Android y `.exe` para Windows incorporando todo el catálogo de 271 ejercicios.
+   - Generar el nuevo `.apk` para Android y `.exe` para Windows incorporando todo el catálogo de 272 ejercicios.
 
 ---
 

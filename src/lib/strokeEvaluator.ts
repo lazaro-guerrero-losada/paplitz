@@ -1418,9 +1418,145 @@ function evaluateZNWaveFidelity(
   };
 }
 
+/**
+ * Evalúa la fidelidad de un trazo con doble quiebre en corchete [ (bracket_left):
+ * - Comienza en el riel superior (xStart, yTop)
+ * - Desciende en diagonal hacia la izquierda (↙) hasta el Vértice 1 a 1/3 de altura (xStart - 26, yTop + h/3)
+ * - Desciende verticalmente (↓) hasta el Vértice 2 a 2/3 de altura (xStart - 26, yTop + 2h/3)
+ * - Desciende en diagonal hacia la derecha (↘) hasta el riel inferior (xStart, yBottom)
+ * - Ambos extremos apoyan en la misma vertical X
+ */
+function evaluateBracketFidelity(
+  stroke: RawStroke,
+  yTop: number,
+  yBottom: number
+): {
+  score: number;
+  hasKink: boolean;
+  isCorrectDirection: boolean;
+  apexDeflection: number;
+  apexYRel: number;
+} {
+  if (stroke.points.length < 4) {
+    return { score: 10, hasKink: false, isCorrectDirection: false, apexDeflection: 0, apexYRel: 0.5 };
+  }
+
+  const h = yBottom - yTop;
+  const pStart = stroke.points[0];
+  const pEnd = stroke.points[stroke.points.length - 1];
+
+  // Eje de referencia: promedio X de los dos extremos
+  const refX = (pStart.x + pEnd.x) / 2;
+
+  let maxTargetDefl1 = 0; // Vértice 1 a 1/3
+  let maxOppositeDefl1 = 0;
+  let p1Peak = stroke.points[0];
+
+  let maxTargetDefl2 = 0; // Vértice 2 a 2/3
+  let maxOppositeDefl2 = 0;
+  let p2Peak = stroke.points[stroke.points.length - 1];
+
+  let centerDefl = 0; // Tramo central vertical
+  let centerPointsCount = 0;
+
+  for (const p of stroke.points) {
+    const leftDefl = refX - p.x;
+    const rightDefl = p.x - refX;
+
+    if (p.y >= yTop + h * 0.15 && p.y <= yTop + h * 0.45) {
+      if (leftDefl > maxTargetDefl1) {
+        maxTargetDefl1 = leftDefl;
+        p1Peak = p;
+      }
+      if (rightDefl > maxOppositeDefl1) maxOppositeDefl1 = rightDefl;
+    }
+
+    if (p.y >= yTop + h * 0.40 && p.y <= yTop + h * 0.60) {
+      centerDefl += leftDefl;
+      centerPointsCount++;
+    }
+
+    if (p.y >= yTop + h * 0.55 && p.y <= yTop + h * 0.85) {
+      if (leftDefl > maxTargetDefl2) {
+        maxTargetDefl2 = leftDefl;
+        p2Peak = p;
+      }
+      if (rightDefl > maxOppositeDefl2) maxOppositeDefl2 = rightDefl;
+    }
+  }
+
+  const avgCenterDefl = centerPointsCount > 0 ? centerDefl / centerPointsCount : (maxTargetDefl1 + maxTargetDefl2) / 2;
+
+  // Condiciones de presencia de corchete:
+  // - Ambos vértices se desvían al menos 7px hacia la izquierda
+  // - El tramo central también mantiene deflexión hacia la izquierda
+  const hasKink = maxTargetDefl1 >= 7.0 && maxTargetDefl2 >= 7.0 && avgCenterDefl >= 6.0;
+
+  // Dirección correcta: deflexiones hacia la izquierda (◄), no a la derecha
+  const isCorrectDirection = hasKink && maxTargetDefl1 >= maxOppositeDefl1 && maxTargetDefl2 >= maxOppositeDefl2;
+
+  if (!hasKink) {
+    return {
+      score: 15,
+      hasKink: false,
+      isCorrectDirection: false,
+      apexDeflection: Math.max(0, (maxTargetDefl1 + maxTargetDefl2) / 2),
+      apexYRel: 0.5,
+    };
+  }
+
+  if (!isCorrectDirection) {
+    return {
+      score: 25,
+      hasKink: true,
+      isCorrectDirection: false,
+      apexDeflection: (maxTargetDefl1 + maxTargetDefl2) / 2,
+      apexYRel: 0.5,
+    };
+  }
+
+  // Puntuación geométrica:
+  // 1. Deflexión de Vértice 1 vs 26px objetivo
+  const p1DeflDiff = Math.abs(maxTargetDefl1 - 26);
+  const p1Score = Math.max(0, 100 - p1DeflDiff * 4.5);
+
+  // 2. Deflexión de Vértice 2 vs 26px objetivo
+  const p2DeflDiff = Math.abs(maxTargetDefl2 - 26);
+  const p2Score = Math.max(0, 100 - p2DeflDiff * 4.5);
+
+  // 3. Rectitud vertical del tramo central (diferencia entre vértices |defl1 - defl2| cercana a 0)
+  const spineDiff = Math.abs(maxTargetDefl1 - maxTargetDefl2);
+  const spineScore = Math.max(0, 100 - spineDiff * 5.0);
+
+  // 4. Ubicación vertical de los vértices (p1 ≈ 0.33h, p2 ≈ 0.67h)
+  const p1YRel = h > 0 ? (p1Peak.y - yTop) / h : 0.33;
+  const p2YRel = h > 0 ? (p2Peak.y - yTop) / h : 0.67;
+  const yScore = Math.max(0, 100 - (Math.abs(p1YRel - 0.33) + Math.abs(p2YRel - 0.67)) * 140);
+
+  // 5. Alineación vertical de los extremos superior e inferior en el mismo eje (|pEnd.x - pStart.x| cercano a 0)
+  const returnDiff = Math.abs(pEnd.x - pStart.x);
+  const returnScore = Math.max(0, 100 - returnDiff * 5.0);
+
+  const score = Math.round(
+    p1Score * 0.25 +
+    p2Score * 0.25 +
+    spineScore * 0.20 +
+    yScore * 0.15 +
+    returnScore * 0.15
+  );
+
+  return {
+    score: Math.min(100, Math.max(0, score)),
+    hasKink: true,
+    isCorrectDirection: true,
+    apexDeflection: (maxTargetDefl1 + maxTargetDefl2) / 2,
+    apexYRel: 0.5,
+  };
+}
+
 function evaluateKinkFidelity(
   stroke: RawStroke,
-  kinkType: 'triangle_left' | 'triangle_right' | 'chevron_left' | 'zigzag_wave',
+  kinkType: 'triangle_left' | 'triangle_right' | 'chevron_left' | 'zigzag_wave' | 'bracket_left',
   yTop: number,
   yBottom: number
 ): {
@@ -1432,6 +1568,9 @@ function evaluateKinkFidelity(
 } {
   if (kinkType === 'zigzag_wave') {
     return evaluateZigzagWaveFidelity(stroke, yTop, yBottom);
+  }
+  if (kinkType === 'bracket_left') {
+    return evaluateBracketFidelity(stroke, yTop, yBottom);
   }
 
   if (stroke.points.length < 3) {
@@ -2932,6 +3071,8 @@ export function evaluateSpacingTrackSubmission(
         ? `Paso Objetivo: ${targetSpacing}px con Zigzag en Onda ◄►◄`
         : kinkType === 'chevron_left'
         ? `Paso Objetivo: ${targetSpacing}px con Quiebre en Chevron ◄`
+        : kinkType === 'bracket_left'
+        ? `Paso Objetivo: ${targetSpacing}px con Quiebre en Corchete [`
         : `Paso Objetivo: ${targetSpacing}px con Quiebre`,
     };
 
@@ -2939,16 +3080,22 @@ export function evaluateSpacingTrackSubmission(
       ? '¡Zigzag en Onda y Espaciado Logrados!'
       : kinkType === 'chevron_left'
       ? '¡Quiebres en Chevron y Espaciado Logrados!'
+      : kinkType === 'bracket_left'
+      ? '¡Quiebres en Corchete y Espaciado Logrados!'
       : '¡Quiebres y Espaciado Logrados!';
     let feedbackMessage = kinkType === 'zigzag_wave'
       ? `Has conseguido un paso medio de ${measuredAvgSpacingPx}px (objetivo: ${targetSpacing}px) con buena reproducción del patrón zigzag en onda ◄►◄.`
       : kinkType === 'chevron_left'
       ? `Has conseguido un paso medio de ${measuredAvgSpacingPx}px (objetivo: ${targetSpacing}px) con buena reproducción del patrón chevron ◄.`
+      : kinkType === 'bracket_left'
+      ? `Has conseguido un paso medio de ${measuredAvgSpacingPx}px (objetivo: ${targetSpacing}px) con buena reproducción del patrón en corchete [.`
       : `Has conseguido un paso medio de ${measuredAvgSpacingPx}px (objetivo: ${targetSpacing}px) con buena reproducción del quiebre triangular.`;
     let tipMessage = kinkType === 'zigzag_wave'
       ? 'Mantén los vértices del zigzag alineados a 1/4, 1/2 y 3/4 de la altura de la franja.'
       : kinkType === 'chevron_left'
       ? 'Mantén los vértices del chevron alineados al centro de la franja.'
+      : kinkType === 'bracket_left'
+      ? 'Mantén los quiebres alineados a 1/3 y 2/3 de altura, con el tramo central vertical.'
       : 'Mantén la altura del vértice alineada visualmente en todos los trazos.';
     let avatarMood: AvatarMood = 'wink';
     let directionWarning: string | undefined;
@@ -2971,6 +3118,10 @@ export function evaluateSpacingTrackSubmission(
         feedbackTitle = '¡Falta el Quiebre en Chevron! ◄';
         feedbackMessage = 'Has trazado líneas verticales rectas. Este ejercicio requiere realizar el quiebre en chevron (ángulo <) hacia la izquierda en el centro del trazo, idéntico a las líneas de INICIO y FIN.';
         tipMessage = 'Traza en diagonal hacia la izquierda hasta el centro (~26px) y regresa en diagonal hacia la derecha hasta el carril inferior.';
+      } else if (kinkType === 'bracket_left') {
+        feedbackTitle = '¡Falta el Quiebre en Corchete! [';
+        feedbackMessage = 'Has trazado líneas verticales rectas. Este ejercicio requiere realizar el doble quiebre en corchete ([) hacia la izquierda a 1/3 y 2/3 de la altura con tramo vertical central, idéntico a las líneas de INICIO y FIN.';
+        tipMessage = 'Baja en diagonal hacia la izquierda hasta 1/3 de altura (~26px), continúa recto vertical hasta 2/3, y regresa en diagonal hacia la derecha hasta el carril inferior.';
       } else {
         const dirText = kinkType === 'triangle_left' ? 'hacia la izquierda (◄)' : 'hacia la derecha (►)';
         feedbackTitle = kinkType === 'triangle_left' ? '¡Falta el Quiebre Triangular! ◄' : '¡Falta el Quiebre Triangular! ►';
@@ -2989,6 +3140,10 @@ export function evaluateSpacingTrackSubmission(
         feedbackTitle = '¡Chevron en Sentido Opuesto!';
         feedbackMessage = 'Has dirigido el vértice hacia la derecha. El quiebre en chevron debe apuntar hacia la izquierda (◄).';
         tipMessage = 'Compara con el patrón de muestra a la izquierda antes de trazar.';
+      } else if (kinkType === 'bracket_left') {
+        feedbackTitle = '¡Corchete en Sentido Opuesto!';
+        feedbackMessage = 'Has dirigido los quiebres hacia la derecha. El quiebre en corchete debe apuntar hacia la izquierda ([).';
+        tipMessage = 'Observa el patrón de muestra a la izquierda: los quiebres entran hacia la izquierda.';
       } else {
         const expectedDir = kinkType === 'triangle_left' ? 'izquierda ◄' : 'derecha ►';
         feedbackTitle = '¡Quiebre en Sentido Opuesto!';
