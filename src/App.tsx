@@ -180,6 +180,23 @@ export function App() {
   const [calisthenicsSeed, setCalisthenicsSeed] = useState<number>(() => Math.floor(Math.random() * 90000 + 10000));
   const [, setStrokeEvaluation] = useState<StrokeEvaluation | null>(null);
 
+  // Control de versiones/variantes activas por nivel de calistenia
+  const [nodeVariantIndices, setNodeVariantIndices] = useState<Record<string, number>>(() => {
+    const saved = localStorage.getItem('paplitz_node_variant_indices');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  useEffect(() => {
+    localStorage.setItem('paplitz_node_variant_indices', JSON.stringify(nodeVariantIndices));
+  }, [nodeVariantIndices]);
+
+  // Variantes del nivel actual
+  const activeVariants = activeNode?.variants || (activeNode?.exerciseDef ? [activeNode.exerciseDef] : []);
+  const currentVariantIndex = activeVariants.length > 0
+    ? (nodeVariantIndices[activeNode?.id || ''] || 0) % activeVariants.length
+    : 0;
+  const currentExerciseDef = activeVariants[currentVariantIndex] || activeNode?.exerciseDef || ALL_SINGLE_STROKE_EXERCISES[0];
+
   // Modales
   const [guidebookUnit, setGuidebookUnit] = useState<Unit | null>(null);
   const [showAnalogModal, setShowAnalogModal] = useState(false);
@@ -444,7 +461,11 @@ export function App() {
     if (node) {
       setPlacementTestNode(null);
       setActiveNode(node);
-      handleNewPracticeCube(node);
+      if (!node.isCalisthenics) {
+        handleNewPracticeCube(node);
+      } else {
+        setCalisthenicsSeed(Math.floor(Math.random() * 90000 + 10000));
+      }
     }
   };
 
@@ -492,7 +513,14 @@ export function App() {
 
   const handleSidebarNext = () => {
     if (activeNode?.isCalisthenics) {
-      strokeCanvasRef.current?.next();
+      if (activeVariants.length > 1) {
+        const nextVariantIdx = (currentVariantIndex + 1) % activeVariants.length;
+        setNodeVariantIndices((prev) => ({
+          ...prev,
+          [activeNode.id]: nextVariantIdx,
+        }));
+      }
+      setCalisthenicsSeed(Math.floor(Math.random() * 90000 + 10000));
     } else {
       handleNextCubeOrProblem();
     }
@@ -519,13 +547,25 @@ export function App() {
         setCurrentPhase((prev) => (prev + 1) as 1 | 2 | 3);
       }
 
+      // "pero tiene que cambiar" -> Avanzar automáticamente a la siguiente versión del ejercicio!
+      if (activeVariants.length > 1) {
+        const nextVariantIdx = (currentVariantIndex + 1) % activeVariants.length;
+        setNodeVariantIndices((prev) => ({
+          ...prev,
+          [activeNode.id]: nextVariantIdx,
+        }));
+        setCalisthenicsSeed(Math.floor(Math.random() * 90000 + 10000));
+      }
+
       if (newStreak < 3) {
+        const nextVariantIdx = activeVariants.length > 1 ? (currentVariantIndex + 1) % activeVariants.length : 0;
+        const nextVariant = activeVariants[nextVariantIdx];
         showToast(
           '🎯',
-          `Racha de Maestría: ${newStreak}/3 (≥90%)`,
-          newStreak === 1
-            ? `¡Gran precisión con ${recordedScore}%! Necesitas 2 más seguidos ≥90% para superar ${activeNode.code}.`
-            : `¡Excelente trazo (${recordedScore}%)! Solo te falta 1 más para superar ${activeNode.code}.`
+          `Racha: ${newStreak}/3 (≥90%)`,
+          activeVariants.length > 1
+            ? `¡Versión ${currentVariantIndex + 1}/${activeVariants.length} superada (${recordedScore}%)! Cambiando a: ${nextVariant.title}.`
+            : `¡Gran precisión con ${recordedScore}%! Necesitas ${3 - newStreak} más seguidos ≥90% para superar ${activeNode.code}.`
         );
       } else {
         // Superado 3/3!
@@ -571,13 +611,12 @@ export function App() {
 
       const prevStreak = masteryStreaks[activeNode.id] || 0;
       setMasteryStreaks((prev) => ({ ...prev, [activeNode.id]: 0 }));
-      if (prevStreak > 0) {
-        showToast(
-          '⚠️',
-          `Racha reiniciada (${recordedScore}%)`,
-          `Para superar ${activeNode.code} necesitas 3 aciertos seguidos con nota ≥90%.`
-        );
-      }
+      showToast(
+        '⚠️',
+        prevStreak > 0 ? `Racha reiniciada (${recordedScore}%)` : `Precisión: ${recordedScore}% (Requiere ≥90%)`,
+        `Reintenta la Versión ${currentVariantIndex + 1} para dominarla con nota ≥90%.`
+      );
+      setCalisthenicsSeed(Math.floor(Math.random() * 90000 + 10000));
     }
   };
 
@@ -1312,6 +1351,52 @@ export function App() {
                       </select>
                     </div>
 
+                    {/* SELECTOR DE VERSIONES DEL NIVEL (PARA CALISTENIA) */}
+                    {activeNode?.isCalisthenics && activeVariants.length > 1 && (
+                      <div className="border-2 border-black p-2 bg-neutral-50 shadow-[2px_2px_0px_#000000] space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-mono uppercase tracking-widest text-neutral-600 font-bold">
+                            Versiones a Superar:
+                          </span>
+                          <span className="text-[11px] font-mono font-bold bg-black text-white px-1.5 py-0.2">
+                            {currentVariantIndex + 1} / {activeVariants.length}
+                          </span>
+                        </div>
+
+                        {/* Botones de versiones con scroll horizontal */}
+                        <div className="flex items-center gap-1 overflow-x-auto py-1 scrollbar-thin">
+                          {activeVariants.map((v, idx) => (
+                            <button
+                              key={v.id || idx}
+                              onClick={() => {
+                                setNodeVariantIndices((prev) => ({ ...prev, [activeNode.id]: idx }));
+                                setCalisthenicsSeed(Math.floor(Math.random() * 90000 + 10000));
+                              }}
+                              className={`w-6 h-6 shrink-0 border-2 border-black text-xs font-mono font-bold flex items-center justify-center cursor-pointer transition-colors ${
+                                currentVariantIndex === idx
+                                  ? 'bg-black text-white shadow-[1px_1px_0px_#000000]'
+                                  : 'bg-white text-black hover:bg-neutral-200'
+                              }`}
+                              title={`Versión ${idx + 1}: ${v.title}`}
+                            >
+                              {idx + 1}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Nombre de la versión activa */}
+                        <div className="text-[11px] font-sans text-neutral-800 leading-tight border-t border-neutral-300 pt-1.5">
+                          <span className="font-mono font-bold">V{currentVariantIndex + 1}: </span>
+                          <span className="font-semibold">{currentExerciseDef.title}</span>
+                          {currentExerciseDef.desc && (
+                            <p className="text-[10px] text-neutral-500 font-sans mt-0.5 leading-snug">
+                              {currentExerciseDef.desc}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     {/* INDICADORES: RACHA DE MAESTRÍA (3 CUBOS) + FASES CINEMÁTICAS (3 CUADRADOS) */}
                     <div className="border-2 border-black p-2.5 bg-neutral-50 shadow-[2px_2px_0px_#000000] space-y-2.5">
                       {/* Racha de Maestría: 3 Cubitos con botón (i) */}
@@ -1505,7 +1590,7 @@ export function App() {
                 {activeNode?.isCalisthenics ? (
                   <StrokePracticeCanvas
                     ref={strokeCanvasRef}
-                    exerciseDef={activeNode.exerciseDef || ALL_SINGLE_STROKE_EXERCISES[0]}
+                    exerciseDef={currentExerciseDef}
                     currentPhase={currentPhase}
                     showSolution={showSolution}
                     showUserStrokes={showUserStrokes}

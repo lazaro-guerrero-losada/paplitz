@@ -165,10 +165,17 @@ export const LearningPath: React.FC<LearningPathProps> = ({
                   </button>
 
                   {/* Etiqueta con el número y nombre del ejercicio */}
-                  <div className="mt-2 text-center max-w-[150px]">
+                  <div className="mt-2 text-center max-w-[160px]">
                     <div className="text-xs font-bold font-display leading-tight">
                       {node.code} · {node.title}
                     </div>
+                    {node.variants && node.variants.length > 1 && (
+                      <div className="mt-1">
+                        <span className="text-[9px] font-mono uppercase bg-neutral-100 border border-black px-1.5 py-0.5 font-bold shadow-[1px_1px_0px_#000000] inline-block">
+                          {node.variants.length} versiones
+                        </span>
+                      </div>
+                    )}
                     <div className="text-[10px] text-neutral-500 font-sans mt-0.5 leading-snug">
                       {node.subtitle}
                     </div>

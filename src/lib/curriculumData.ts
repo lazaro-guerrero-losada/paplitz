@@ -18,6 +18,7 @@ export interface LessonNode {
   hasGroundGrid?: boolean;
   isCalisthenics?: boolean;
   exerciseDef?: LabExerciseDef;
+  variants?: LabExerciseDef[];
 }
 
 export interface Unit {
@@ -42,73 +43,40 @@ export interface ModuleTrack {
   units: Unit[];
 }
 
-/**
- * Convierte un ejercicio de calistenia del catálogo a un nodo del Camino
- */
-function calisthenicsExerciseToNode(ex: LabExerciseDef, indexInModule: number): LessonNode {
+function createGroupedCalisthenicsNode(
+  id: string,
+  code: string,
+  title: string,
+  subtitle: string,
+  variants: LabExerciseDef[],
+  indexInModule: number,
+  difficulty: 'easy' | 'medium' | 'hard' = 'medium',
+  xpReward: number = 35
+): LessonNode {
   const isFirst = indexInModule === 0;
-  const isExam = ex.title.toLowerCase().includes('maestría') || ex.title.toLowerCase().includes('examen');
-  const isRush = ex.title.toLowerCase().includes('racha') || ex.title.toLowerCase().includes('velocidad');
-  const isWarmup = ex.title.toLowerCase().includes('fija') || ex.title.toLowerCase().includes('primer contacto');
-
+  const primaryEx = variants[0] || ALL_SINGLE_STROKE_EXERCISES[0];
   return {
-    id: `cal-${ex.id || ex.code.toLowerCase().replace('.', '_')}`,
-    code: ex.code,
-    title: ex.title,
-    subtitle: ex.desc || ex.metrics || '',
-    type: isExam ? 'exam' : isRush ? 'rush' : isWarmup ? 'warmup' : 'standard',
-    difficulty: ex.difficulty === 'Fácil' ? 'easy' : ex.difficulty === 'Media' ? 'medium' : 'hard',
+    id,
+    code,
+    title,
+    subtitle: `${variants.length} versiones · ${subtitle}`,
+    type: 'standard',
+    difficulty,
     perspectiveMode: 'gentle',
     axesMode: 'none',
     status: isFirst ? 'current' : 'locked',
-    xpReward: ex.difficulty === 'Fácil' ? 20 : ex.difficulty === 'Media' ? 30 : 45,
+    xpReward,
     isCalisthenics: true,
-    exerciseDef: ex,
+    exerciseDef: primaryEx,
+    variants,
   };
 }
 
 /**
- * Construye las 5 Unidades Pedagógicas de Calistenia (237 Retos Dinámicos)
+ * Construye las 5 Unidades Pedagógicas de Calistenia Agrupadas (18 Niveles con 237 Variantes Dinámicas)
  */
 function buildCalisthenicsModuleUnits(): Unit[] {
   const all = ALL_SINGLE_STROKE_EXERCISES;
-  const isMulti = (id: string) =>
-    ['d1_15', 'd1_16', 'd1_17', 'd2_15', 'd2_16', 'd2_17', 'd3_15', 'd3_16', 'd3_17', 'd4_15', 'd4_16', 'd4_17'].includes(id);
-
-  // U1: Fundamentos Ortogonales (Horizontales y Verticales) — 52 ejercicios
-  const u1Exercises = all.filter((e) => {
-    const id = e.id || '';
-    return id.startsWith('d5_') || id.startsWith('d6_') || id.startsWith('d7_') || id.startsWith('d8_');
-  });
-
-  // U2: Diagonales & Perspectiva — 90 ejercicios
-  const u2Exercises = all.filter((e) => {
-    const id = e.id || '';
-    return (
-      ((id.startsWith('d1_') || id.startsWith('d2_') || id.startsWith('d3_') || id.startsWith('d4_')) && !isMulti(id)) ||
-      id.startsWith('d9_') ||
-      id.startsWith('d10_')
-    );
-  });
-
-  // U3: Multi-Líneas & Rosetas Radiales — 50 ejercicios
-  const u3Exercises = all.filter((e) => {
-    const id = e.id || '';
-    return isMulti(id) || id.startsWith('d11_') || id.startsWith('d12_');
-  });
-
-  // U4: Arcos & Ondas Biomecánicas (C & S) — 20 ejercicios
-  const u4Exercises = all.filter((e) => {
-    const id = e.id || '';
-    return id.startsWith('cc_') || id.startsWith('cs_');
-  });
-
-  // U5: Carriles y Espaciado Rítmico — 25 ejercicios
-  const u5Exercises = all.filter((e) => {
-    const id = e.id || '';
-    return id.startsWith('sp_');
-  });
-
   let globalIndex = 0;
 
   return [
@@ -128,7 +96,48 @@ function buildCalisthenicsModuleUnits(): Unit[] {
         ],
         diagramNotes: 'Primero domina la dirección natural de izquierda a derecha antes de pasar a la inversa.',
       },
-      nodes: u1Exercises.map((e) => calisthenicsExerciseToNode(e, globalIndex++)),
+      nodes: [
+        createGroupedCalisthenicsNode(
+          'cal_u1_d5',
+          'C1.1',
+          'Horizontales Naturales (→)',
+          'Deslizamiento de izquierda a derecha con control de inercia y longitud',
+          all.filter((e) => e.id?.startsWith('d5_')),
+          globalIndex++,
+          'easy',
+          25
+        ),
+        createGroupedCalisthenicsNode(
+          'cal_u1_d6',
+          'C1.2',
+          'Horizontales Inversas (←)',
+          'Recogida de derecha a izquierda con frenado seco en diana',
+          all.filter((e) => e.id?.startsWith('d6_')),
+          globalIndex++,
+          'easy',
+          25
+        ),
+        createGroupedCalisthenicsNode(
+          'cal_u1_d7',
+          'C1.3',
+          'Verticales Ascendentes (↑)',
+          'Empuje vertical de abajo a arriba con alineación del antebrazo',
+          all.filter((e) => e.id?.startsWith('d7_')),
+          globalIndex++,
+          'medium',
+          30
+        ),
+        createGroupedCalisthenicsNode(
+          'cal_u1_d8',
+          'C1.4',
+          'Verticales Descendentes (↓)',
+          'Tirón vertical hacia el cuerpo con parada milimétrica',
+          all.filter((e) => e.id?.startsWith('d8_')),
+          globalIndex++,
+          'medium',
+          30
+        ),
+      ],
     },
     {
       id: 'unit-cal-2',
@@ -145,7 +154,68 @@ function buildCalisthenicsModuleUnits(): Unit[] {
         ],
         diagramNotes: 'En ángulos descendentes o inversos, rota mentalmente el hombro para mantener la fluidez.',
       },
-      nodes: u2Exercises.map((e) => calisthenicsExerciseToNode(e, globalIndex++)),
+      nodes: [
+        createGroupedCalisthenicsNode(
+          'cal_u2_d1',
+          'C2.1',
+          'Diagonal Ascendente Natural (↗)',
+          'Lanzamiento a 45°-60° de abajo-izquierda a arriba-derecha',
+          all.filter((e) => e.id?.startsWith('d1_') && e.singleStrokeConfig?.variationType !== 'multi_line'),
+          globalIndex++,
+          'easy',
+          30
+        ),
+        createGroupedCalisthenicsNode(
+          'cal_u2_d2',
+          'C2.2',
+          'Diagonal Inversa al Pecho (↙)',
+          'Flexión de arriba-derecha a abajo-izquierda con muñeca libre',
+          all.filter((e) => e.id?.startsWith('d2_') && e.singleStrokeConfig?.variationType !== 'multi_line'),
+          globalIndex++,
+          'medium',
+          30
+        ),
+        createGroupedCalisthenicsNode(
+          'cal_u2_d3',
+          'C2.3',
+          'Diagonal Descendente Externa (↘)',
+          'Empuje diagonal hacia afuera de arriba-izquierda a abajo-derecha',
+          all.filter((e) => e.id?.startsWith('d3_') && e.singleStrokeConfig?.variationType !== 'multi_line'),
+          globalIndex++,
+          'medium',
+          30
+        ),
+        createGroupedCalisthenicsNode(
+          'cal_u2_d4',
+          'C2.4',
+          'Diagonal de Empuje Superior (↖)',
+          'Ascenso hacia la esquina superior izquierda de abajo-derecha',
+          all.filter((e) => e.id?.startsWith('d4_') && e.singleStrokeConfig?.variationType !== 'multi_line'),
+          globalIndex++,
+          'medium',
+          35
+        ),
+        createGroupedCalisthenicsNode(
+          'cal_u2_d9',
+          'C2.5',
+          'Aristas en Fuga Suave Derecha (↗ ~18°)',
+          'Pendiente baja de perspectiva cónica hacia el punto de fuga derecho',
+          all.filter((e) => e.id?.startsWith('d9_') && e.singleStrokeConfig?.variationType !== 'multi_line'),
+          globalIndex++,
+          'hard',
+          40
+        ),
+        createGroupedCalisthenicsNode(
+          'cal_u2_d10',
+          'C2.6',
+          'Aristas en Fuga Suave Izquierda (↖ ~18°)',
+          'Pendiente baja de perspectiva cónica hacia el punto de fuga izquierdo',
+          all.filter((e) => e.id?.startsWith('d10_') && e.singleStrokeConfig?.variationType !== 'multi_line'),
+          globalIndex++,
+          'hard',
+          40
+        ),
+      ],
     },
     {
       id: 'unit-cal-3',
@@ -162,7 +232,38 @@ function buildCalisthenicsModuleUnits(): Unit[] {
         ],
         diagramNotes: 'Usa el centro focal como punto de anclaje visual constante en todas las direcciones.',
       },
-      nodes: u3Exercises.map((e) => calisthenicsExerciseToNode(e, globalIndex++)),
+      nodes: [
+        createGroupedCalisthenicsNode(
+          'cal_u3_d11',
+          'C3.1',
+          'Roseta Radial Divergente 360° (☼)',
+          'Disparo de 8 y 12 radios regulares desde el centro hacia las dianas exteriores',
+          all.filter((e) => e.id?.startsWith('d11_')),
+          globalIndex++,
+          'medium',
+          40
+        ),
+        createGroupedCalisthenicsNode(
+          'cal_u3_d12',
+          'C3.2',
+          'Roseta Radial Convergente 360° (❂)',
+          'Recogida de radios perimetrales hacia el núcleo central común',
+          all.filter((e) => e.id?.startsWith('d12_')),
+          globalIndex++,
+          'medium',
+          40
+        ),
+        createGroupedCalisthenicsNode(
+          'cal_u3_multi',
+          'C3.3',
+          'Constelaciones Multi-Línea Dispersas',
+          '2 y 3 trazos independientes en cuadrantes y pendientes distintas',
+          all.filter((e) => e.singleStrokeConfig?.variationType === 'multi_line'),
+          globalIndex++,
+          'hard',
+          45
+        ),
+      ],
     },
     {
       id: 'unit-cal-4',
@@ -179,7 +280,28 @@ function buildCalisthenicsModuleUnits(): Unit[] {
         ],
         diagramNotes: 'Comienza despacio en Fase 1 (Precisión) y acelera a Fase 2 (Fluidez) y Fase 3 (Velocidad).',
       },
-      nodes: u4Exercises.map((e) => calisthenicsExerciseToNode(e, globalIndex++)),
+      nodes: [
+        createGroupedCalisthenicsNode(
+          'cal_u4_c',
+          'C4.1',
+          'Control de Curvatura: Arcos en C (⌒)',
+          'Arcos cóncavos y convexos de flecha suave, media y pronunciada',
+          all.filter((e) => e.id?.startsWith('cc_')),
+          globalIndex++,
+          'medium',
+          35
+        ),
+        createGroupedCalisthenicsNode(
+          'cal_u4_s',
+          'C4.2',
+          'Puntos de Inflexión: Ondas en S (∿)',
+          'Transición de doble curvatura continua sin aristas vivas ni saltos',
+          all.filter((e) => e.id?.startsWith('cs_')),
+          globalIndex++,
+          'hard',
+          45
+        ),
+      ],
     },
     {
       id: 'unit-cal-5',
@@ -196,7 +318,52 @@ function buildCalisthenicsModuleUnits(): Unit[] {
         ],
         diagramNotes: 'El espaciado regular crea valores tonales homogéneos fundamentales para el render.',
       },
-      nodes: u5Exercises.map((e) => calisthenicsExerciseToNode(e, globalIndex++)),
+      nodes: [
+        createGroupedCalisthenicsNode(
+          'cal_u5_straight',
+          'C5.1',
+          'Espaciado Ortogonal y Cuñas Angulares',
+          'Bandas paralelas rectas, diagonales, quiebros en V y chevron',
+          all.filter(
+            (e) =>
+              e.id?.startsWith('sp_') &&
+              (e.spacingTrackConfig?.kinkType === 'none' ||
+                e.spacingTrackConfig?.kinkType?.includes('chevron') ||
+                e.spacingTrackConfig?.kinkType?.includes('v_') ||
+                e.spacingTrackConfig?.kinkType?.includes('triangle') ||
+                e.spacingTrackConfig?.kinkType?.includes('zigzag')) &&
+              !e.spacingTrackConfig?.hasBlocksWithGaps &&
+              e.spacingTrackConfig?.spacingMultiplier === 1
+          ),
+          globalIndex++,
+          'medium',
+          40
+        ),
+        createGroupedCalisthenicsNode(
+          'cal_u5_curves',
+          'C5.2',
+          'Espaciado de Arcos y Ondas Curvas',
+          'Ondas sinusoidales, arcos en bóveda y curvas de nivel en carril',
+          all.filter((e) => e.id?.startsWith('sp_') && e.spacingTrackConfig?.kinkType?.startsWith('curve_')),
+          globalIndex++,
+          'hard',
+          45
+        ),
+        createGroupedCalisthenicsNode(
+          'cal_u5_density',
+          'C5.3',
+          'Fraccionamiento y Densidad de Trama',
+          'Subdivisión de paso a la mitad (paso x/2), bloques discontinuos y densidad graduada',
+          all.filter(
+            (e) =>
+              e.id?.startsWith('sp_') &&
+              (e.spacingTrackConfig?.spacingMultiplier === 0.5 || e.spacingTrackConfig?.hasBlocksWithGaps)
+          ),
+          globalIndex++,
+          'hard',
+          50
+        ),
+      ],
     },
   ];
 }

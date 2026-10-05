@@ -24,19 +24,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
     - *Fase 2: Fluidez* — Continuous forearm rhythm eliminating micro-hesitation and stop-and-go jerks.
     - *Fase 3: Velocidad* — Ballistic flick strokes, building sketching confidence and clean terminal lift-offs.
   - **Real-Time Kinematic & Geometric Evaluation**: Instant algorithmic scoring of path deviation, curvature fidelity, velocity consistency, and stroke angle accuracy.
-- **🗺️ Two-Module Dual Learning Path (`curriculumData.ts`, `LearningPath.tsx`)**:
-  - **Módulo 1: Líneas, Trazos & Calistenia** (237 calisthenics exercises with 3 kinematic phases).
-  - **Módulo 2: Paralelepípedos & Cajas** (10 progressive 3D perspective box levels).
-  - Seamless module switcher tabs in both "El Camino" and the "Práctica" workspace.
+- **🗺️ Two-Module Dual Learning Path & Grouped Calisthenics Progression (`curriculumData.ts`, `LearningPath.tsx`)**:
+  - **Módulo 1: Líneas, Trazos & Calistenia** (Reestructurado en **18 niveles agrupados progresivos**, eliminando la saturación de 237 nodos separados en el camino).
+  - **Módulo 2: Paralelepípedos & Cajas** (10 niveles progresivos de perspectiva isométrica y cónica).
+  - **Sistema de Versiones Progresivas por Nivel (`variants`)**: Cada uno de los 18 niveles agrupa entre 7 y 20 versiones procedimentales (guía fija $\to$ longitud/posición variable $\to$ puntos ciegos sin guía $\to$ variación total $\to$ multi-trazos).
+  - **Mecánica Dinámica de Avance de Versión**: Cada vez que el estudiante consigue un acierto de maestría ($\ge 90\%$), el ejercicio **cambia automáticamente a la siguiente versión** del nivel, evitando la monotonía de repetir el mismo ejercicio estático.
+  - **Badge de Versiones en El Camino**: Cada nodo muestra una insignia destacada con el número exacto de versiones a superar (`X versiones`).
 - **🎨 Redesigned Immersive Practice Workspace (`App.tsx`, `StrokePracticeCanvas.tsx`, `DrawingCanvas.tsx`)**:
-  - **Left Collapsible Sidebar**: Organizes all controls neatly in a vertical drawer with a one-click `<` / `>` toggle button to maximize and center the drawing canvas for distraction-free tablet/stylus sketching.
-  - **Top Mode Switcher (2 Visual Buttons)**: Direct toggle between `[ El Camino ]` (default progression) and `[ Reto Diario ]` (daily habit sets).
+  - **Left Collapsible Sidebar**: Organiza todos los controles en un panel lateral limpio con botón `<` / `>` para maximizar el lienzo a pantalla completa.
+  - **Top Mode Switcher**: Conmutador directo de 2 botones entre `[ El Camino ]` y `[ Reto Diario ]`.
+  - **Selector Interactivo de Versiones del Nivel en la Barra Lateral**:
+    - Indicador numérico `Versión X de Y` con contador de versiones.
+    - Fila horizontal de botones de versión `[1] [2] [3]...` para navegar y practicar cualquier variante del nivel.
+    - Visualización del título y descripción pedagógica de la variante activa.
   - **Camino Controls in Sidebar**:
-    - Direct Module selector (`[ 1. Trazos ]` vs `[ 2. Cajas ]`).
-    - Unlocked lesson dropdown selector with code and title.
-    - 3-Cube Mastery Streak indicator (`✓ ✓ ✓`, 1/3, 2/3, 3/3) with didactic `(i)` info modal.
-    - 3-Square Kinematic Phases indicator (`[1]`, `[2]`, `[3]`) with didactic `(i)` info modal (dynamically displayed only on calisthenics exercises).
-  - **Integrated Action Toolbar**: Fast-access buttons for *Deshacer (Undo)*, *Borrar (Clear)*, *Siguiente / Nueva Semilla (Next)*, and layer visibility toggles (*Ver Trazo*, *Ver Solución / Guía Fantasma*).
+    - Selector directo de módulo (`[ 1. Trazos ]` vs `[ 2. Cajas ]`).
+    - Desplegable de niveles desbloqueados.
+    - Indicador de Racha de Maestría (3 cubos `✓ ✓ ✓`) con modal didáctico `(i)`.
+    - Indicador de 3 Fases Cinemáticas (`[1]`, `[2]`, `[3]`) con modal didáctico `(i)`.
+  - **Integrated Action Toolbar**: Botones de *Deshacer*, *Borrar*, *Siguiente* (que avanza a la siguiente versión), *Ver Trazo* y *Ver Solución*.
 - **ℹ️ Didactic Info Modals (`PracticeInfoModals.tsx`)**:
   - **Mastery Streak Modal**: Explains the 3-in-a-row $\ge 90\%$ rule to students, emphasizing reproducibility and motor consistency over lucky single attempts.
   - **Kinematic Phases Modal**: Explains the 3 biomechanical phases (Precision $\rightarrow$ Flow $\rightarrow$ Speed) and how to train the shoulder/arm for expressive sketching.
