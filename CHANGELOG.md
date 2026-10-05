@@ -6,12 +6,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
-## [Unreleased] — 2026-10-01
+## [0.2.0] — 2026-10-05
 
-### Added
-- **Dedicated Project Changelog (`CHANGELOG.md`)**: Comprehensive project tracking document detailing all architectural updates, UX redesigns, and bug fixes directly in the repository.
+### 🚀 Mega-Update: Motor Calisthenics Engine, Two-Module Learning Curriculum & Immersive Practice Canvas
 
----
+#### 🌟 Added & Integrated
+- **⚡ Full Vector & Procedural Motor Calisthenics Engine (`strokeProceduralGenerator.ts`, `strokeEvaluator.ts`, `strokeKinematics.ts`, `strokeTypes.ts`)**:
+  - **237 Procedural Calisthenics Exercises**: Completely generated in real-time on high-DPI canvases without relying on static raster scans.
+  - **5 Didactic Units (Module 1)**:
+    - *Unit 1: Trazos Fundamentales Ortogonales* (52 challenges: D1–D4 horizontal, vertical, and bidirectional strokes).
+    - *Unit 2: Diagonales Principales y Fugas de Perspectiva* (90 challenges: D5–D10 multi-angle vanishing lines).
+    - *Unit 3: Multi-Líneas y Rosetas Radiales* (50 challenges: D11–D12 radial bursts, 360° spoke precision).
+    - *Unit 4: Arcos y Ondas Biomecánicas* (20 challenges: C & S curvature control with inflection anchor points).
+    - *Unit 5: Carriles de Ritmo y Espaciado Interlineal* (25 challenges: E1.1–E17.1 equidistant parallel frequency tracks).
+  - **3 Biomechanical Kinematic Subphases**:
+    - *Fase 1: Precisión* — Slow, guided motor accuracy connecting endpoints without geometric deviation.
+    - *Fase 2: Fluidez* — Continuous forearm rhythm eliminating micro-hesitation and stop-and-go jerks.
+    - *Fase 3: Velocidad* — Ballistic flick strokes, building sketching confidence and clean terminal lift-offs.
+  - **Real-Time Kinematic & Geometric Evaluation**: Instant algorithmic scoring of path deviation, curvature fidelity, velocity consistency, and stroke angle accuracy.
+- **🗺️ Two-Module Dual Learning Path (`curriculumData.ts`, `LearningPath.tsx`)**:
+  - **Módulo 1: Líneas, Trazos & Calistenia** (237 calisthenics exercises with 3 kinematic phases).
+  - **Módulo 2: Paralelepípedos & Cajas** (10 progressive 3D perspective box levels).
+  - Seamless module switcher tabs in both "El Camino" and the "Práctica" workspace.
+- **🎨 Redesigned Immersive Practice Workspace (`App.tsx`, `StrokePracticeCanvas.tsx`, `DrawingCanvas.tsx`)**:
+  - **Left Collapsible Sidebar**: Organizes all controls neatly in a vertical drawer with a one-click `<` / `>` toggle button to maximize and center the drawing canvas for distraction-free tablet/stylus sketching.
+  - **Top Mode Switcher (2 Visual Buttons)**: Direct toggle between `[ El Camino ]` (default progression) and `[ Reto Diario ]` (daily habit sets).
+  - **Camino Controls in Sidebar**:
+    - Direct Module selector (`[ 1. Trazos ]` vs `[ 2. Cajas ]`).
+    - Unlocked lesson dropdown selector with code and title.
+    - 3-Cube Mastery Streak indicator (`✓ ✓ ✓`, 1/3, 2/3, 3/3) with didactic `(i)` info modal.
+    - 3-Square Kinematic Phases indicator (`[1]`, `[2]`, `[3]`) with didactic `(i)` info modal (dynamically displayed only on calisthenics exercises).
+  - **Integrated Action Toolbar**: Fast-access buttons for *Deshacer (Undo)*, *Borrar (Clear)*, *Siguiente / Nueva Semilla (Next)*, and layer visibility toggles (*Ver Trazo*, *Ver Solución / Guía Fantasma*).
+- **ℹ️ Didactic Info Modals (`PracticeInfoModals.tsx`)**:
+  - **Mastery Streak Modal**: Explains the 3-in-a-row $\ge 90\%$ rule to students, emphasizing reproducibility and motor consistency over lucky single attempts.
+  - **Kinematic Phases Modal**: Explains the 3 biomechanical phases (Precision $\rightarrow$ Flow $\rightarrow$ Speed) and how to train the shoulder/arm for expressive sketching.
+
+#### 🧠 Architectural Rationale & Why This Was Built
+1. **Cognitive Load Separation (Strokes vs 3D Volumes)**: Trying to learn 3D perspective construction while still struggling with basic line straightness or hand tremors leads to cognitive overload. Decomposing the curriculum into *Module 1 (Motor Calisthenics)* and *Module 2 (3D Volumes)* allows deliberate practice of neuromuscular coordination first, making 3D perspective intuitive and effortless later.
+2. **Procedural Geometry vs Raster Scans**: Static scans from workbooks (Bloques 1 al 8) suffer from fixed pixel resolutions, image compression artifacts, and inability to generate infinite random variations. The new procedural vector engine renders infinitely crisp geometry on any screen resolution (4K, iPad, graphics tablets) and provides mathematically exact analytical evaluation.
+3. **Ergonomic Tablet Usability**: Industrial designers and artists need the largest possible canvas. By collapsing the sidebar, the drawing area expands dynamically to full screen while keeping essential actions accessible at a glance.
 
 ## [0.1.2] — 2026-09-30
 

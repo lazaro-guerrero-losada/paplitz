@@ -93,27 +93,45 @@ Paplitz bridges canonical design literature with modern interactive input hardwa
 
 ---
 
-## 04. Didactic Methodology: "The Path" & The Practice Loop
+## 04. Didactic Methodology: "The Path" & The Two-Module Curriculum
+
+Paplitz organizes spatial skill acquisition into a **two-module deliberate practice curriculum**, separating neuromuscular motor control from 3D projective construction to prevent cognitive overload:
+
+```mermaid
+flowchart TD
+    subgraph M1["MÓDULO 1: Líneas, Trazos & Calistenia (237 Retos)"]
+        U1["U1: Ortogonales Fundamentales\n(Horizontales y Verticales)"] --> U2["U2: Diagonales & Fugas\n(Ángulos Críticos)"]
+        U2 --> U3["U3: Rosetas Radiales\n(Control 360°)"]
+        U3 --> U4["U4: Ondas & Arcos C y S\n(Puntos de Inflexión)"]
+        U4 --> U5["U5: Carriles de Espaciado\n(Ritmo & Frecuencia)"]
+    end
+    subgraph KP["3 Fases Cinemáticas"]
+        F1["Fase 1: Precisión (Lento & Guiado)"] --> F2["Fase 2: Fluidez (Ritmo Continuo)"] --> F3["Fase 3: Velocidad (Disparo Balístico)"]
+    end
+    subgraph M2["MÓDULO 2: Paralelepípedos & Cajas 3D (10 Niveles)"]
+        B1["Isométrica y 1 Punto"] --> B2["2 y 3 Puntos de Fuga"] --> B3["Cajas Rotadas & Sombras"]
+    end
+    M1 -.-> KP
+    M1 ==> M2
+```
 
 ### The 4 Principles of Cognitive Scaffolding
-1. **Granular Milestone Decomposition:** Beginners are not asked to draw a sports car or an electric power drill. Challenges isolate the atomic building block of all spatial design: **the orthogonal cube and its cardinal vanishing rays**.
-2. **Gradual Scaffolding:**
-   * *Assisted Phase:* Explicit projection of $X, Y, Z$ director axes and dotted construction guidelines.
-   * *Intermediate Phase:* Progressive fading of assistive lines; intuitive eye-level convergence estimation.
-   * *Expert Phase:* Blind sketching, dynamic rotations, and projected shadow boundaries with directional light sources.
-3. **Immediate Dopaminergic Reinforcement Loop:** Instead of waiting days for critiques, finishing a stroke triggers an instant percentage score, volumetric validation, and XP progression.
-4. **Placement Tests & Adaptive Progression:** Students with prior drafting experience can take leveling evaluations to automatically unlock advanced units matching their skill level.
+1. **Deconstruction of Motor vs Spatial Cognitive Load:** Beginners are not asked to build complex perspective boxes while their hand still hesitates or trembles. Module 1 trains forearm and shoulder motor stability across 237 procedural calisthenics drills. Once line confidence is cemented, Module 2 introduces 3D projective geometry.
+2. **The 3 Kinematic Subphases (Calisthenics Engine):**
+   * *Phase 1: Precision:* Slow, controlled stroke connecting anchor keypoints ① and ② without geometric deflection.
+   * *Phase 2: Fluidity:* Continuous rhythmic execution using the forearm to eliminate micro-hesitations.
+   * *Phase 3: Velocity:* High-speed ballistic flick strokes, building sketching confidence with clean release.
+3. **The 3-in-a-Row Mastery Rule ($\ge 90\%$):** To conquer a node and unlock subsequent lessons, the student must achieve **3 consecutive passing trials with a score of $\ge 90\%$**, cultivating solid muscle memory rather than relying on fortuitous single attempts.
+4. **Immediate Analytical Feedback Loop:** Finishing a stroke triggers instant percentage evaluation, deviation metrics, and progressive gamification (XP, streaks, and Sensei Cubo reactions).
 
 ---
 
-### The Practice Loop: Challenge, Sketch & Evaluation
+### The Practice Workspace: Collapsible Sidebar & Immersive Canvas
 
-Paplitz structures every drill into an intuitive, high-tempo interactive cycle:
-
-| 1. Geometric Challenge | 2. Freehand Sketching | 3. Analytical Evaluation |
-| :---: | :---: | :---: |
-| ![Step 1 - Challenge](docs/assets/step1-challenge.png) | ![Step 2 - Sketching](docs/assets/step2-sketching.png) | ![Step 3 - Evaluation](docs/assets/step3-evaluation.png) |
-| **Step 1: Procedural Generation**<br>The mathematical engine projects an incomplete orthogonal form with seed-based $X, Y, Z$ perspective axes. | **Step 2: Freehand Sketching**<br>The student completes missing edges on a digital canvas with pressure sensitivity, stroke stabilization, and instant undo. | **Step 3: Quantitative Diagnostic**<br>In $<2\text{ ms}$, the engine computes angular convergence to vanishing points, volume closure, and score ($\ge 80\%$ to pass). |
+The practice environment features an ergonomic, distraction-free layout designed specifically for graphic tablet and stylus workflows:
+* **Collapsible Left Sidebar:** Consolidates all controls (mode switcher, lesson selector, mastery counters, drawing actions) into a neat panel that can be hidden with a single click (`<` / `>`) to maximize screen real estate.
+* **Two Practice Modes:** Instant toggle between **El Camino** (structured curriculum progress) and **Reto Diario** (12-exercise daily habit sets).
+* **Layer Toggles:** Switch between user stroke review and ghost/theoretical solutions at will.
 
 ---
 
