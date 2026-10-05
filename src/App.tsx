@@ -43,6 +43,7 @@ import {
   Target,
   PanelLeft,
   Maximize2,
+  ArrowRight,
 } from 'lucide-react';
 import { PaplitzSaveData, applySaveDataToLocalStorage, fastForwardCurriculum } from './lib/saveSystem';
 import { recordDailyPractice } from './lib/streakSystem';
@@ -457,21 +458,6 @@ export function App() {
     setActiveTab('practice');
     setAvatarMood('speed-lightning');
     setTimeout(() => setAvatarMood('neutral'), 2500);
-  };
-
-  // Al seleccionar una lección desde el filtro desplegable
-  const handleSelectLessonById = (nodeId: string) => {
-    const node = allNodes.find((n) => n.id === nodeId);
-    if (node) {
-      setPlacementTestNode(null);
-      setActiveNode(node);
-      setStrokeEvaluation(null);
-      if (!node.isCalisthenics) {
-        handleNewPracticeCube(node);
-      } else {
-        setCalisthenicsSeed(Math.floor(Math.random() * 90000 + 10000));
-      }
-    }
   };
 
   // Al hacer clic en un nodo del Camino
@@ -1286,69 +1272,23 @@ export function App() {
                 </div>
 
                 {/* 2. SI MODO ES "EL CAMINO": CONTEXTO Y PROGRESIÓN */}
+                {/* 2. SI MODO ES "EL CAMINO": INFORMACIÓN EN UNA SOLA LÍNEA Y BOTÓN A EL CAMINO */}
                 {practiceMode === 'camino' && (
-                  <div className="space-y-3">
-                    {/* TARJETA UNIFICADA: MÓDULO & LECCIÓN ACTIVA */}
-                    <div className="border-2 border-black p-2.5 bg-white shadow-[2px_2px_0px_#000000] space-y-2">
-                      <div className="flex items-center justify-between gap-1.5 pb-2 border-b border-neutral-200">
-                        <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-500 font-bold shrink-0">
-                          Módulo:
+                  <div className="border-2 border-black p-2.5 bg-white shadow-[2px_2px_0px_#000000] space-y-2 font-mono">
+                    {/* Información completa del ejercicio en una misma línea */}
+                    <div className="flex items-center justify-between gap-1.5">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="px-1.5 py-0.5 bg-black text-white text-[10px] font-bold shrink-0">
+                          {activeModuleId === 'module-calisthenics' ? 'M1' : 'M2'} · {activeNode?.code || '1.1'}
                         </span>
-                        <select
-                          value={activeModuleId}
-                          onChange={(e) => handleSelectModule(e.target.value)}
-                          className="flex-1 min-w-0 bg-neutral-100 border border-black px-1.5 py-0.5 text-xs font-mono font-bold cursor-pointer truncate hover:bg-neutral-200 transition-colors"
-                        >
-                          <option value="module-calisthenics">1 · Trazos & Calistenia</option>
-                          <option value="module-cubes">2 · Paralelepípedos & Cajas</option>
-                        </select>
+                        <span className="font-bold text-xs text-neutral-900 truncate" title={activeNode?.title}>
+                          {activeNode?.title || 'Ejercicio'}
+                        </span>
                       </div>
 
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-500 font-bold">
-                            Lección:
-                          </span>
-                          {activeNode?.status === 'completed' && (
-                            <span className="text-[9px] font-mono px-1.5 py-0.2 bg-black text-white font-bold">
-                              Superada ✓
-                            </span>
-                          )}
-                        </div>
-                        <select
-                          value={activeNode?.id || ''}
-                          onChange={(e) => handleSelectLessonById(e.target.value)}
-                          className="w-full border-2 border-black px-2 py-1.5 text-xs font-mono font-bold bg-white cursor-pointer truncate shadow-[1px_1px_0px_#000000]"
-                        >
-                          {unlockedNodes.map((n) => (
-                            <option key={n.id} value={n.id}>
-                              {n.code} · {n.title}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      {activeNode?.subtitle && (
-                        <p className="text-[11px] font-sans text-neutral-600 leading-snug pt-0.5">
-                          {activeNode.subtitle}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* SELECTOR DE VARIANTES ELEGANTE (SIN SCROLLBAR HORIZONTAL CAÓTICO) */}
-                    {activeNode?.isCalisthenics && activeVariants.length > 1 && (
-                      <div className="border-2 border-black p-2.5 bg-white shadow-[2px_2px_0px_#000000] space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-500 font-bold">
-                            Variante:
-                          </span>
-                          <span className="text-xs font-mono font-bold bg-black text-white px-2 py-0.5">
-                            {currentVariantIndex + 1} / {activeVariants.length}
-                          </span>
-                        </div>
-
-                        {/* Controles Stepper */}
-                        <div className="flex items-center gap-1.5">
+                      {/* Variante (si aplica) con flechas compactas */}
+                      {activeNode?.isCalisthenics && activeVariants.length > 1 && (
+                        <div className="flex items-center gap-0.5 shrink-0 bg-neutral-100 border border-black px-1 py-0.5">
                           <button
                             type="button"
                             onClick={() => {
@@ -1356,28 +1296,14 @@ export function App() {
                               setNodeVariantIndices((prev) => ({ ...prev, [activeNode.id]: nextIdx }));
                               setCalisthenicsSeed(Math.floor(Math.random() * 90000 + 10000));
                             }}
-                            className="p-1.5 border border-black hover:bg-neutral-100 active:scale-95 cursor-pointer shadow-[1px_1px_0px_#000000] shrink-0"
+                            className="hover:text-black text-neutral-500 font-bold px-0.5 cursor-pointer leading-none"
                             title="Variante anterior"
                           >
-                            <ChevronLeft className="w-3.5 h-3.5" />
+                            <ChevronLeft className="w-3 h-3 stroke-[2.5]" />
                           </button>
-
-                          <select
-                            value={currentVariantIndex}
-                            onChange={(e) => {
-                              const idx = Number(e.target.value);
-                              setNodeVariantIndices((prev) => ({ ...prev, [activeNode.id]: idx }));
-                              setCalisthenicsSeed(Math.floor(Math.random() * 90000 + 10000));
-                            }}
-                            className="flex-1 min-w-0 border border-black px-2 py-1 text-xs font-mono font-bold bg-white cursor-pointer truncate shadow-[1px_1px_0px_#000000]"
-                          >
-                            {activeVariants.map((v, idx) => (
-                              <option key={v.id || idx} value={idx}>
-                                V{idx + 1}: {v.title}
-                              </option>
-                            ))}
-                          </select>
-
+                          <span className="text-[10px] font-bold tabular-nums">
+                            V{currentVariantIndex + 1}/{activeVariants.length}
+                          </span>
                           <button
                             type="button"
                             onClick={() => {
@@ -1385,26 +1311,28 @@ export function App() {
                               setNodeVariantIndices((prev) => ({ ...prev, [activeNode.id]: nextIdx }));
                               setCalisthenicsSeed(Math.floor(Math.random() * 90000 + 10000));
                             }}
-                            className="p-1.5 border border-black hover:bg-neutral-100 active:scale-95 cursor-pointer shadow-[1px_1px_0px_#000000] shrink-0"
+                            className="hover:text-black text-neutral-500 font-bold px-0.5 cursor-pointer leading-none"
                             title="Siguiente variante"
                           >
-                            <ChevronRight className="w-3.5 h-3.5" />
+                            <ChevronRight className="w-3 h-3 stroke-[2.5]" />
                           </button>
                         </div>
+                      )}
+                    </div>
 
-                        {/* Descripción concisa de la variante activa */}
-                        <div className="bg-neutral-50 border border-neutral-300 p-2 text-xs">
-                          <div className="font-semibold text-neutral-900 leading-tight">
-                            {currentExerciseDef.title}
-                          </div>
-                          {currentExerciseDef.desc && (
-                            <p className="text-[11px] text-neutral-600 mt-1 leading-snug">
-                              {currentExerciseDef.desc}
-                            </p>
-                          )}
-                        </div>
+                    {/* Botón para más información y selector de nivel desde el mapa de El Camino */}
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('path')}
+                      className="w-full btn-ink-outline py-2 px-2.5 text-xs font-mono font-bold flex items-center justify-between cursor-pointer shadow-[1px_1px_0px_#000000] hover:bg-neutral-100 transition-colors"
+                      title="Ir a El Camino para ver el mapa, requisitos, explicaciones y elegir nivel"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <Map className="w-3.5 h-3.5 stroke-[2.5]" />
+                        <span>Elegir nivel en El Camino</span>
                       </div>
-                    )}
+                      <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
+                    </button>
                   </div>
                 )}
 
