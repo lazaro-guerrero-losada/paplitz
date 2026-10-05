@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { CubeChallenge, Point2D } from '../lib/geometry';
 import { UserStroke, ValidationFeedback, countDetectedAristas } from '../lib/validation';
 import { Undo2, Trash2, Check, ArrowRight, AlertTriangle, CheckCircle, Clock, Zap, Copy, Download, X, Pen, Hand, ArrowDown, ArrowUp, Eye, EyeOff, FileText } from 'lucide-react';
@@ -122,7 +122,13 @@ function renderGroundGrid(
   ctx.restore();
 }
 
-interface DrawingCanvasProps {
+export interface DrawingCanvasRef {
+  undo: () => void;
+  clear: () => void;
+  validate: () => void;
+}
+
+export interface DrawingCanvasProps {
   challenge: CubeChallenge;
   feedback?: ValidationFeedback | null;
   onStrokesChange: (strokes: UserStroke[]) => void;
@@ -130,6 +136,8 @@ interface DrawingCanvasProps {
   onValidate?: (timeRemainingSeconds?: number) => void;
   onNextCube?: () => void;
   onDrawingStateChange?: (isDrawing: boolean) => void;
+  showUserDrawing?: boolean;
+  showParametricSolution?: boolean;
   activeLesson?: {
     id?: string;
     code?: string;
@@ -143,16 +151,20 @@ interface DrawingCanvasProps {
 
 const TOTAL_COUNTDOWN_SECONDS = 30;
 
-export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
-  challenge,
-  feedback,
-  onStrokesChange,
-  showSolution,
-  onValidate,
-  onNextCube,
-  onDrawingStateChange,
-  activeLesson,
-}) => {
+export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((props, ref) => {
+  const {
+    challenge,
+    feedback,
+    onStrokesChange,
+    showSolution,
+    onValidate,
+    onNextCube,
+    onDrawingStateChange,
+    activeLesson,
+    showUserDrawing: externalShowUserDrawing,
+    showParametricSolution: externalShowParametricSolution,
+  } = props;
+
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [strokes, setStrokes] = useState<UserStroke[]>([]);
@@ -161,8 +173,19 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   const activePointerTypeRef = useRef<string | null>(null);
 
   // Visibilidad de trazos del usuario y solución paramétrica tras resolver el problema
-  const [showUserDrawing, setShowUserDrawing] = useState<boolean>(true);
-  const [showParametricSolution, setShowParametricSolution] = useState<boolean>(true);
+  const [internalShowUserDrawing, setInternalShowUserDrawing] = useState<boolean>(true);
+  const [internalShowParametricSolution, setInternalShowParametricSolution] = useState<boolean>(true);
+
+  const showUserDrawing = externalShowUserDrawing !== undefined ? externalShowUserDrawing : internalShowUserDrawing;
+  const showParametricSolution = externalShowParametricSolution !== undefined ? externalShowParametricSolution : internalShowParametricSolution;
+
+  const setShowUserDrawing = (val: boolean | ((prev: boolean) => boolean)) => {
+    setInternalShowUserDrawing(val);
+  };
+  const setShowParametricSolution = (val: boolean | ((prev: boolean) => boolean)) => {
+    setInternalShowParametricSolution(val);
+  };
+
 
   // Estados para el reporte y diagnóstico del cubo con notas del usuario
   const [showReportModal, setShowReportModal] = useState<boolean>(false);
@@ -918,11 +941,17 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
     onValidate?.(timeLeftRef.current);
   };
 
+  useImperativeHandle(ref, () => ({
+    undo: undoLastStroke,
+    clear: clearStrokes,
+    validate: handleValidateClick,
+  }));
+
   return (
     <div
       className="flex flex-col items-center select-none w-full mx-auto"
       style={{
-        width: 'min(100%, 600px, max(280px, calc((100vh - 330px) * 600 / 540)))',
+        width: 'min(100%, 680px, max(280px, calc((100vh - 200px) * 600 / 540)))',
       }}
     >
       {/* Contenedor responsivo del lienzo: aspecto 600/540 bloqueado 1:1 sin deformación ni márgenes invisibles */}
@@ -1394,4 +1423,5 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
       </div>
     </div>
   );
-};
+});
+

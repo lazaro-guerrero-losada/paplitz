@@ -1,9 +1,11 @@
 import React from 'react';
 import { Unit, LessonNode } from '../lib/curriculumData';
-import { Check, Lock, BookOpen, FastForward, Sparkles } from 'lucide-react';
+import { Check, Lock, BookOpen, FastForward, Sparkles, PenTool, Box } from 'lucide-react';
 
 interface LearningPathProps {
   units: Unit[];
+  activeModuleId?: string;
+  onSelectModule?: (moduleId: string) => void;
   onSelectNode: (node: LessonNode) => void;
   onOpenGuidebook: (unit: Unit) => void;
   onOpenPlacementModal?: () => void;
@@ -11,6 +13,8 @@ interface LearningPathProps {
 
 export const LearningPath: React.FC<LearningPathProps> = ({
   units,
+  activeModuleId = 'module-calisthenics',
+  onSelectModule,
   onSelectNode,
   onOpenGuidebook,
   onOpenPlacementModal,
@@ -24,6 +28,34 @@ export const LearningPath: React.FC<LearningPathProps> = ({
 
   return (
     <div className="w-full max-w-xl mx-auto py-8 px-4 flex flex-col items-center">
+      {/* Selector de Módulos del Camino */}
+      {onSelectModule && (
+        <div className="w-full mb-6 flex flex-col sm:flex-row items-stretch gap-2 border-2 border-black p-1 bg-neutral-100 shadow-[3px_3px_0px_#000000]">
+          <button
+            onClick={() => onSelectModule('module-calisthenics')}
+            className={`flex-1 py-2 px-3 text-xs font-mono font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer border border-black ${
+              activeModuleId === 'module-calisthenics'
+                ? 'bg-black text-white shadow-[1px_1px_0px_#000000]'
+                : 'bg-white text-black hover:bg-neutral-200'
+            }`}
+          >
+            <PenTool className="w-4 h-4 shrink-0" />
+            <span className="truncate">MÓDULO 1: LÍNEAS & TRAZOS</span>
+          </button>
+          <button
+            onClick={() => onSelectModule('module-cubes')}
+            className={`flex-1 py-2 px-3 text-xs font-mono font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer border border-black ${
+              activeModuleId === 'module-cubes'
+                ? 'bg-black text-white shadow-[1px_1px_0px_#000000]'
+                : 'bg-white text-black hover:bg-neutral-200'
+            }`}
+          >
+            <Box className="w-4 h-4 shrink-0" />
+            <span className="truncate">MÓDULO 2: PARALELEPÍPEDOS</span>
+          </button>
+        </div>
+      )}
+
       {/* Barra de acceso rápido superior: Recuperar nivel / Saltar camino */}
       {onOpenPlacementModal && (
         <div className="w-full mb-6 p-3 border-2 border-black bg-white shadow-[3px_3px_0px_#000000] flex items-center justify-between gap-3">

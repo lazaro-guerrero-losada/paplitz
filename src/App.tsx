@@ -1,8 +1,19 @@
-import { useState, useEffect } from 'react';
-import { MODULE_PARALLELEPIPEDS, LessonNode, Unit } from './lib/curriculumData';
+import { useState, useEffect, useRef } from 'react';
+import {
+  MODULE_CALISTHENICS,
+  MODULE_PARALLELEPIPEDS,
+  LessonNode,
+  Unit,
+} from './lib/curriculumData';
+import {
+  ALL_SINGLE_STROKE_EXERCISES,
+  StrokeEvaluation,
+} from './lib/strokeTypes';
 import { generateCubeChallenge, CubeChallenge } from './lib/geometry';
 import { validateCubeDrawing, ValidationFeedback, UserStroke, countDetectedAristas } from './lib/validation';
-import { DrawingCanvas } from './components/DrawingCanvas';
+import { DrawingCanvas, DrawingCanvasRef } from './components/DrawingCanvas';
+import { StrokePracticeCanvas, StrokePracticeCanvasRef } from './components/StrokePracticeCanvas';
+import { MasteryStreakInfoModal, KinematicPhasesInfoModal } from './components/PracticeInfoModals';
 import { LearningPath } from './components/LearningPath';
 import { GuidebookModal } from './components/GuidebookModal';
 import { AnalogSheetsModal } from './components/AnalogSheetsModal';
@@ -17,7 +28,26 @@ import { DailySetCompletedModal } from './components/DailySetCompletedModal';
 import { calculatePlayerLevel } from './lib/levelSystem';
 import { SenseiCubo } from './components/avatar/SenseiCubo';
 import { AvatarMood } from './lib/avatarTypes';
-import { Flame, Printer, Compass, Map, User, RefreshCw, Filter, PenTool, Gamepad2, BookOpen, Zap, Menu, X, ChevronRight, Target } from 'lucide-react';
+import {
+  Flame,
+  Printer,
+  Compass,
+  Map,
+  User,
+  RefreshCw,
+  PenTool,
+  Gamepad2,
+  BookOpen,
+  Menu,
+  X,
+  ChevronRight,
+  ChevronLeft,
+  Target,
+  Undo2,
+  Trash2,
+  Eye,
+  EyeOff,
+} from 'lucide-react';
 import { PaplitzSaveData, applySaveDataToLocalStorage, fastForwardCurriculum } from './lib/saveSystem';
 import { recordDailyPractice } from './lib/streakSystem';
 import {
@@ -39,6 +69,46 @@ function GithubIcon({ className = 'w-3.5 h-3.5' }: { className?: string }) {
   );
 }
 
+function loadAndSanitizeUnits(savedKey: string, defaultUnits: Unit[]): Unit[] {
+  const saved = localStorage.getItem(savedKey);
+  let loadedUnits = defaultUnits;
+  if (saved) {
+    try {
+      const parsed: Unit[] = JSON.parse(saved);
+      loadedUnits = defaultUnits.map((defaultUnit) => {
+        const savedUnit = parsed.find((u) => u.id === defaultUnit.id);
+        if (!savedUnit) return defaultUnit;
+        return {
+          ...defaultUnit,
+          nodes: defaultUnit.nodes.map((defaultNode) => {
+            const savedNode = savedUnit.nodes.find((n) => n.id === defaultNode.id);
+            return savedNode
+              ? { ...defaultNode, status: savedNode.status, score: savedNode.score }
+              : defaultNode;
+          }),
+        };
+      });
+    } catch {
+      loadedUnits = defaultUnits;
+    }
+  }
+
+  let foundFirstUncompleted = false;
+  return loadedUnits.map((u) => ({
+    ...u,
+    nodes: u.nodes.map((n) => {
+      if (n.status === 'completed') {
+        return n;
+      }
+      if (!foundFirstUncompleted) {
+        foundFirstUncompleted = true;
+        return { ...n, status: 'current' as const };
+      }
+      return { ...n, status: 'locked' as const };
+    }),
+  }));
+}
+
 export function App() {
   // Pestañas principales: 'practice' (Home / Práctica Rápida), 'path' (El Camino), 'minigames' (Minijuegos), 'profile' (Perfil)
   const [activeTab, setActiveTab] = useState<'practice' | 'path' | 'minigames' | 'profile'>('practice');
@@ -47,73 +117,76 @@ export function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [showRotatePrompt, setShowRotatePrompt] = useState<boolean>(true);
   const [isPortraitMobile, setIsPortraitMobile] = useState<boolean>(false);
-  const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
+  const [, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
 
   // Estado del Avatar Acompañante Cúbico ("Cubito")
   const [avatarMood, setAvatarMood] = useState<AvatarMood>('neutral');
   const [isUserDrawing, setIsUserDrawing] = useState<boolean>(false);
 
-  // Estado del Currículum / Camino
-  // Estado del Currículum / Camino (fusionando progreso guardado con la estructura actual)
-  const [units, setUnits] = useState<Unit[]>(() => {
-    const saved = localStorage.getItem('paplitz_units');
-    let loadedUnits = MODULE_PARALLELEPIPEDS.units;
-    if (saved) {
-      try {
-        const parsed: Unit[] = JSON.parse(saved);
-        loadedUnits = MODULE_PARALLELEPIPEDS.units.map((defaultUnit) => {
-          const savedUnit = parsed.find((u) => u.id === defaultUnit.id);
-          if (!savedUnit) return defaultUnit;
-          return {
-            ...defaultUnit,
-            nodes: defaultUnit.nodes.map((defaultNode) => {
-              const savedNode = savedUnit.nodes.find((n) => n.id === defaultNode.id);
-              return savedNode
-                ? { ...defaultNode, status: savedNode.status, score: savedNode.score }
-                : defaultNode;
-            }),
-          };
-        });
-      } catch {
-        loadedUnits = MODULE_PARALLELEPIPEDS.units;
-      }
-    }
-
-    // Auto-sanitizar para garantizar una progresión estrictamente secuencial:
-    // Los nodos completados se preservan. El primer nodo no completado es 'current'.
-    // Los nodos posteriores no completados permanecen 'locked' (evitando saltos indebidos de nivel).
-    let foundFirstUncompleted = false;
-    return loadedUnits.map((u) => ({
-      ...u,
-      nodes: u.nodes.map((n) => {
-        if (n.status === 'completed') {
-          return n;
-        }
-        if (!foundFirstUncompleted) {
-          foundFirstUncompleted = true;
-          return { ...n, status: 'current' as const };
-        }
-        return { ...n, status: 'locked' as const };
-      }),
-    }));
+  // Módulo activo del Camino: 'module-calisthenics' (Líneas y Trazos) vs 'module-cubes' (Paralelepípedos)
+  const [activeModuleId, setActiveModuleId] = useState<'module-calisthenics' | 'module-cubes'>(() => {
+    return (localStorage.getItem('paplitz_active_module') as any) || 'module-calisthenics';
   });
 
-  // Lista aplanada de todos los nodos del camino
+  // Estado de Unidades por módulo
+  const [calisthenicsUnits, setCalisthenicsUnits] = useState<Unit[]>(() =>
+    loadAndSanitizeUnits('paplitz_calisthenics_units', MODULE_CALISTHENICS.units)
+  );
+  const [cubeUnits, setCubeUnits] = useState<Unit[]>(() =>
+    loadAndSanitizeUnits('paplitz_units', MODULE_PARALLELEPIPEDS.units)
+  );
+
+  const units = activeModuleId === 'module-calisthenics' ? calisthenicsUnits : cubeUnits;
+  const setUnits = (newUnits: Unit[] | ((prev: Unit[]) => Unit[])) => {
+    if (activeModuleId === 'module-calisthenics') {
+      setCalisthenicsUnits(newUnits);
+    } else {
+      setCubeUnits(newUnits);
+    }
+  };
+
+  // Lista aplanada de todos los nodos del camino activo
   const allNodes = units.flatMap((u) => u.nodes);
   const unlockedNodes = allNodes.filter((n) => n.status !== 'locked');
 
   // Nodo activo seleccionado
   const [activeNode, setActiveNode] = useState<LessonNode>(() => {
-    return allNodes.find((n) => n.status === 'current') || allNodes[0];
+    const initialUnits = (localStorage.getItem('paplitz_active_module') as any) === 'module-cubes'
+      ? cubeUnits
+      : calisthenicsUnits;
+    const all = initialUnits.flatMap((u) => u.nodes);
+    return all.find((n) => n.status === 'current') || all[0];
   });
+
+  // Fase cinemática activa (1: Precisión, 2: Fluidez, 3: Velocidad) - SOLO para calistenia
+  const [currentPhase, setCurrentPhase] = useState<1 | 2 | 3>(1);
+
+  // Modo de práctica en la barra lateral: 'camino' (por defecto) o 'daily' (reto diario)
+  const [practiceMode, setPracticeMode] = useState<'camino' | 'daily'>('camino');
+  // Colapso de la barra lateral izquierda
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
+  // Visibilidad de trazos de usuario y soluciones/guías
+  const [showUserStrokes, setShowUserStrokes] = useState<boolean>(true);
+  const [showSolution, setShowSolution] = useState<boolean>(true);
+  // Modales de información didáctica
+  const [showMasteryStreakInfo, setShowMasteryStreakInfo] = useState<boolean>(false);
+  const [showKinematicPhasesInfo, setShowKinematicPhasesInfo] = useState<boolean>(false);
+
+  // Refs de lienzos de dibujo
+  const strokeCanvasRef = useRef<StrokePracticeCanvasRef | null>(null);
+  const cubeCanvasRef = useRef<DrawingCanvasRef | null>(null);
+
+  // Semilla y evaluación para calistenia
+  const [calisthenicsSeed, setCalisthenicsSeed] = useState<number>(() => Math.floor(Math.random() * 90000 + 10000));
+  const [, setStrokeEvaluation] = useState<StrokeEvaluation | null>(null);
 
   // Modales
   const [guidebookUnit, setGuidebookUnit] = useState<Unit | null>(null);
   const [showAnalogModal, setShowAnalogModal] = useState(false);
 
-  // Desafío de Dibujo actual
+  // Desafío de Cubo 3D actual
   const [challenge, setChallenge] = useState<CubeChallenge>(() => {
-    const initial = allNodes.find((n) => n.status === 'current') || allNodes[0];
+    const initial = cubeUnits.flatMap((u) => u.nodes).find((n) => n.status === 'current') || cubeUnits[0].nodes[0];
     return generateCubeChallenge(101, 600, 540, {
       mode: initial.perspectiveMode,
       axesMode: initial.axesMode,
@@ -124,7 +197,6 @@ export function App() {
   });
   const [strokes, setStrokes] = useState<UserStroke[]>([]);
   const [feedback, setFeedback] = useState<ValidationFeedback | null>(null);
-  const [showSolution, setShowSolution] = useState(false);
 
   // Gamificación y Progreso
   const [streak, setStreak] = useState<number>(() => {
@@ -192,11 +264,14 @@ export function App() {
 
   // Guardar en LocalStorage
   useEffect(() => {
-    localStorage.setItem('paplitz_units', JSON.stringify(units));
+    localStorage.setItem('paplitz_calisthenics_units', JSON.stringify(calisthenicsUnits));
+    localStorage.setItem('paplitz_units', JSON.stringify(cubeUnits));
+    localStorage.setItem('paplitz_active_module', activeModuleId);
     localStorage.setItem('paplitz_streak', streak.toString());
     localStorage.setItem('paplitz_xp', xp.toString());
     localStorage.setItem('paplitz_scores', JSON.stringify(scoresHistory));
-  }, [units, streak, xp, scoresHistory]);
+  }, [calisthenicsUnits, cubeUnits, activeModuleId, streak, xp, scoresHistory]);
+
 
   // Persistir estado de reto diario activo
   useEffect(() => {
@@ -377,9 +452,135 @@ export function App() {
   const handleSelectNode = (node: LessonNode) => {
     setPlacementTestNode(null);
     setActiveNode(node);
-    handleNewPracticeCube(node);
+    setCurrentPhase(1);
+    setFeedback(null);
+    setShowSolution(false);
+    setStrokes([]);
+    setStrokeEvaluation(null);
+    if (!node.isCalisthenics) {
+      handleNewPracticeCube(node);
+    } else {
+      setCalisthenicsSeed(Math.floor(Math.random() * 90000 + 10000));
+    }
     setActiveTab('practice');
   };
+
+  const handleSelectModule = (modId: string) => {
+    const validModId = modId === 'module-cubes' ? 'module-cubes' : 'module-calisthenics';
+    setActiveModuleId(validModId);
+    const targetUnits = validModId === 'module-calisthenics' ? calisthenicsUnits : cubeUnits;
+    const targetAll = targetUnits.flatMap((u) => u.nodes);
+    const nextNode = targetAll.find((n) => n.status === 'current') || targetAll[0];
+    handleSelectNode(nextNode);
+  };
+
+  const handleSidebarUndo = () => {
+    if (activeNode?.isCalisthenics) {
+      strokeCanvasRef.current?.undo();
+    } else {
+      cubeCanvasRef.current?.undo();
+    }
+  };
+
+  const handleSidebarClear = () => {
+    if (activeNode?.isCalisthenics) {
+      strokeCanvasRef.current?.clear();
+    } else {
+      cubeCanvasRef.current?.clear();
+    }
+  };
+
+  const handleSidebarNext = () => {
+    if (activeNode?.isCalisthenics) {
+      strokeCanvasRef.current?.next();
+    } else {
+      handleNextCubeOrProblem();
+    }
+  };
+
+  // Evaluación de trazos de calistenia completada
+  const handleCalisthenicsEvaluationComplete = (evalResult: StrokeEvaluation | null) => {
+    setStrokeEvaluation(evalResult);
+    if (!evalResult) return;
+
+    const recordedScore = Math.round(evalResult.overallScore);
+    setScoresHistory((prev) => [...prev.slice(-19), recordedScore]);
+
+    if (evalResult.passed && recordedScore >= 90) {
+      setAvatarMood('success-stars');
+      setTimeout(() => setAvatarMood('neutral'), 2600);
+      setXp((prev) => prev + 25);
+
+      const currentStreak = masteryStreaks[activeNode.id] || 0;
+      const newStreak = currentStreak + 1;
+      setMasteryStreaks((prev) => ({ ...prev, [activeNode.id]: newStreak }));
+
+      if (currentPhase < 3) {
+        setCurrentPhase((prev) => (prev + 1) as 1 | 2 | 3);
+      }
+
+      if (newStreak < 3) {
+        showToast(
+          '🎯',
+          `Racha de Maestría: ${newStreak}/3 (≥90%)`,
+          newStreak === 1
+            ? `¡Gran precisión con ${recordedScore}%! Necesitas 2 más seguidos ≥90% para superar ${activeNode.code}.`
+            : `¡Excelente trazo (${recordedScore}%)! Solo te falta 1 más para superar ${activeNode.code}.`
+        );
+      } else {
+        // Superado 3/3!
+        setMasteryStreaks((prev) => ({ ...prev, [activeNode.id]: 0 }));
+
+        const currentIndexInAll = allNodes.findIndex((n) => n.id === activeNode.id);
+        const immediateNextNode =
+          currentIndexInAll >= 0 && currentIndexInAll < allNodes.length - 1
+            ? allNodes[currentIndexInAll + 1]
+            : null;
+
+        const nextUnits = units.map((unit) => ({
+          ...unit,
+          nodes: unit.nodes.map((n) => {
+            if (n.id === activeNode.id) {
+              return { ...n, status: 'completed' as const, score: Math.max(n.score || 0, recordedScore) };
+            }
+            if (immediateNextNode && n.id === immediateNextNode.id && n.status === 'locked') {
+              return { ...n, status: 'current' as const };
+            }
+            return n;
+          }),
+        }));
+
+        setUnits(nextUnits);
+        setActiveNode((prev) =>
+          prev ? { ...prev, status: 'completed', score: Math.max(prev.score || 0, recordedScore) } : prev
+        );
+
+        showToast(
+          '✨',
+          `¡Nivel ${activeNode.code} Superado! (3/3)`,
+          immediateNextNode
+            ? `Has dominado ${activeNode.code}. Nuevo nivel desbloqueado: ${immediateNextNode.code}`
+            : `¡Maestría demostrada con 3 aciertos seguidos ≥90%!`,
+          immediateNextNode ? `Ir a ${immediateNextNode.code}` : undefined,
+          immediateNextNode ? () => handleSelectNode(immediateNextNode) : undefined
+        );
+      }
+    } else {
+      setAvatarMood('fail-spiral');
+      setTimeout(() => setAvatarMood('neutral'), 3000);
+
+      const prevStreak = masteryStreaks[activeNode.id] || 0;
+      setMasteryStreaks((prev) => ({ ...prev, [activeNode.id]: 0 }));
+      if (prevStreak > 0) {
+        showToast(
+          '⚠️',
+          `Racha reiniciada (${recordedScore}%)`,
+          `Para superar ${activeNode.code} necesitas 3 aciertos seguidos con nota ≥90%.`
+        );
+      }
+    }
+  };
+
 
   // Practicar un reto específico (por ejemplo desde la vista detallada de hojas A4)
   const handlePracticeSpecificChallenge = (lesson: LessonNode, specificSeed: number) => {
@@ -1014,215 +1215,326 @@ export function App() {
           </div>
         )}
 
-        {/* PESTAÑA 1: HOME / PRÁCTICA RÁPIDA (TODO AL ALCANCE, SIN SCROLL) */}
+        {/* PESTAÑA 1: HOME / PRÁCTICA RÁPIDA (CON BARRA LATERAL ORGANIZADA Y LIENZO AGRANDADO) */}
         {activeTab === 'practice' && (
-          <div className="flex-1 w-full practice-grid px-3 sm:px-4 py-2 sm:py-3 gap-3 lg:gap-4">
-            {/* Columna 1: Reto Diario en el lateral izquierdo en Desktop (arriba del todo); en móvil abajo del lienzo pero encima de Cubito */}
-            <div
-              data-no-cubito="true"
-              className="w-full min-w-0 flex flex-col items-center lg:items-end justify-start shrink-0 pt-1 lg:pt-2 max-w-sm w-full mx-auto lg:mx-0 lg:justify-self-end order-2 lg:order-1"
+          <div className="flex-1 w-full flex flex-col md:flex-row overflow-hidden relative min-h-[calc(100vh-64px)] bg-neutral-100">
+            {/* BARRA LATERAL IZQUIERDA (COLLAPSIBLE SIDEBAR) */}
+            <aside
+              className={`bg-white border-r-2 border-black transition-all duration-200 flex flex-col z-20 shrink-0 select-none ${
+                isSidebarCollapsed ? 'w-0 overflow-hidden border-r-0' : 'w-full md:w-80 shadow-[4px_0px_0px_#000000]'
+              }`}
             >
-              <DailyChallengePanel
-                unlockedNodes={unlockedNodes}
-                activeSession={dailySetSession}
-                onStartChallenge={handleStartDailyChallenge}
-                onCancelChallenge={handleCancelDailyChallenge}
-                history={dailySetHistory}
-                onClearHistory={handleClearDailyHistory}
-              />
-            </div>
-
-            {/* Columna central: Lienzo 100% centrado con la pantalla */}
-            <div
-              className="w-full min-w-0 flex flex-col items-center shrink-0 justify-self-center order-1 lg:order-2"
-              style={{
-                width: 'min(100%, 600px, max(280px, calc((100vh - 330px) * 600 / 540)))',
-              }}
-            >
-              {/* Barra superior compacta con Selector de Lección alineado 1:1 con el Camino */}
-              <div className="w-full flex items-center justify-between gap-2 mb-2 border-b-2 border-black pb-2 flex-nowrap">
-                <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                  <Filter className="w-4 h-4 text-black shrink-0" />
-                  <span className="text-xs font-mono uppercase font-bold shrink-0 hidden xs:inline">Lección:</span>
-                  <select
-                    value={activeNode?.id || ''}
-                    onChange={(e) => handleSelectLessonById(e.target.value)}
-                    className="border-2 border-black px-2 py-1 text-xs font-mono font-bold bg-white shadow-[2px_2px_0px_#000000] cursor-pointer min-w-0 w-full truncate"
+              <div className="w-full md:w-80 flex flex-col h-full overflow-y-auto p-3 sm:p-4 space-y-3 font-sans">
+                {/* 1. SELECTOR SUPERIOR: [ EL CAMINO ] vs [ RETO DIARIO ] */}
+                <div className="grid grid-cols-2 gap-1.5 p-1 border-2 border-black bg-neutral-100 shadow-[2px_2px_0px_#000000]">
+                  <button
+                    onClick={() => setPracticeMode('camino')}
+                    className={`py-1.5 px-2 text-xs font-mono font-bold flex items-center justify-center gap-1.5 cursor-pointer border border-black transition-colors ${
+                      practiceMode === 'camino'
+                        ? 'bg-black text-white shadow-[1px_1px_0px_#000000]'
+                        : 'bg-white text-black hover:bg-neutral-200'
+                    }`}
                   >
-                    {unlockedNodes.map((n) => (
-                      <option key={n.id} value={n.id}>
-                        {n.code} · {n.title}
-                      </option>
-                    ))}
-                  </select>
+                    <Map className="w-3.5 h-3.5" />
+                    <span>El Camino</span>
+                  </button>
+                  <button
+                    onClick={() => setPracticeMode('daily')}
+                    className={`py-1.5 px-2 text-xs font-mono font-bold flex items-center justify-center gap-1.5 cursor-pointer border border-black transition-colors ${
+                      practiceMode === 'daily'
+                        ? 'bg-black text-white shadow-[1px_1px_0px_#000000]'
+                        : 'bg-white text-black hover:bg-neutral-200'
+                    }`}
+                  >
+                    <Target className="w-3.5 h-3.5" />
+                    <span>Reto Diario</span>
+                  </button>
                 </div>
 
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {activeNode && (
-                    activeNode.status === 'completed' ? (
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 font-bold border border-black bg-black text-white shrink-0">
-                        <span className="hidden xs:inline">Superado ✓</span>
-                        <span className="xs:hidden">✓</span>
+                {/* 2. SI MODO ES "EL CAMINO": CONTROLES DEL CAMINO */}
+                {practiceMode === 'camino' && (
+                  <div className="space-y-3">
+                    {/* Selector de Módulo */}
+                    <div className="border-2 border-black p-2 bg-neutral-50 shadow-[2px_2px_0px_#000000]">
+                      <span className="text-[10px] font-mono uppercase tracking-widest text-neutral-500 font-bold block mb-1">
+                        Módulo:
                       </span>
-                    ) : (
-                      <div
-                        className="flex items-center gap-1 border border-black bg-white px-1.5 py-0.5 text-[10px] font-mono font-bold shadow-[1px_1px_0px_#000000] shrink-0"
-                        title={`Racha de maestría: ${currentMasteryStreak}/3 cubos seguidos con nota ≥90% para superar el nivel`}
-                      >
-                        <span className="hidden xs:inline">Maestría:</span>
-                        <div className="flex items-center gap-0.5">
-                          {[0, 1, 2].map((i) => (
-                            <span
-                              key={i}
-                              className={`w-2.5 h-2.5 border border-black inline-flex items-center justify-center text-[8px] font-bold ${
-                                i < currentMasteryStreak
-                                  ? 'bg-black text-white'
-                                  : 'bg-neutral-100 text-transparent'
-                              }`}
-                            >
-                              ✓
-                            </span>
-                          ))}
-                        </div>
-                        <span className="tabular-nums">{currentMasteryStreak}/3</span>
+                      <div className="grid grid-cols-2 gap-1">
+                        <button
+                          onClick={() => handleSelectModule('module-calisthenics')}
+                          className={`p-1.5 text-[11px] font-mono font-bold flex items-center justify-center gap-1 border border-black cursor-pointer truncate ${
+                            activeModuleId === 'module-calisthenics'
+                              ? 'bg-black text-white'
+                              : 'bg-white text-black hover:bg-neutral-100'
+                          }`}
+                          title="Líneas, Trazos y Calistenia (237 ejercicios)"
+                        >
+                          <PenTool className="w-3 h-3 shrink-0" />
+                          <span className="truncate">1. Trazos</span>
+                        </button>
+                        <button
+                          onClick={() => handleSelectModule('module-cubes')}
+                          className={`p-1.5 text-[11px] font-mono font-bold flex items-center justify-center gap-1 border border-black cursor-pointer truncate ${
+                            activeModuleId === 'module-cubes'
+                              ? 'bg-black text-white'
+                              : 'bg-white text-black hover:bg-neutral-100'
+                          }`}
+                          title="Paralelepípedos y Cajas 3D"
+                        >
+                          <Compass className="w-3 h-3 shrink-0" />
+                          <span className="truncate">2. Cajas</span>
+                        </button>
                       </div>
-                    )
-                  )}
+                    </div>
+
+                    {/* Selector de Nivel / Lección */}
+                    <div className="border-2 border-black p-2 bg-white shadow-[2px_2px_0px_#000000]">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] font-mono uppercase tracking-widest text-neutral-500 font-bold">
+                          Lección:
+                        </span>
+                        {activeNode?.status === 'completed' && (
+                          <span className="text-[9px] font-mono px-1 py-0.2 bg-black text-white font-bold">
+                            Superado ✓
+                          </span>
+                        )}
+                      </div>
+                      <select
+                        value={activeNode?.id || ''}
+                        onChange={(e) => handleSelectLessonById(e.target.value)}
+                        className="w-full border-2 border-black px-2 py-1.5 text-xs font-mono font-bold bg-white cursor-pointer truncate"
+                      >
+                        {unlockedNodes.map((n) => (
+                          <option key={n.id} value={n.id}>
+                            {n.code} · {n.title}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* INDICADORES: RACHA DE MAESTRÍA (3 CUBOS) + FASES CINEMÁTICAS (3 CUADRADOS) */}
+                    <div className="border-2 border-black p-2.5 bg-neutral-50 shadow-[2px_2px_0px_#000000] space-y-2.5">
+                      {/* Racha de Maestría: 3 Cubitos con botón (i) */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-mono font-bold uppercase">Maestría:</span>
+                          <div className="flex items-center gap-1">
+                            {[0, 1, 2].map((i) => (
+                              <span
+                                key={i}
+                                className={`w-4 h-4 border-2 border-black flex items-center justify-center text-[10px] font-bold ${
+                                  i < currentMasteryStreak
+                                    ? 'bg-black text-white'
+                                    : 'bg-white text-transparent'
+                                }`}
+                              >
+                                ✓
+                              </span>
+                            ))}
+                          </div>
+                          <span className="text-xs font-mono font-bold tabular-nums">
+                            {currentMasteryStreak}/3
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => setShowMasteryStreakInfo(true)}
+                          className="w-5 h-5 border border-black flex items-center justify-center text-[11px] font-mono font-bold hover:bg-black hover:text-white transition-colors cursor-pointer"
+                          title="Información sobre la Racha de Maestría"
+                        >
+                          i
+                        </button>
+                      </div>
+
+                      {/* Fases Cinemáticas (SOLO EN NIVELES DE TRAZOS) */}
+                      {activeNode?.isCalisthenics && (
+                        <div className="pt-2 border-t border-neutral-300 flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-mono font-bold uppercase">Fase:</span>
+                            <div className="flex items-center gap-1">
+                              {[
+                                { num: 1 as const, label: '1' },
+                                { num: 2 as const, label: '2' },
+                                { num: 3 as const, label: '3' },
+                              ].map((f) => (
+                                <button
+                                  key={f.num}
+                                  onClick={() => setCurrentPhase(f.num)}
+                                  className={`w-6 h-6 border-2 border-black text-xs font-mono font-bold flex items-center justify-center cursor-pointer transition-colors ${
+                                    currentPhase === f.num
+                                      ? 'bg-black text-white shadow-[1px_1px_0px_#000000]'
+                                      : 'bg-white text-black hover:bg-neutral-200'
+                                  }`}
+                                  title={`Fase ${f.num}: ${f.num === 1 ? 'Precisión' : f.num === 2 ? 'Fluidez' : 'Velocidad'}`}
+                                >
+                                  {f.label}
+                                </button>
+                              ))}
+                            </div>
+                            <span className="text-[10px] font-mono uppercase text-neutral-600 font-bold ml-0.5">
+                              {currentPhase === 1 ? 'Precisión' : currentPhase === 2 ? 'Fluidez' : 'Velocidad'}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => setShowKinematicPhasesInfo(true)}
+                            className="w-5 h-5 border border-black flex items-center justify-center text-[11px] font-mono font-bold hover:bg-black hover:text-white transition-colors cursor-pointer"
+                            title="Información sobre las 3 Fases Cinemáticas"
+                          >
+                            i
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. SI MODO ES "RETO DIARIO": CONTROLES DE DAILY CHALLENGE */}
+                {practiceMode === 'daily' && (
+                  <DailyChallengePanel
+                    unlockedNodes={unlockedNodes}
+                    activeSession={dailySetSession}
+                    onStartChallenge={handleStartDailyChallenge}
+                    onCancelChallenge={handleCancelDailyChallenge}
+                    history={dailySetHistory}
+                    onClearHistory={handleClearDailyHistory}
+                  />
+                )}
+
+                {/* 3. BOTONES DE ACCIÓN DEL LIENZO (Deshacer, Borrar, Siguiente, etc.) */}
+                <div className="border-2 border-black p-2.5 bg-white shadow-[2px_2px_0px_#000000] space-y-2">
+                  <span className="text-[10px] font-mono uppercase tracking-widest text-neutral-500 font-bold block mb-1">
+                    Acciones de Dibujo:
+                  </span>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button
+                      onClick={handleSidebarUndo}
+                      className="btn-ink-outline py-1.5 px-2 text-xs font-mono font-bold flex items-center justify-center gap-1 cursor-pointer"
+                      title="Deshacer último trazo (Ctrl+Z)"
+                    >
+                      <Undo2 className="w-3.5 h-3.5" />
+                      <span>Deshacer</span>
+                    </button>
+                    <button
+                      onClick={handleSidebarClear}
+                      className="btn-ink-outline py-1.5 px-2 text-xs font-mono font-bold flex items-center justify-center gap-1 cursor-pointer hover:bg-red-50 hover:text-red-700"
+                      title="Borrar todo el lienzo"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Borrar</span>
+                    </button>
+                  </div>
+
                   <button
-                    onClick={() => handleNewPracticeCube()}
-                    className="btn-ink-outline px-2.5 py-1 text-xs font-mono flex items-center gap-1 cursor-pointer shrink-0"
-                    title="Generar otro cubo aleatorio con la misma lección"
+                    onClick={handleSidebarNext}
+                    className="btn-ink w-full py-1.5 px-2 text-xs font-mono font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
+                    title="Generar nuevo reto con la misma lección o pasar al siguiente"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
-                    <span>Nuevo</span>
+                    <span>Siguiente / Nuevo</span>
                   </button>
+
+                  <div className="grid grid-cols-2 gap-1.5 pt-1 border-t border-neutral-200">
+                    <button
+                      onClick={() => setShowUserStrokes((prev) => !prev)}
+                      className={`py-1 px-1.5 text-[11px] font-mono font-bold flex items-center justify-center gap-1 border border-black cursor-pointer transition-colors ${
+                        showUserStrokes ? 'bg-neutral-100 text-black' : 'bg-neutral-200 text-neutral-500 line-through'
+                      }`}
+                      title="Ocultar o mostrar trazo dibujado"
+                    >
+                      {showUserStrokes ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                      <span className="truncate">Trazo</span>
+                    </button>
+                    <button
+                      onClick={() => setShowSolution((prev) => !prev)}
+                      className={`py-1 px-1.5 text-[11px] font-mono font-bold flex items-center justify-center gap-1 border border-black cursor-pointer transition-colors ${
+                        showSolution ? 'bg-neutral-100 text-black' : 'bg-neutral-200 text-neutral-500 line-through'
+                      }`}
+                      title="Ocultar o mostrar guías y solución"
+                    >
+                      {showSolution ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                      <span className="truncate">Solución</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 4. DETALLES Y GUÍA DE LA LECCIÓN ACTIVA */}
+                {activeNode && (
+                  <div className="border border-black p-2.5 bg-neutral-50 text-xs">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="font-mono font-bold bg-black text-white px-1.5 py-0.2 text-[10px]">
+                        {activeNode.code}
+                      </span>
+                      <span className="font-display font-bold truncate">
+                        {activeNode.title}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-neutral-600 font-sans leading-snug">
+                      {activeNode.subtitle}
+                    </p>
+                  </div>
+                )}
+
+                {/* Sensei Cubo opcional al fondo del sidebar */}
+                <div className="pt-2 flex justify-center">
+                  <SenseiCubo
+                    mood={avatarMood}
+                    isDrawing={isUserDrawing}
+                    size={110}
+                    onPoke={() => {
+                      setAvatarMood('poked');
+                      setTimeout(() => setAvatarMood('neutral'), 1800);
+                    }}
+                  />
                 </div>
               </div>
+            </aside>
 
-              {/* Banner de Examen de Nivelación Activo */}
-              {placementTestNode && placementTestNode.id === activeNode?.id && (
-                <div className="w-full mb-2 px-3 py-1.5 border-2 border-black bg-neutral-100 flex items-center justify-between text-xs shadow-[2px_2px_0px_#000000]">
-                  <div className="flex items-center gap-2">
-                    <span className="bg-black text-white px-1.5 py-0.2 font-mono font-bold text-[10px] flex items-center gap-1">
-                      <Zap className="w-3 h-3" /> EXAMEN
-                    </span>
-                    <span className="font-mono font-bold text-xs">
-                      Supera este reto (≥75%) para convalidar lecciones anteriores (+50 XP bonus).
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => setPlacementTestNode(null)}
-                    className="text-[10px] font-mono uppercase font-bold text-neutral-600 hover:text-black underline cursor-pointer"
-                  >
-                    Cancelar Examen
-                  </button>
-                </div>
-              )}
-
-              {/* Banner de Reto Diario Activo */}
-              {dailySetSession && !dailySetSession.isCompleted && (
-                <div className="w-full mb-2 px-3 py-1.5 border-2 border-black bg-white shadow-[2px_2px_0px_#000000] flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="bg-black text-white px-1.5 py-0.2 font-mono font-bold text-[10px] flex items-center gap-1 shrink-0">
-                      <Target className="w-3 h-3" /> RETO DIARIO
-                    </span>
-                    <span className="font-mono font-bold text-xs truncate">
-                      Ejercicio {dailySetSession.currentIndex + 1} de {dailySetSession.totalCount}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <div className="w-16 sm:w-24 h-2 border border-black bg-neutral-100 overflow-hidden">
-                      <div
-                        className="h-full bg-black transition-all duration-300"
-                        style={{
-                          width: `${Math.round(
-                            ((dailySetSession.currentIndex + (feedback ? 1 : 0)) / dailySetSession.totalCount) * 100
-                          )}%`,
-                        }}
-                      />
-                    </div>
-                    <span className="text-[10px] font-mono font-bold">
-                      {Math.round(((dailySetSession.currentIndex + (feedback ? 1 : 0)) / dailySetSession.totalCount) * 100)}%
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Banner de Guía Activa compacto */}
-              {activeNode && (
-                <div className="w-full mb-2 px-3 py-1.5 border border-black bg-neutral-50 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1.5 truncate">
-                    <span className="font-mono font-bold bg-black text-white px-1.5 py-0.2 text-[10px]">
-                      {activeNode.code}
-                    </span>
-                    <span className="font-display font-bold text-xs truncate">
-                      {activeNode.title}
-                    </span>
-                    <span className="text-[10px] text-neutral-500 font-sans hidden sm:inline truncate">
-                      — {activeNode.subtitle}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {activeNode.status === 'current' ? (
-                      <span className="text-[10px] font-mono bg-white text-black border border-black px-1.5 py-0.5 font-bold shrink-0 flex items-center gap-1 shadow-[1px_1px_0px_#000000]">
-                        <span className="hidden sm:inline text-neutral-500">Objetivo:</span>
-                        <span>3 seguidos ≥90%</span>
-                        <span className="bg-black text-white px-1 text-[9px]">{currentMasteryStreak}/3</span>
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-mono bg-white text-black border border-black px-1.5 py-0.5 font-bold shrink-0 shadow-[1px_1px_0px_#000000]">
-                        Superado ✓
-                      </span>
-                    )}
-                    {activeNode.axesMode === 'xyz' && (
-                      <span className="text-[10px] font-mono bg-white text-black border border-black px-2 py-0.5 font-bold shrink-0 flex items-center gap-1 shadow-[1px_1px_0px_#000000]">
-                        <Compass className="w-3 h-3 stroke-[2.5]" />
-                        <span className="hidden sm:inline">Ejes X, Y, Z</span>
-                      </span>
-                    )}
-                    {activeNode.axesMode === 'base_axes' && (
-                      <span className="text-[10px] font-mono bg-white text-black border border-black px-2 py-0.5 font-bold shrink-0 flex items-center gap-1 shadow-[1px_1px_0px_#000000]">
-                        <Compass className="w-3 h-3 stroke-[2.5]" />
-                        <span className="hidden sm:inline">Ejes X e Y</span>
-                      </span>
-                    )}
-                    {activeNode.axesMode === 'none' && (
-                      <span className="text-[10px] font-mono bg-white text-black border border-black px-2 py-0.5 font-bold shrink-0 flex items-center gap-1 shadow-[1px_1px_0px_#000000]">
-                        <PenTool className="w-3 h-3 stroke-[2.5]" />
-                        <span className="hidden sm:inline">Reto Libre</span>
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Lienzo de dibujo responsivo con controles unificados inmediatamente al alcance */}
-              <DrawingCanvas
-                challenge={challenge}
-                feedback={feedback}
-                onStrokesChange={setStrokes}
-                showSolution={showSolution}
-                onValidate={handleValidate}
-                onNextCube={handleNextCubeOrProblem}
-                onDrawingStateChange={setIsUserDrawing}
-                activeLesson={activeNode}
-              />
+            {/* BOTÓN LATERAL PARA OCULTAR / DESPLEGAR LA BARRA */}
+            <div className="relative z-30">
+              <button
+                onClick={() => setIsSidebarCollapsed((prev) => !prev)}
+                className="absolute top-3 left-1 bg-black text-white p-2 border-2 border-black shadow-[2px_2px_0px_#ffffff] cursor-pointer hover:scale-105 active:scale-95 transition-all flex items-center justify-center"
+                title={isSidebarCollapsed ? "Mostrar panel lateral" : "Ocultar panel lateral (maximizar lienzo)"}
+              >
+                {isSidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+              </button>
             </div>
 
-            {/* Columna 3: Sensei Cubo en el lateral derecho en Desktop (más abajo que el reto); en móvil al final del todo */}
-            <div className="w-full min-w-0 flex flex-col items-center lg:items-start justify-start shrink-0 pt-3 sm:pt-4 lg:pt-14 max-w-sm w-full mx-auto lg:mx-0 lg:justify-self-start order-3 lg:order-3">
-              <SenseiCubo
-                mood={avatarMood}
-                isDrawing={isUserDrawing}
-                size={windowWidth < 640 ? 120 : 155}
-                onPoke={() => {
-                  setAvatarMood('poked');
-                  setTimeout(() => setAvatarMood('neutral'), 1800);
-                }}
-              />
+            {/* ÁREA CENTRAL: LIENZO 100% CENTRADO Y MÁS GRANDE */}
+            <div className="flex-1 flex flex-col items-center justify-center p-3 sm:p-6 overflow-hidden min-h-0">
+              <div className="w-full flex flex-col items-center justify-center max-w-2xl lg:max-w-3xl">
+                {activeNode?.isCalisthenics ? (
+                  <StrokePracticeCanvas
+                    ref={strokeCanvasRef}
+                    exerciseDef={activeNode.exerciseDef || ALL_SINGLE_STROKE_EXERCISES[0]}
+                    currentPhase={currentPhase}
+                    showSolution={showSolution}
+                    showUserStrokes={showUserStrokes}
+                    seed={calisthenicsSeed}
+                    onNewSeed={setCalisthenicsSeed}
+                    onDrawingStateChange={setIsUserDrawing}
+                    onPhaseAdvance={(nextPhase) => setCurrentPhase(nextPhase)}
+                    onEvaluationComplete={handleCalisthenicsEvaluationComplete}
+                  />
+                ) : (
+                  <DrawingCanvas
+                    ref={cubeCanvasRef}
+                    challenge={challenge}
+                    feedback={feedback}
+                    onStrokesChange={setStrokes}
+                    showSolution={showSolution}
+                    showUserDrawing={showUserStrokes}
+                    showParametricSolution={showSolution}
+                    onValidate={handleValidate}
+                    onNextCube={handleNextCubeOrProblem}
+                    onDrawingStateChange={setIsUserDrawing}
+                    activeLesson={activeNode}
+                  />
+                )}
+              </div>
             </div>
           </div>
         )}
+
 
         {/* PESTAÑA 2: MINIJUEGOS */}
         {activeTab === 'minigames' && (
@@ -1243,18 +1555,20 @@ export function App() {
           <div className="flex-1 bg-white">
             <div className="text-center pt-8 pb-4">
               <span className="text-xs font-mono uppercase tracking-widest bg-black text-white px-2 py-0.5 font-bold">
-                MÓDULO 1
+                {activeModuleId === 'module-calisthenics' ? 'MÓDULO 1' : 'MÓDULO 2'}
               </span>
               <h1 className="text-3xl sm:text-4xl font-bold font-display mt-2">
-                {MODULE_PARALLELEPIPEDS.name}
+                {activeModuleId === 'module-calisthenics' ? MODULE_CALISTHENICS.name : MODULE_PARALLELEPIPEDS.name}
               </h1>
               <p className="text-sm text-neutral-600 font-sans max-w-md mx-auto mt-1">
-                {MODULE_PARALLELEPIPEDS.subtitle}
+                {activeModuleId === 'module-calisthenics' ? MODULE_CALISTHENICS.subtitle : MODULE_PARALLELEPIPEDS.subtitle}
               </p>
             </div>
 
             <LearningPath
               units={units}
+              activeModuleId={activeModuleId}
+              onSelectModule={handleSelectModule}
               onSelectNode={handleSelectNode}
               onOpenGuidebook={(unit) => setGuidebookUnit(unit)}
               onOpenPlacementModal={() => setIsPlacementModalOpen(true)}
@@ -1331,6 +1645,14 @@ export function App() {
           onClose={() => setCompletedDailySetForModal(null)}
         />
       )}
+      <MasteryStreakInfoModal
+        isOpen={showMasteryStreakInfo}
+        onClose={() => setShowMasteryStreakInfo(false)}
+      />
+      <KinematicPhasesInfoModal
+        isOpen={showKinematicPhasesInfo}
+        onClose={() => setShowKinematicPhasesInfo(false)}
+      />
     </div>
   );
 }

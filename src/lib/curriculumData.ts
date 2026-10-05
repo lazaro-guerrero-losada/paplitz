@@ -1,8 +1,9 @@
 import { PerspectiveMode, AxesMode } from './geometry';
+import { ALL_SINGLE_STROKE_EXERCISES, LabExerciseDef } from './strokeTypes';
 
 export interface LessonNode {
   id: string;
-  code: string; // '1.1', '1.2', '1.3', '1.4', '2.1', etc.
+  code: string; // '1.1', '1.2', '1.3', '1.4', '2.1', 'C1.01', 'E1.1', etc.
   title: string;
   subtitle: string;
   type: 'warmup' | 'standard' | 'rush' | 'exam';
@@ -15,6 +16,8 @@ export interface LessonNode {
   xpReward: number;
   isShadowLevel?: boolean;
   hasGroundGrid?: boolean;
+  isCalisthenics?: boolean;
+  exerciseDef?: LabExerciseDef;
 }
 
 export interface Unit {
@@ -38,6 +41,173 @@ export interface ModuleTrack {
   icon: string;
   units: Unit[];
 }
+
+/**
+ * Convierte un ejercicio de calistenia del catálogo a un nodo del Camino
+ */
+function calisthenicsExerciseToNode(ex: LabExerciseDef, indexInModule: number): LessonNode {
+  const isFirst = indexInModule === 0;
+  const isExam = ex.title.toLowerCase().includes('maestría') || ex.title.toLowerCase().includes('examen');
+  const isRush = ex.title.toLowerCase().includes('racha') || ex.title.toLowerCase().includes('velocidad');
+  const isWarmup = ex.title.toLowerCase().includes('fija') || ex.title.toLowerCase().includes('primer contacto');
+
+  return {
+    id: `cal-${ex.id || ex.code.toLowerCase().replace('.', '_')}`,
+    code: ex.code,
+    title: ex.title,
+    subtitle: ex.desc || ex.metrics || '',
+    type: isExam ? 'exam' : isRush ? 'rush' : isWarmup ? 'warmup' : 'standard',
+    difficulty: ex.difficulty === 'Fácil' ? 'easy' : ex.difficulty === 'Media' ? 'medium' : 'hard',
+    perspectiveMode: 'gentle',
+    axesMode: 'none',
+    status: isFirst ? 'current' : 'locked',
+    xpReward: ex.difficulty === 'Fácil' ? 20 : ex.difficulty === 'Media' ? 30 : 45,
+    isCalisthenics: true,
+    exerciseDef: ex,
+  };
+}
+
+/**
+ * Construye las 5 Unidades Pedagógicas de Calistenia (237 Retos Dinámicos)
+ */
+function buildCalisthenicsModuleUnits(): Unit[] {
+  const all = ALL_SINGLE_STROKE_EXERCISES;
+  const isMulti = (id: string) =>
+    ['d1_15', 'd1_16', 'd1_17', 'd2_15', 'd2_16', 'd2_17', 'd3_15', 'd3_16', 'd3_17', 'd4_15', 'd4_16', 'd4_17'].includes(id);
+
+  // U1: Fundamentos Ortogonales (Horizontales y Verticales) — 52 ejercicios
+  const u1Exercises = all.filter((e) => {
+    const id = e.id || '';
+    return id.startsWith('d5_') || id.startsWith('d6_') || id.startsWith('d7_') || id.startsWith('d8_');
+  });
+
+  // U2: Diagonales & Perspectiva — 90 ejercicios
+  const u2Exercises = all.filter((e) => {
+    const id = e.id || '';
+    return (
+      ((id.startsWith('d1_') || id.startsWith('d2_') || id.startsWith('d3_') || id.startsWith('d4_')) && !isMulti(id)) ||
+      id.startsWith('d9_') ||
+      id.startsWith('d10_')
+    );
+  });
+
+  // U3: Multi-Líneas & Rosetas Radiales — 50 ejercicios
+  const u3Exercises = all.filter((e) => {
+    const id = e.id || '';
+    return isMulti(id) || id.startsWith('d11_') || id.startsWith('d12_');
+  });
+
+  // U4: Arcos & Ondas Biomecánicas (C & S) — 20 ejercicios
+  const u4Exercises = all.filter((e) => {
+    const id = e.id || '';
+    return id.startsWith('cc_') || id.startsWith('cs_');
+  });
+
+  // U5: Carriles y Espaciado Rítmico — 25 ejercicios
+  const u5Exercises = all.filter((e) => {
+    const id = e.id || '';
+    return id.startsWith('sp_');
+  });
+
+  let globalIndex = 0;
+
+  return [
+    {
+      id: 'unit-cal-1',
+      number: 1,
+      title: 'Trazos Fundamentales Ortogonales (Horizontales y Verticales)',
+      description: 'Dominio de los ejes absolutos X e Y: estabilidad de muñeca, aceleración uniforme y consistencia de longitud.',
+      bookChapter: 'Paplitz Calisthenics — Ejes Ortogonales D5 (→), D6 (←), D7 (↑), D8 (↓)',
+      guidebookContent: {
+        title: 'Estabilidad de Ejes Ortogonales',
+        axioms: [
+          'Bloquea la muñeca y utiliza el hombro y antebrazo como compás para garantizar rectitud.',
+          'Traza con velocidad controlada desde el punto de inicio ① hasta el punto de fin ②.',
+          'Mantén una presión constante de pluma durante todo el recorrido.',
+          'Ajusta la postura antes de cada trazo para alinearte con la dirección solicitada.',
+        ],
+        diagramNotes: 'Primero domina la dirección natural de izquierda a derecha antes de pasar a la inversa.',
+      },
+      nodes: u1Exercises.map((e) => calisthenicsExerciseToNode(e, globalIndex++)),
+    },
+    {
+      id: 'unit-cal-2',
+      number: 2,
+      title: 'Diagonales Principales y Fugas de Perspectiva',
+      description: 'Líneas dinámicas a 45° y fugas sutiles a 15°-20° para proyectar aristas en escorzo y planos oblicuos.',
+      bookChapter: 'Paplitz Calisthenics — Cuadrantes Diagonales D1 (↗), D3 (↘), D2 (↙), D4 (↖) y Fugas D9, D10',
+      guidebookContent: {
+        title: 'Cuadrantes Diagonales y Líneas de Fuga',
+        axioms: [
+          'El cuadrante natural de subida (35° a 75° ↗) requiere soltar el brazo con decisión.',
+          'Las fugas suaves (~15°-20°) entrenan la convergencia hacia puntos de fuga muy lejanos.',
+          'Ajusta la trayectoria en el aire antes de tocar el papel (técnica del fantasma o ghosting).',
+        ],
+        diagramNotes: 'En ángulos descendentes o inversos, rota mentalmente el hombro para mantener la fluidez.',
+      },
+      nodes: u2Exercises.map((e) => calisthenicsExerciseToNode(e, globalIndex++)),
+    },
+    {
+      id: 'unit-cal-3',
+      number: 3,
+      title: 'Multi-Líneas y Rosetas Radiales (Convergencia Focal)',
+      description: 'Control de paralelismo simultáneo y proyección focal 360° desde y hacia centros de gravedad.',
+      bookChapter: 'Paplitz Calisthenics — Multi-Trazo y Rosetas D11 (☼ Fuera) y D12 (❂ Dentro)',
+      guidebookContent: {
+        title: 'Paralelismo y Confluencia Radial',
+        axioms: [
+          'Mantén constante el paso interlineal en las secuencias de 2 y 3 líneas paralelas.',
+          'En las rosetas divergentes (☼), proyecta cada radio a partir del núcleo con espaciado angular regular.',
+          'En las rosetas convergentes (❂), apunta al punto central como blanco sin frenar antes de tiempo.',
+        ],
+        diagramNotes: 'Usa el centro focal como punto de anclaje visual constante en todas las direcciones.',
+      },
+      nodes: u3Exercises.map((e) => calisthenicsExerciseToNode(e, globalIndex++)),
+    },
+    {
+      id: 'unit-cal-4',
+      number: 4,
+      title: 'Arcos y Ondas Biomecánicas (Curvas en C y S)',
+      description: 'Transición a la forma orgánica: arcos parabólicos en C y curvas sinusoidales en S de cadencia continua.',
+      bookChapter: 'Paplitz Calisthenics — Arcos en C (CC.01-10) y Ondas en S (CS.11-20)',
+      guidebookContent: {
+        title: 'Curvatura Biomecánica Continua',
+        axioms: [
+          'Las curvas demandan una sincronía entre el codo y la muñeca sin tirones angulares.',
+          'En la onda en S, el punto de inflexión debe ser suave y continuo, sin formar esquinas.',
+          'Conecta con elasticidad los puntos de cresta y valle marcados en la trayectoria.',
+        ],
+        diagramNotes: 'Comienza despacio en Fase 1 (Precisión) y acelera a Fase 2 (Fluidez) y Fase 3 (Velocidad).',
+      },
+      nodes: u4Exercises.map((e) => calisthenicsExerciseToNode(e, globalIndex++)),
+    },
+    {
+      id: 'unit-cal-5',
+      number: 5,
+      title: 'Carriles de Ritmo y Espaciado Interlineal',
+      description: 'Consistencia de trama en bandas acotadas: espaciado x y x/2, diagonales, quiebros en V, relámpagos y ondas.',
+      bookChapter: 'Paplitz Calisthenics — Carriles y Espaciado Rítmico E1.1 a E17.1',
+      guidebookContent: {
+        title: 'Espaciado Interlineal y Muros de Carril',
+        axioms: [
+          'Observa la muestra entintada a la izquierda y replica el paso exacto dentro de los carriles.',
+          'En quiebros angulares (V, chevron, zigzag), detén el trazo secamente en el vértice antes de cambiar de dirección.',
+          'Respeta los límites superior e inferior de cada franja sin salirte ni quedarte corto.',
+        ],
+        diagramNotes: 'El espaciado regular crea valores tonales homogéneos fundamentales para el render.',
+      },
+      nodes: u5Exercises.map((e) => calisthenicsExerciseToNode(e, globalIndex++)),
+    },
+  ];
+}
+
+export const MODULE_CALISTHENICS: ModuleTrack = {
+  id: 'module-calisthenics',
+  name: 'Líneas, Trazos & Calistenia',
+  subtitle: '237 retos dinámicos de biomecánica: precisión, fluidez, velocidad y ritmo',
+  icon: 'pen-tool',
+  units: buildCalisthenicsModuleUnits(),
+};
 
 export const MODULE_PARALLELEPIPEDS: ModuleTrack = {
   id: 'module-cubes',
@@ -269,3 +439,9 @@ export const MODULE_PARALLELEPIPEDS: ModuleTrack = {
     },
   ],
 };
+
+export const ALL_MODULES: ModuleTrack[] = [
+  MODULE_CALISTHENICS,
+  MODULE_PARALLELEPIPEDS,
+];
+
