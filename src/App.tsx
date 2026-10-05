@@ -43,7 +43,6 @@ import {
   Target,
   PanelLeft,
   Maximize2,
-  Info,
 } from 'lucide-react';
 import { PaplitzSaveData, applySaveDataToLocalStorage, fastForwardCurriculum } from './lib/saveSystem';
 import { recordDailyPractice } from './lib/streakSystem';
@@ -539,24 +538,12 @@ export function App() {
         setCurrentPhase((prev) => (prev + 1) as 1 | 2 | 3);
       }
 
-      // "pero tiene que cambiar" -> Avanzar automáticamente a la siguiente versión del ejercicio!
-      if (activeVariants.length > 1) {
-        const nextVariantIdx = (currentVariantIndex + 1) % activeVariants.length;
-        setNodeVariantIndices((prev) => ({
-          ...prev,
-          [activeNode.id]: nextVariantIdx,
-        }));
-        setCalisthenicsSeed(Math.floor(Math.random() * 90000 + 10000));
-      }
-
       if (newStreak < 3) {
-        const nextVariantIdx = activeVariants.length > 1 ? (currentVariantIndex + 1) % activeVariants.length : 0;
-        const nextVariant = activeVariants[nextVariantIdx];
         showToast(
           '🎯',
           `Racha: ${newStreak}/3 (≥90%)`,
           activeVariants.length > 1
-            ? `¡Versión ${currentVariantIndex + 1}/${activeVariants.length} superada (${recordedScore}%)! Cambiando a: ${nextVariant.title}.`
+            ? `¡Versión ${currentVariantIndex + 1}/${activeVariants.length} superada (${recordedScore}%)!`
             : `¡Gran precisión con ${recordedScore}%! Necesitas ${3 - newStreak} más seguidos ≥90% para superar ${activeNode.code}.`
         );
       } else {
@@ -608,7 +595,6 @@ export function App() {
         prevStreak > 0 ? `Racha reiniciada (${recordedScore}%)` : `Precisión: ${recordedScore}% (Requiere ≥90%)`,
         `Reintenta la Versión ${currentVariantIndex + 1} para dominarla con nota ≥90%.`
       );
-      setCalisthenicsSeed(Math.floor(Math.random() * 90000 + 10000));
     }
   };
 
@@ -1419,81 +1405,6 @@ export function App() {
                         </div>
                       </div>
                     )}
-
-                    {/* PROGRESO: RACHA DE MAESTRÍA Y FASES CINEMÁTICAS */}
-                    <div className="border-2 border-black p-2.5 bg-white shadow-[2px_2px_0px_#000000] space-y-2">
-                      {/* Racha de Maestría */}
-                      <div className="flex items-center justify-between text-xs font-mono">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] font-bold uppercase text-neutral-500">Maestría:</span>
-                          <div className="flex items-center gap-1">
-                            {[0, 1, 2].map((i) => (
-                              <span
-                                key={i}
-                                className={`w-4 h-4 border border-black flex items-center justify-center text-[9px] font-bold transition-colors ${
-                                  i < currentMasteryStreak ? 'bg-black text-white' : 'bg-neutral-100 text-transparent'
-                                }`}
-                              >
-                                ✓
-                              </span>
-                            ))}
-                          </div>
-                          <span className="text-xs font-bold tabular-nums ml-0.5">
-                            {currentMasteryStreak}/3
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setShowMasteryStreakInfo(true)}
-                          className="text-[10px] font-mono text-neutral-500 hover:text-black flex items-center gap-0.5 cursor-pointer underline decoration-dotted"
-                          title="Cómo funciona la racha de maestría"
-                        >
-                          <span>Info</span>
-                          <Info className="w-3 h-3" />
-                        </button>
-                      </div>
-
-                      {/* Fases Cinemáticas (solo en calistenia) */}
-                      {activeNode?.isCalisthenics && (
-                        <div className="pt-2 border-t border-neutral-200">
-                          <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-[10px] font-bold uppercase font-mono text-neutral-500">
-                              Fase de Motricidad:
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setShowKinematicPhasesInfo(true)}
-                              className="text-[10px] font-mono text-neutral-500 hover:text-black flex items-center gap-0.5 cursor-pointer underline decoration-dotted"
-                              title="Cómo funcionan las 3 fases"
-                            >
-                              <span>Info</span>
-                              <Info className="w-3 h-3" />
-                            </button>
-                          </div>
-                          <div className="grid grid-cols-3 gap-1">
-                            {[
-                              { num: 1 as const, label: '1. Precisión', desc: 'Fase 1: Control de extremos' },
-                              { num: 2 as const, label: '2. Fluidez', desc: 'Fase 2: Velocidad constante' },
-                              { num: 3 as const, label: '3. Velocidad', desc: 'Fase 3: Inercia de hombro' },
-                            ].map((f) => (
-                              <button
-                                key={f.num}
-                                type="button"
-                                onClick={() => setCurrentPhase(f.num)}
-                                className={`py-1 text-[10px] font-mono font-bold border border-black text-center transition-colors cursor-pointer ${
-                                  currentPhase === f.num
-                                    ? 'bg-black text-white shadow-[1px_1px_0px_#000000]'
-                                    : 'bg-neutral-50 text-neutral-700 hover:bg-neutral-100'
-                                }`}
-                                title={f.desc}
-                              >
-                                {f.label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
                   </div>
                 )}
 
@@ -1565,6 +1476,10 @@ export function App() {
                     onPhaseAdvance={(nextPhase) => setCurrentPhase(nextPhase)}
                     onEvaluationComplete={handleCalisthenicsEvaluationComplete}
                     onNext={handleSidebarNext}
+                    masteryStreak={currentMasteryStreak}
+                    onOpenMasteryInfo={() => setShowMasteryStreakInfo(true)}
+                    onOpenPhaseInfo={() => setShowKinematicPhasesInfo(true)}
+                    onPhaseChange={(phase) => setCurrentPhase(phase)}
                   />
                 ) : (
                   <DrawingCanvas

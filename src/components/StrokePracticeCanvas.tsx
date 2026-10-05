@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
-import { Undo2, Trash2, Check, ArrowRight, AlertTriangle, CheckCircle2, RefreshCw, Eye, EyeOff } from 'lucide-react';
+import { Undo2, Trash2, Check, ArrowRight, AlertTriangle, RefreshCw, Eye, EyeOff, Zap } from 'lucide-react';
 import {
   LabExerciseDef,
   RawStroke,
@@ -30,6 +30,10 @@ export interface StrokePracticeCanvasProps {
   onNext?: () => void;
   onToggleSolution?: () => void;
   onToggleUserStrokes?: () => void;
+  masteryStreak?: number;
+  onOpenMasteryInfo?: () => void;
+  onOpenPhaseInfo?: () => void;
+  onPhaseChange?: (phase: 1 | 2 | 3) => void;
 }
 
 export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePracticeCanvasProps>(
@@ -47,6 +51,10 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
       onNext,
       onToggleSolution,
       onToggleUserStrokes,
+      masteryStreak,
+      onOpenMasteryInfo,
+      onOpenPhaseInfo,
+      onPhaseChange,
     },
     ref
   ) => {
@@ -63,9 +71,15 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
     const [strokes, setStrokes] = useState<RawStroke[]>([]);
     const [evaluation, setEvaluation] = useState<StrokeEvaluation | null>(null);
     const [isDrawing, setIsDrawing] = useState<boolean>(false);
+    const [autoAdvance, setAutoAdvance] = useState<boolean>(() => {
+      const saved = localStorage.getItem('paplitz_stroke_auto_advance');
+      return saved !== null ? saved === 'true' : true;
+    });
+    const [autoAdvanceCountdown, setAutoAdvanceCountdown] = useState<number | null>(null);
     const currentStrokeRef = useRef<PointWithMeta[]>([]);
     const activePointerIdRef = useRef<number | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    const isDrawingRef = useRef<boolean>(false);
 
     // Sincronizar cuando cambia el ejercicio o la fase
     useEffect(() => {
@@ -80,11 +94,13 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
       currentStrokeRef.current = [];
       setIsDrawing(false);
       setEvaluation(null);
+      setAutoAdvanceCountdown(null);
       onEvaluationComplete(null);
     }, [exerciseDef.code, currentPhase, externalSeed]);
 
     // Manejadores de acciones
     const handleUndo = useCallback(() => {
+      setAutoAdvanceCountdown(null);
       setStrokes((prev) => {
         const next = prev.slice(0, -1);
         setEvaluation(null);
@@ -94,6 +110,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
     }, [onEvaluationComplete]);
 
     const handleClear = useCallback(() => {
+      setAutoAdvanceCountdown(null);
       setStrokes([]);
       currentStrokeRef.current = [];
       setEvaluation(null);
@@ -111,6 +128,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
     }, [strokes, challenge, currentPhase, onPhaseAdvance, onEvaluationComplete]);
 
     const handleNext = useCallback(() => {
+      setAutoAdvanceCountdown(null);
       if (onNext) {
         onNext();
       } else {
@@ -128,11 +146,52 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
     }, [onNext, onNewSeed, exerciseDef, currentPhase, onEvaluationComplete]);
 
     const handleRetry = useCallback(() => {
+      setAutoAdvanceCountdown(null);
       setStrokes([]);
       currentStrokeRef.current = [];
       setEvaluation(null);
       onEvaluationComplete(null);
     }, [onEvaluationComplete]);
+
+    const handleToggleAutoAdvance = useCallback(() => {
+      setAutoAdvance((prev) => {
+        const next = !prev;
+        localStorage.setItem('paplitz_stroke_auto_advance', String(next));
+        if (!next) {
+          setAutoAdvanceCountdown(null);
+        }
+        return next;
+      });
+    }, []);
+
+    // Temporizador de 2 segundos de auto-avance tras corregir
+    useEffect(() => {
+      if (!evaluation || !autoAdvance) {
+        setAutoAdvanceCountdown(null);
+        return;
+      }
+
+      setAutoAdvanceCountdown(2);
+
+      const intervalId = setInterval(() => {
+        setAutoAdvanceCountdown((prev) => {
+          if (prev === null || prev <= 1) {
+            clearInterval(intervalId);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      const timeoutId = setTimeout(() => {
+        handleNext();
+      }, 2000);
+
+      return () => {
+        clearInterval(intervalId);
+        clearTimeout(timeoutId);
+      };
+    }, [evaluation, autoAdvance, handleNext]);
 
     // Métodos expuestos para la barra de herramientas lateral
     useImperativeHandle(ref, () => ({
@@ -662,13 +721,15 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
         ctx.stroke();
       }
 
-      // H. SUPERPOSICIÓN DE SOLUCIÓN TRAS CORRECCIÓN
-      if (showSolution && evaluation && evaluation.solutionOverlay) {
+      // H. SUPERPOSICIÓN DE SOLUCIÓN TRAS CORRECCIÓN (SIEMPRE VISIBLE AL EVALUAR)
+      if (evaluation && evaluation.solutionOverlay) {
         const linesToDraw: { x: number; y: number }[][] =
           evaluation.solutionOverlay.multiLines && evaluation.solutionOverlay.multiLines.length > 0
             ? evaluation.solutionOverlay.multiLines.map((l) => l.points)
-            : evaluation.solutionOverlay.points.length > 1
+            : evaluation.solutionOverlay.points && evaluation.solutionOverlay.points.length > 1
             ? [evaluation.solutionOverlay.points]
+            : challenge.idealPath && challenge.idealPath.length > 1
+            ? [challenge.idealPath]
             : [];
 
         const isCommonCenterEnd =
@@ -682,6 +743,21 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
         for (const sPts of linesToDraw) {
           if (sPts.length < 2) continue;
           ctx.save();
+
+          // 1. Casing blanco de contraste para que la línea guía resalte nítidamente sobre los trazos dibujados
+          ctx.strokeStyle = '#FFFFFF';
+          ctx.lineWidth = 6;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.setLineDash([]);
+          ctx.beginPath();
+          ctx.moveTo(sPts[0].x, sPts[0].y);
+          for (let i = 1; i < sPts.length; i++) {
+            ctx.lineTo(sPts[i].x, sPts[i].y);
+          }
+          ctx.stroke();
+
+          // 2. Línea discontinua negra técnica
           ctx.strokeStyle = '#000000';
           ctx.lineWidth = 2.4;
           ctx.lineCap = 'round';
@@ -775,19 +851,21 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
       activePointerIdRef.current = e.pointerId;
       const { x, y, pressure } = getNormalizedCoords(e);
       currentStrokeRef.current = [{ x, y, pressure, time: Date.now() }];
+      isDrawingRef.current = true;
       setIsDrawing(true);
       if (onDrawingStateChange) onDrawingStateChange(true);
     };
 
     const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-      if (!isDrawing || (activePointerIdRef.current !== null && activePointerIdRef.current !== e.pointerId)) return;
+      if (!isDrawingRef.current || (activePointerIdRef.current !== null && activePointerIdRef.current !== e.pointerId)) return;
       const { x, y, pressure } = getNormalizedCoords(e);
       currentStrokeRef.current.push({ x, y, pressure, time: Date.now() });
       renderCanvas();
     };
 
     const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
-      if (!isDrawing || (activePointerIdRef.current !== null && activePointerIdRef.current !== e.pointerId)) return;
+      if (!isDrawingRef.current || (activePointerIdRef.current !== null && activePointerIdRef.current !== e.pointerId)) return;
+      isDrawingRef.current = false;
       setIsDrawing(false);
       if (onDrawingStateChange) onDrawingStateChange(false);
       activePointerIdRef.current = null;
@@ -842,6 +920,98 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
               maxHeight: 'calc(100vh - 220px)',
             }}
           />
+
+          {/* HUD SUPERIOR IZQUIERDO: MAESTRÍA Y FASE CINEMÁTICA (NÚMEROS, CUADRITOS E INFO) */}
+          <div className="absolute top-2.5 left-2.5 z-20 flex flex-col gap-1.5 p-1.5 bg-white/95 border-2 border-black shadow-[2px_2px_0px_#000000] font-mono pointer-events-auto select-none">
+            {/* Maestría: M [✓][✓][ ] 0/3 [i] */}
+            <div className="flex items-center gap-1.5 text-xs">
+              <span className="text-[10px] font-bold text-neutral-600">M:</span>
+              <div className="flex items-center gap-0.5">
+                {[0, 1, 2].map((i) => (
+                  <span
+                    key={i}
+                    className={`w-3.5 h-3.5 border border-black flex items-center justify-center text-[8px] font-bold ${
+                      i < (masteryStreak ?? 0) ? 'bg-black text-white' : 'bg-neutral-100 text-transparent'
+                    }`}
+                  >
+                    ✓
+                  </span>
+                ))}
+              </div>
+              <span className="text-[10px] font-bold tabular-nums">
+                {masteryStreak ?? 0}/3
+              </span>
+              {onOpenMasteryInfo && (
+                <button
+                  type="button"
+                  onClick={onOpenMasteryInfo}
+                  className="w-3.5 h-3.5 border border-black flex items-center justify-center text-[9px] font-bold text-neutral-600 hover:text-black hover:bg-neutral-200 cursor-pointer"
+                  title="Información de Maestría (Racha de 3 aciertos ≥90%)"
+                >
+                  i
+                </button>
+              )}
+            </div>
+
+            {/* Fase de Motricidad: F [1][2][3] [i] */}
+            <div className="flex items-center gap-1.5 pt-1 border-t border-neutral-300 text-xs">
+              <span className="text-[10px] font-bold text-neutral-600">F:</span>
+              <div className="flex items-center gap-1">
+                {([1, 2, 3] as const).map((ph) => (
+                  <button
+                    key={ph}
+                    type="button"
+                    onClick={() => onPhaseChange && onPhaseChange(ph)}
+                    className={`w-4 h-4 border border-black flex items-center justify-center text-[9px] font-bold cursor-pointer transition-colors ${
+                      currentPhase === ph
+                        ? 'bg-black text-white shadow-[1px_1px_0px_#000000]'
+                        : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+                    }`}
+                    title={`Fase ${ph}: ${ph === 1 ? 'Precisión (extremos)' : ph === 2 ? 'Fluidez (velocidad constante)' : 'Velocidad (inercia)'}`}
+                  >
+                    {ph}
+                  </button>
+                ))}
+              </div>
+              {onOpenPhaseInfo && (
+                <button
+                  type="button"
+                  onClick={onOpenPhaseInfo}
+                  className="w-3.5 h-3.5 border border-black flex items-center justify-center text-[9px] font-bold text-neutral-600 hover:text-black hover:bg-neutral-200 cursor-pointer"
+                  title="Información de Fases de Motricidad"
+                >
+                  i
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* HUD SUPERIOR DERECHO: NOTA OBTENIDA EN GRANDE */}
+          {evaluation && (
+            <div className="absolute top-2.5 right-2.5 z-20 flex flex-col items-center bg-white border-2 border-black p-2 sm:p-2.5 shadow-[3px_3px_0px_#000000] font-mono pointer-events-auto">
+              <span className="text-[10px] font-bold uppercase text-neutral-500 tracking-wider">
+                Nota
+              </span>
+              <span className="text-2xl sm:text-3xl font-black leading-none my-0.5">
+                {Math.round(evaluation.overallScore)}%
+              </span>
+              <span
+                className={`text-[9px] font-bold uppercase px-1.5 py-0.5 mt-0.5 border border-black ${
+                  evaluation.passed && evaluation.overallScore >= 90
+                    ? 'bg-black text-white'
+                    : evaluation.passed
+                    ? 'bg-neutral-200 text-black'
+                    : 'bg-white text-neutral-700'
+                }`}
+              >
+                {evaluation.passed && evaluation.overallScore >= 90
+                  ? 'Excelente'
+                  : evaluation.passed
+                  ? 'Aprobado'
+                  : 'Reintentar'}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* BARRA DE CONTROL INFERIOR Y EVALUACIÓN */}
@@ -870,6 +1040,19 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                   title="Borrar lienzo"
                 >
                   <Trash2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                </button>
+
+                {/* Alternar auto-avance */}
+                <button
+                  type="button"
+                  onClick={handleToggleAutoAdvance}
+                  className={`px-2 py-1 text-xs font-bold border border-black flex items-center gap-1 cursor-pointer transition-colors shadow-[1px_1px_0px_#000000] ${
+                    autoAdvance ? 'bg-black text-white' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+                  }`}
+                  title={autoAdvance ? "Auto-avance activado (espera 2s tras corregir). Haz clic para desactivar." : "Auto-avance desactivado. Haz clic para activar."}
+                >
+                  <Zap className={`w-3.5 h-3.5 ${autoAdvance ? 'fill-white' : ''}`} />
+                  <span className="text-[10px]">Auto: {autoAdvance ? 'ON (2s)' : 'OFF'}</span>
                 </button>
 
                 {/* Alternar capas: Trazo y Solución */}
@@ -915,40 +1098,8 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
             /* Estado EVALUADO: NOTA visible, Siguiente, Reintentar y panel de diagnóstico */
             <div className="flex flex-col gap-1.5 w-full">
               <div className="flex items-center justify-between gap-2 p-2 border-2 border-black bg-white shadow-[2px_2px_0px_#000000]">
-                {/* Lado izquierdo: NOTA y estado */}
-                <div className="flex items-center gap-2">
-                  <div
-                    className={`flex items-center gap-1.5 border-2 border-black px-2.5 py-1 text-xs font-bold shadow-[1px_1px_0px_#000000] ${
-                      evaluation.passed && evaluation.overallScore >= 90
-                        ? 'bg-black text-white'
-                        : evaluation.passed
-                        ? 'bg-neutral-100 text-black'
-                        : 'bg-neutral-200 text-black'
-                    }`}
-                  >
-                    {evaluation.passed ? (
-                      <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
-                    ) : (
-                      <AlertTriangle className="w-4 h-4 stroke-[2.5]" />
-                    )}
-                    <span>NOTA: {Math.round(evaluation.overallScore)}%</span>
-                    <span
-                      className={`text-[9px] px-1 py-0.2 uppercase font-bold ml-1 ${
-                        evaluation.passed && evaluation.overallScore >= 90
-                          ? 'bg-white text-black'
-                          : evaluation.passed
-                          ? 'bg-black text-white'
-                          : 'border border-black text-black'
-                      }`}
-                    >
-                      {evaluation.passed && evaluation.overallScore >= 90
-                        ? 'Excelente (≥90%)'
-                        : evaluation.passed
-                        ? 'Aprobado'
-                        : 'Reintentar'}
-                    </span>
-                  </div>
-
+                {/* Lado izquierdo: Reintentar, Auto-toggle y capas */}
+                <div className="flex items-center gap-1.5 sm:gap-2">
                   <button
                     type="button"
                     onClick={handleRetry}
@@ -957,6 +1108,19 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">Reintentar</span>
+                  </button>
+
+                  {/* Alternar auto-avance */}
+                  <button
+                    type="button"
+                    onClick={handleToggleAutoAdvance}
+                    className={`px-2 py-1 text-xs font-bold border border-black flex items-center gap-1 cursor-pointer transition-colors shadow-[1px_1px_0px_#000000] ${
+                      autoAdvance ? 'bg-black text-white' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+                    }`}
+                    title={autoAdvance ? "Auto-avance activado (espera 2s tras corregir). Haz clic para pausar." : "Auto-avance desactivado. Haz clic para activar."}
+                  >
+                    <Zap className={`w-3.5 h-3.5 ${autoAdvance ? 'fill-white' : ''}`} />
+                    <span className="text-[10px]">Auto: {autoAdvance ? 'ON (2s)' : 'OFF'}</span>
                   </button>
 
                   {/* Alternar capas en evaluado */}
@@ -987,14 +1151,27 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                   )}
                 </div>
 
-                {/* Lado derecho: Botón Siguiente */}
+                {/* Lado derecho: Botón Siguiente con cuenta atrás */}
                 <button
                   type="button"
                   onClick={handleNext}
-                  className="btn-ink px-4 py-1.5 text-xs uppercase font-bold flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
+                  className="btn-ink px-4 py-1.5 text-xs uppercase font-bold flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] relative overflow-hidden"
                   title="Siguiente ejercicio o versión (Enter / Espacio)"
                 >
-                  <span>Siguiente</span>
+                  {autoAdvance && autoAdvanceCountdown !== null && autoAdvanceCountdown > 0 && (
+                    <div
+                      className="absolute bottom-0 left-0 top-0 bg-white/25 pointer-events-none transition-all duration-1000 ease-linear"
+                      style={{
+                        width: `${((2 - autoAdvanceCountdown) / 2) * 100}%`,
+                      }}
+                    />
+                  )}
+                  <span>
+                    Siguiente
+                    {autoAdvance && autoAdvanceCountdown !== null && autoAdvanceCountdown > 0
+                      ? ` (${autoAdvanceCountdown}s)`
+                      : ''}
+                  </span>
                   <ArrowRight className="w-4 h-4 stroke-[2.5]" />
                 </button>
               </div>
