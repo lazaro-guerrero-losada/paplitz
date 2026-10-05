@@ -1671,6 +1671,7 @@ export function App() {
           <MinigamesView
             unlockedNodes={unlockedNodes}
             activeNode={activeNode}
+            calisthenicsNodes={calisthenicsUnits.flatMap((u) => u.nodes)}
             onAwardXP={(amount) => setXp((prev) => prev + amount)}
             onAvatarMoodChange={(mood) => {
               setAvatarMood(mood);
