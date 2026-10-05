@@ -792,11 +792,11 @@ export function generateSpacingTrackChallenge(
       }
     } else if (isHorizontalCurve) {
       const b = bands[0];
-      let startBaseY = b.yTop + 34;
+      let startBaseY = b.yTop + 18;
       let endBaseY = b.yBottom;
       if (kinkType === 'curve_arch_down') {
-        startBaseY = b.yTop + 2;
-        endBaseY = b.yBottom - 32;
+        startBaseY = b.yTop;
+        endBaseY = b.yBottom - 18;
       } else if (kinkType === 'curve_wave_horizontal') {
         startBaseY = b.yTop + 18;
         endBaseY = b.yBottom - 16;
@@ -973,14 +973,17 @@ export function generateSpacingTrackChallenge(
         },
       ];
     } else if (isHorizontalCurve) {
-      let startBaseY = b.yTop + 34; // 239
-      let finalBaseY = b.yBottom;   // 335
+      let startBaseY = b.yTop + 18; // 223 -> apex at 205 (b.yTop)
+      let finalBaseY = b.yBottom;   // 335 -> ends at 335 (b.yBottom)
+      let targetInteriorLineCount = 13;
       if (kinkType === 'curve_arch_down') {
-        startBaseY = b.yTop + 2;     // 207
-        finalBaseY = b.yBottom - 32; // 303
+        startBaseY = b.yTop;         // 205 -> ends at 205 (b.yTop)
+        finalBaseY = b.yBottom - 18; // 317 -> apex at 335 (b.yBottom)
+        targetInteriorLineCount = 13;
       } else if (kinkType === 'curve_wave_horizontal') {
         startBaseY = b.yTop + 18;    // 223
         finalBaseY = b.yBottom - 16; // 319
+        targetInteriorLineCount = 11;
       }
       blocks = [
         {
@@ -990,7 +993,7 @@ export function generateSpacingTrackChallenge(
           width: 128,
           startLinePoints: generateCurvedHorizontalStrokePoints(188, 316, startBaseY, kinkType as any),
           finalLinePoints: generateCurvedHorizontalStrokePoints(188, 316, finalBaseY, kinkType as any),
-          targetInteriorLineCount: 11,
+          targetInteriorLineCount,
         },
         {
           id: 'b2',
@@ -999,7 +1002,7 @@ export function generateSpacingTrackChallenge(
           width: 128,
           startLinePoints: generateCurvedHorizontalStrokePoints(364, 492, startBaseY, kinkType as any),
           finalLinePoints: generateCurvedHorizontalStrokePoints(364, 492, finalBaseY, kinkType as any),
-          targetInteriorLineCount: 11,
+          targetInteriorLineCount,
         },
       ];
     } else if (isChevron || isZigzagWave || isBracket || isVerticalCurve) {
@@ -1116,11 +1119,11 @@ export function generateSpacingTrackChallenge(
         });
       }
     } else if (isHorizontalCurve) {
-      let startBaseY = b.yTop + 34;
+      let startBaseY = b.yTop + 18;
       let finalBaseY = b.yBottom;
       if (kinkType === 'curve_arch_down') {
-        startBaseY = b.yTop + 2;
-        finalBaseY = b.yBottom - 32;
+        startBaseY = b.yTop;
+        finalBaseY = b.yBottom - 18;
       } else if (kinkType === 'curve_wave_horizontal') {
         startBaseY = b.yTop + 18;
         finalBaseY = b.yBottom - 16;

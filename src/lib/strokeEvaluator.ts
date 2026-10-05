@@ -2999,11 +2999,14 @@ export function evaluateSpacingTrackSubmission(
     let wrongDirCount = 0;
     const allSpacings: number[] = [];
 
-    let startBaseY = singleBand.yTop + 34; // 239
+    let startBaseY = singleBand.yTop + 34; // 239 (zigzag_zn)
     let finalBaseY = singleBand.yBottom;   // 335
-    if (kinkType === 'curve_arch_down') {
-      startBaseY = singleBand.yTop + 2;     // 207
-      finalBaseY = singleBand.yBottom - 32; // 303
+    if (kinkType === 'curve_arch_up') {
+      startBaseY = singleBand.yTop + 18;    // 223 -> apex touches 205 (singleBand.yTop)
+      finalBaseY = singleBand.yBottom;      // 335 -> ends touch 335 (singleBand.yBottom)
+    } else if (kinkType === 'curve_arch_down') {
+      startBaseY = singleBand.yTop;         // 205 -> ends touch 205 (singleBand.yTop)
+      finalBaseY = singleBand.yBottom - 18; // 317 -> apex touches 335 (singleBand.yBottom)
     } else if (kinkType === 'curve_wave_horizontal') {
       startBaseY = singleBand.yTop + 18;    // 223
       finalBaseY = singleBand.yBottom - 16; // 319
@@ -3287,7 +3290,7 @@ export function evaluateSpacingTrackSubmission(
         measuredAvgSpacingPx,
         spacingVariance: measuredSpacingVariance,
         measuredAvgAngleDeg: 0,
-        measuredOpticalDensityPct: Math.min(100, Math.round((trackStrokes.length / (11 * blockList.length)) * 100)),
+        measuredOpticalDensityPct: Math.min(100, Math.round((trackStrokes.length / (((kinkType === 'curve_arch_up' || kinkType === 'curve_arch_down') ? 13 : 11) * blockList.length)) * 100)),
       },
       feedbackTitle,
       feedbackMessage,

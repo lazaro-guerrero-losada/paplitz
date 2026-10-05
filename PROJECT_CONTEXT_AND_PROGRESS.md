@@ -320,18 +320,18 @@ Inspirado en el Ejercicio 1.1 del cuaderno de dibujo (*"Making Strokes Consisten
     - **2 bloques con pausa central:** Bloque 1 y Bloque 2 de $128$px cada uno con pausa de $48$px, 15 trazos por bloque.
     - **Muestra permanente:** Bloque a la izquierda (`MUESTRA ARCO C ) (x/2 = 8px)`) con flecha y dot (●).
 21. **E13.1 — Carril Arco Convexo Horizontal ⌒ (Bloques & Pausas · x/2):**
-    - 1 franja de altura $y = 130$px, espaciado fino vertical $x/2 = 8$px.
+    - 1 franja de altura $y = 130$px ($y_{\text{top}} = 205, y_{\text{bottom}} = 335$), espaciado fino vertical $x/2 = 8$px.
     - Patrón geométrico de líneas paralelas curvas en arco convexo hacia arriba (`⌒`).
     - **Trazo horizontal continuo de izquierda a derecha (→):** Se inicia en $(X_{\text{start}}, y_{\text{base}})$, se curva suavemente elevándose hacia arriba con deflexión máxima de $18$px en el centro ($X_{\text{start}} + W/2, y_{\text{base}} - 18$px), y desciende suavemente retornando al nivel base en $(X_{\text{end}}, y_{\text{base}})$. Longitud nominal: $\approx 134$px.
-    - **Líneas de INICIO y FIN:** Línea superior sólida pre-dibujada en $y_{\text{base}} = 239$px (apoyando su cúpula en $y_{\text{top}} = 205$px) y línea inferior sólida en $y_{\text{base}} = 335$px.
-    - **2 bloques con pausa central:** Bloque 1 y Bloque 2 de ancho $W = 128$px con pausa intermedia de $48$px y 11 trazos interiores por bloque.
+    - **Ocupación completa de la altura $y$:** Línea superior sólida pre-dibujada de **INICIO** en $y_{\text{base}} = 223$px (con su cúpula tocando exactamente el riel superior $y_{\text{top}} = 205$px) y línea inferior sólida de **FIN** en $y_{\text{base}} = 335$px (apoyando sus extremos en el riel inferior $y_{\text{bottom}} = 335$px). La altura vertical total ocupada por el conjunto es exactamente $y = 130$px ($[205, 335]$).
+    - **2 bloques con pausa central:** Bloque 1 y Bloque 2 de ancho $W = 128$px con pausa intermedia de $48$px y 13 trazos interiores por bloque espaciados a $8$px.
     - **Muestra permanente:** Bloque a la izquierda (`MUESTRA ARCO ⌒ (x/2 = 8px)`) con flecha direccional a la derecha y dot (●) a la izquierda.
 22. **E14.1 — Carril Arco Cóncavo Horizontal ∪ (Bloques & Pausas · x/2):**
-    - 1 franja de altura $y = 130$px, espaciado fino vertical $x/2 = 8$px.
+    - 1 franja de altura $y = 130$px ($y_{\text{top}} = 205, y_{\text{bottom}} = 335$), espaciado fino vertical $x/2 = 8$px.
     - Patrón geométrico de líneas paralelas curvas en arco cóncavo hacia abajo (`∪`).
     - **Trazo horizontal continuo de izquierda a derecha (→):** Deflexión máxima de $18$px hacia abajo en el centro del bloque ($X_{\text{start}} + W/2, y_{\text{base}} + 18$px).
-    - **Líneas de INICIO y FIN:** Línea superior en $y_{\text{base}} = 207$px y línea inferior en $y_{\text{base}} = 303$px (con el seno del arco tocando $y_{\text{bottom}} = 335$px).
-    - **2 bloques con pausa central:** 11 trazos interiores por bloque con pausa de $48$px.
+    - **Ocupación completa de la altura $y$:** Línea superior de **INICIO** en $y_{\text{base}} = 205$px (con sus extremos apoyando exactamente en el riel superior $y_{\text{top}} = 205$px) y línea inferior de **FIN** en $y_{\text{base}} = 317$px (con el seno del arco tocando exactamente el riel inferior $y_{\text{bottom}} = 335$px). La altura vertical total ocupada por el conjunto es exactamente $y = 130$px ($[205, 335]$).
+    - **2 bloques con pausa central:** 13 trazos interiores por bloque con pausa de $48$px espaciados a $8$px.
     - **Muestra permanente:** Bloque a la izquierda (`MUESTRA ARCO ∪ (x/2 = 8px)`).
 23. **E15.1 — Carril Onda Horizontal en S ~ (Bloques & Pausas · x/2):**
     - 1 franja de altura $y = 130$px, espaciado fino vertical $x/2 = 8$px.
@@ -601,8 +601,8 @@ A continuación se resumen los avances implementados en la última fase de traba
     - Creación de 7 nuevos niveles de espaciado y ritmo en carriles basados en la Página 5 del cuaderno técnico (*Exercise 1.5 - Curved Lines*):
       1. `E11.1`: Arco C Izquierda `(` (comba parabólica de $20$px hacia la izquierda, 15 trazos por bloque).
       2. `E12.1`: Arco C Derecha `)` (comba parabólica de $20$px hacia la derecha, 15 trazos por bloque).
-      3. `E13.1`: Arco Convexo Arriba `⌒` (trazo horizontal de izquierda a derecha, elevación de $18$px, 11 trazos por bloque).
-      4. `E14.1`: Arco Cóncavo Abajo `∪` (trazo horizontal de izquierda a derecha, seno de $18$px hacia abajo, 11 trazos por bloque).
+      3. `E13.1`: Arco Convexo Arriba `⌒` (trazo horizontal de izquierda a derecha, elevación de $18$px, altura completa $y$, 13 trazos por bloque).
+      4. `E14.1`: Arco Cóncavo Abajo `∪` (trazo horizontal de izquierda a derecha, seno de $18$px hacia abajo, altura completa $y$, 13 trazos por bloque).
       5. `E15.1`: Onda Horizontal en S `~` (trazo horizontal, seno de $14$px y cresta de $14$px, 11 trazos por bloque).
       6. `E16.1`: Onda Vertical en S `§` (trazo vertical, doble comba sinusoidal de $16$px, 15 trazos por bloque).
       7. `E17.1`: Onda Inclinada en S `∿` (trazo vertical con deslizamiento lateral progresivo hacia la derecha de $+36$px, ángulo rector $\approx 74.5^\circ$, 15 trazos por bloque).
