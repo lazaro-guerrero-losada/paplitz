@@ -24,7 +24,10 @@ import {
   Hourglass,
   Pen,
   Hand,
+  Ghost,
+  Sparkles,
 } from 'lucide-react';
+import { GhostLineMinigame } from './GhostLineMinigame';
 
 interface MinigamesViewProps {
   unlockedNodes: LessonNode[];
@@ -34,7 +37,7 @@ interface MinigamesViewProps {
   onDrawingStateChange?: (isDrawing: boolean) => void;
 }
 
-type GameMode = 'blitz' | 'fever' | 'survival' | 'sprint';
+type GameMode = 'blitz' | 'fever' | 'survival' | 'sprint' | 'ghost';
 
 interface HighScoreData {
   [key: string]: number; // ej: "blitz_1.1": 8, "fever_1.1": 12, "sprint_1.1": 42.5
@@ -189,6 +192,9 @@ export const MinigamesView: React.FC<MinigamesViewProps> = ({
   const startGame = (mode: GameMode) => {
     setGameMode(mode);
     setGameState('playing');
+    if (mode === 'ghost') {
+      return;
+    }
     setCubesCompleted(0);
     setScoresList([]);
     setStreakCombo(0);
@@ -730,6 +736,7 @@ export const MinigamesView: React.FC<MinigamesViewProps> = ({
     const feverRecord = highScores[`fever_${currentLesson.code}`] ?? 0;
     const survivalRecord = highScores[`survival_${currentLesson.code}`] ?? 0;
     const sprintRecord = highScores[`sprint_${currentLesson.code}`];
+    const ghostRecord = parseInt(localStorage.getItem('paplitz_ghost_best_streak') || '0', 10);
 
     return (
       <div className="max-w-4xl w-full mx-auto px-4 py-6">
@@ -799,7 +806,51 @@ export const MinigamesView: React.FC<MinigamesViewProps> = ({
           </div>
         </div>
 
-        {/* Tarjetas de Selección de Minijuegos en Rejilla 2x2 */}
+        {/* JUEGO DESTACADO: LÍNEA FANTASMA (TRAZOS & MEMORIA MUSCULAR) */}
+        <div className="card-ink bg-white p-5 mb-6 flex flex-col md:flex-row items-center justify-between gap-5 border-2 border-black shadow-[4px_4px_0px_#000000] relative overflow-hidden">
+          <div className="absolute top-2 right-2 bg-black text-white text-[9px] font-mono uppercase px-2 py-0.5 font-bold flex items-center gap-1">
+            <Sparkles className="w-3 h-3 fill-white text-white" />
+            <span>NUEVO MINIJUEGO DE TRAZOS</span>
+          </div>
+
+          <div className="flex-1">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-11 h-11 border-2 border-black flex items-center justify-center bg-neutral-100 shadow-[2px_2px_0px_#000000]">
+                <Ghost className="w-6 h-6 stroke-[2.5]" />
+              </div>
+              <div>
+                <h3 className="text-xl sm:text-2xl font-bold font-display leading-tight flex items-center gap-2">
+                  <span>Línea Fantasma</span>
+                </h3>
+                <span className="text-[10px] font-mono uppercase text-neutral-500 font-bold">
+                  Memoria Muscular & Sincronía (Gris Clarito)
+                </span>
+              </div>
+            </div>
+            <p className="text-xs font-sans text-neutral-600 max-w-xl">
+              Crea tu propia línea o elige una plantilla y persigue al fantasma en gris clarito: cada vez que dibujas debes repetir exactamente la misma trayectoria con la máxima precisión milimétrica. ¿Cuántas veces seguidas lograrás sincronizarte sin fallar?
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row md:flex-col items-center md:items-end gap-3 w-full md:w-auto shrink-0 pt-3 md:pt-0 border-t md:border-t-0 border-neutral-200">
+            <div className="flex items-center gap-2 text-xs font-mono">
+              <span className="text-neutral-500">Récord de Racha:</span>
+              <span className="font-bold flex items-center gap-1 bg-neutral-100 border border-black px-2 py-0.5 shadow-[1px_1px_0px_#000000]">
+                <Trophy className="w-3.5 h-3.5" />
+                {ghostRecord} {ghostRecord === 1 ? 'acierto' : 'seguidos'}
+              </span>
+            </div>
+            <button
+              onClick={() => startGame('ghost')}
+              className="btn-ink w-full sm:w-auto md:w-52 py-2.5 px-4 text-xs font-mono uppercase font-bold flex items-center justify-center gap-2 cursor-pointer shadow-[3px_3px_0px_#000000]"
+            >
+              <Play className="w-3.5 h-3.5 fill-white stroke-none" />
+              <span>Jugar Línea Fantasma</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Tarjetas de Selección de Minijuegos de Cajas en Rejilla 2x2 */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {/* JUEGO 1: FIEBRE DE TIEMPO (CUBOS CON ESTRELLA) */}
           <div className="card-ink bg-white p-5 flex flex-col justify-between border-2 border-black shadow-[4px_4px_0px_#000000] hover:-translate-y-0.5 transition-transform relative overflow-hidden">
@@ -960,6 +1011,18 @@ export const MinigamesView: React.FC<MinigamesViewProps> = ({
           </div>
         </div>
       </div>
+    );
+  }
+
+  // Si el modo activo es Línea Fantasma
+  if (gameMode === 'ghost') {
+    return (
+      <GhostLineMinigame
+        onExit={exitGame}
+        onAwardXP={onAwardXP}
+        onAvatarMoodChange={onAvatarMoodChange}
+        onDrawingStateChange={onDrawingStateChange}
+      />
     );
   }
 
