@@ -35,7 +35,6 @@ import {
   Map,
   User,
   RefreshCw,
-  PenTool,
   Gamepad2,
   BookOpen,
   Menu,
@@ -47,6 +46,9 @@ import {
   Trash2,
   Eye,
   EyeOff,
+  Check,
+  CheckCircle,
+  AlertTriangle,
 } from 'lucide-react';
 import { PaplitzSaveData, applySaveDataToLocalStorage, fastForwardCurriculum } from './lib/saveSystem';
 import { recordDailyPractice } from './lib/streakSystem';
@@ -178,7 +180,7 @@ export function App() {
 
   // Semilla y evaluación para calistenia
   const [calisthenicsSeed, setCalisthenicsSeed] = useState<number>(() => Math.floor(Math.random() * 90000 + 10000));
-  const [, setStrokeEvaluation] = useState<StrokeEvaluation | null>(null);
+  const [strokeEvaluation, setStrokeEvaluation] = useState<StrokeEvaluation | null>(null);
 
   // Control de versiones/variantes activas por nivel de calistenia
   const [nodeVariantIndices, setNodeVariantIndices] = useState<Record<string, number>>(() => {
@@ -461,6 +463,7 @@ export function App() {
     if (node) {
       setPlacementTestNode(null);
       setActiveNode(node);
+      setStrokeEvaluation(null);
       if (!node.isCalisthenics) {
         handleNewPracticeCube(node);
       } else {
@@ -489,6 +492,7 @@ export function App() {
   const handleSelectModule = (modId: string) => {
     const validModId = modId === 'module-cubes' ? 'module-cubes' : 'module-calisthenics';
     setActiveModuleId(validModId);
+    setStrokeEvaluation(null);
     const targetUnits = validModId === 'module-calisthenics' ? calisthenicsUnits : cubeUnits;
     const targetAll = targetUnits.flatMap((u) => u.nodes);
     const nextNode = targetAll.find((n) => n.status === 'current') || targetAll[0];
@@ -504,6 +508,7 @@ export function App() {
   };
 
   const handleSidebarClear = () => {
+    setStrokeEvaluation(null);
     if (activeNode?.isCalisthenics) {
       strokeCanvasRef.current?.clear();
     } else {
@@ -511,7 +516,16 @@ export function App() {
     }
   };
 
+  const handleSidebarEvaluate = () => {
+    if (activeNode?.isCalisthenics) {
+      strokeCanvasRef.current?.evaluate();
+    } else {
+      handleValidate();
+    }
+  };
+
   const handleSidebarNext = () => {
+    setStrokeEvaluation(null);
     if (activeNode?.isCalisthenics) {
       if (activeVariants.length > 1) {
         const nextVariantIdx = (currentVariantIndex + 1) % activeVariants.length;
@@ -1293,37 +1307,19 @@ export function App() {
                 {/* 2. SI MODO ES "EL CAMINO": CONTROLES DEL CAMINO */}
                 {practiceMode === 'camino' && (
                   <div className="space-y-3">
-                    {/* Selector de Módulo */}
-                    <div className="border-2 border-black p-2 bg-neutral-50 shadow-[2px_2px_0px_#000000]">
-                      <span className="text-[10px] font-mono uppercase tracking-widest text-neutral-500 font-bold block mb-1">
+                    {/* Selector de Módulo (desplegable compacto) */}
+                    <div className="flex items-center gap-1.5 border-2 border-black px-2 py-1 bg-neutral-50 shadow-[2px_2px_0px_#000000]">
+                      <span className="text-[10px] font-mono uppercase font-bold text-neutral-500 shrink-0">
                         Módulo:
                       </span>
-                      <div className="grid grid-cols-2 gap-1">
-                        <button
-                          onClick={() => handleSelectModule('module-calisthenics')}
-                          className={`p-1.5 text-[11px] font-mono font-bold flex items-center justify-center gap-1 border border-black cursor-pointer truncate ${
-                            activeModuleId === 'module-calisthenics'
-                              ? 'bg-black text-white'
-                              : 'bg-white text-black hover:bg-neutral-100'
-                          }`}
-                          title="Líneas, Trazos y Calistenia (237 ejercicios)"
-                        >
-                          <PenTool className="w-3 h-3 shrink-0" />
-                          <span className="truncate">1. Trazos</span>
-                        </button>
-                        <button
-                          onClick={() => handleSelectModule('module-cubes')}
-                          className={`p-1.5 text-[11px] font-mono font-bold flex items-center justify-center gap-1 border border-black cursor-pointer truncate ${
-                            activeModuleId === 'module-cubes'
-                              ? 'bg-black text-white'
-                              : 'bg-white text-black hover:bg-neutral-100'
-                          }`}
-                          title="Paralelepípedos y Cajas 3D"
-                        >
-                          <Compass className="w-3 h-3 shrink-0" />
-                          <span className="truncate">2. Cajas</span>
-                        </button>
-                      </div>
+                      <select
+                        value={activeModuleId}
+                        onChange={(e) => handleSelectModule(e.target.value)}
+                        className="flex-1 bg-white border border-black px-1.5 py-0.5 text-xs font-mono font-bold cursor-pointer truncate"
+                      >
+                        <option value="module-calisthenics">1. Trazos & Calistenia</option>
+                        <option value="module-cubes">2. Paralelepípedos & Cajas</option>
+                      </select>
                     </div>
 
                     {/* Selector de Nivel / Lección */}
@@ -1397,71 +1393,64 @@ export function App() {
                       </div>
                     )}
 
-                    {/* INDICADORES: RACHA DE MAESTRÍA (3 CUBOS) + FASES CINEMÁTICAS (3 CUADRADOS) */}
-                    <div className="border-2 border-black p-2.5 bg-neutral-50 shadow-[2px_2px_0px_#000000] space-y-2.5">
-                      {/* Racha de Maestría: 3 Cubitos con botón (i) */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-mono font-bold uppercase">Maestría:</span>
-                          <div className="flex items-center gap-1">
-                            {[0, 1, 2].map((i) => (
-                              <span
-                                key={i}
-                                className={`w-4 h-4 border-2 border-black flex items-center justify-center text-[10px] font-bold ${
-                                  i < currentMasteryStreak
-                                    ? 'bg-black text-white'
-                                    : 'bg-white text-transparent'
-                                }`}
-                              >
-                                ✓
-                              </span>
-                            ))}
-                          </div>
-                          <span className="text-xs font-mono font-bold tabular-nums">
-                            {currentMasteryStreak}/3
-                          </span>
+                    {/* INDICADORES COMPACTOS: MAESTRÍA (3 CUBOS) + FASES (3 BOTONES) EN 1 SOLA LÍNEA */}
+                    <div className="border-2 border-black px-2 py-1 bg-neutral-50 shadow-[2px_2px_0px_#000000] flex items-center justify-between gap-1 text-xs font-mono">
+                      {/* Racha de Maestría */}
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span className="text-[10px] font-bold uppercase text-neutral-500">Maestría:</span>
+                        <div className="flex items-center gap-0.5">
+                          {[0, 1, 2].map((i) => (
+                            <span
+                              key={i}
+                              className={`w-3.5 h-3.5 border border-black flex items-center justify-center text-[8px] font-bold ${
+                                i < currentMasteryStreak
+                                  ? 'bg-black text-white'
+                                  : 'bg-white text-transparent'
+                              }`}
+                            >
+                              ✓
+                            </span>
+                          ))}
                         </div>
+                        <span className="text-[10px] font-bold tabular-nums">
+                          {currentMasteryStreak}/3
+                        </span>
                         <button
                           onClick={() => setShowMasteryStreakInfo(true)}
-                          className="w-5 h-5 border border-black flex items-center justify-center text-[11px] font-mono font-bold hover:bg-black hover:text-white transition-colors cursor-pointer"
+                          className="w-4 h-4 border border-black flex items-center justify-center text-[9px] font-bold hover:bg-black hover:text-white transition-colors cursor-pointer ml-0.5"
                           title="Información sobre la Racha de Maestría"
                         >
                           i
                         </button>
                       </div>
 
-                      {/* Fases Cinemáticas (SOLO EN NIVELES DE TRAZOS) */}
+                      {/* Fases Cinemáticas (SOLO EN TRAZOS) */}
                       {activeNode?.isCalisthenics && (
-                        <div className="pt-2 border-t border-neutral-300 flex items-center justify-between">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-xs font-mono font-bold uppercase">Fase:</span>
-                            <div className="flex items-center gap-1">
-                              {[
-                                { num: 1 as const, label: '1' },
-                                { num: 2 as const, label: '2' },
-                                { num: 3 as const, label: '3' },
-                              ].map((f) => (
-                                <button
-                                  key={f.num}
-                                  onClick={() => setCurrentPhase(f.num)}
-                                  className={`w-6 h-6 border-2 border-black text-xs font-mono font-bold flex items-center justify-center cursor-pointer transition-colors ${
-                                    currentPhase === f.num
-                                      ? 'bg-black text-white shadow-[1px_1px_0px_#000000]'
-                                      : 'bg-white text-black hover:bg-neutral-200'
-                                  }`}
-                                  title={`Fase ${f.num}: ${f.num === 1 ? 'Precisión' : f.num === 2 ? 'Fluidez' : 'Velocidad'}`}
-                                >
-                                  {f.label}
-                                </button>
-                              ))}
-                            </div>
-                            <span className="text-[10px] font-mono uppercase text-neutral-600 font-bold ml-0.5">
-                              {currentPhase === 1 ? 'Precisión' : currentPhase === 2 ? 'Fluidez' : 'Velocidad'}
-                            </span>
+                        <div className="flex items-center gap-1 pl-1.5 border-l border-neutral-300 shrink-0">
+                          <span className="text-[10px] font-bold uppercase text-neutral-500">Fase:</span>
+                          <div className="flex items-center gap-0.5">
+                            {[
+                              { num: 1 as const, label: '1', title: 'Fase 1: Precisión' },
+                              { num: 2 as const, label: '2', title: 'Fase 2: Fluidez' },
+                              { num: 3 as const, label: '3', title: 'Fase 3: Velocidad' },
+                            ].map((f) => (
+                              <button
+                                key={f.num}
+                                onClick={() => setCurrentPhase(f.num)}
+                                className={`w-4 h-4 border border-black text-[9px] font-bold flex items-center justify-center cursor-pointer transition-colors ${
+                                  currentPhase === f.num
+                                    ? 'bg-black text-white shadow-[1px_1px_0px_#000000]'
+                                    : 'bg-white text-black hover:bg-neutral-200'
+                                }`}
+                                title={f.title}
+                              >
+                                {f.label}
+                              </button>
+                            ))}
                           </div>
                           <button
                             onClick={() => setShowKinematicPhasesInfo(true)}
-                            className="w-5 h-5 border border-black flex items-center justify-center text-[11px] font-mono font-bold hover:bg-black hover:text-white transition-colors cursor-pointer"
+                            className="w-4 h-4 border border-black flex items-center justify-center text-[9px] font-bold hover:bg-black hover:text-white transition-colors cursor-pointer ml-0.5"
                             title="Información sobre las 3 Fases Cinemáticas"
                           >
                             i
@@ -1484,15 +1473,28 @@ export function App() {
                   />
                 )}
 
-                {/* 3. BOTONES DE ACCIÓN DEL LIENZO (Deshacer, Borrar, Siguiente, etc.) */}
-                <div className="border-2 border-black p-2.5 bg-white shadow-[2px_2px_0px_#000000] space-y-2">
-                  <span className="text-[10px] font-mono uppercase tracking-widest text-neutral-500 font-bold block mb-1">
-                    Acciones de Dibujo:
-                  </span>
+                {/* 3. BOTONES DE ACCIÓN DEL LIENZO (Corregir, Deshacer, Borrar, Siguiente, etc.) */}
+                <div className="border-2 border-black p-2 bg-white shadow-[2px_2px_0px_#000000] space-y-1.5">
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-neutral-500 font-bold">
+                      Acciones:
+                    </span>
+                  </div>
+
+                  {/* Botón Principal Destacado: Corregir / Validar */}
+                  <button
+                    onClick={handleSidebarEvaluate}
+                    className="btn-ink w-full py-1.5 px-2 text-xs font-mono font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
+                    title={activeNode?.isCalisthenics ? "Corregir trazo y ver nota (Enter)" : "Validar perspectiva (Enter)"}
+                  >
+                    <Check className="w-3.5 h-3.5 stroke-[3]" />
+                    <span>{activeNode?.isCalisthenics ? "Corregir Trazo" : "Validar Dibujo"}</span>
+                  </button>
+
                   <div className="grid grid-cols-2 gap-1.5">
                     <button
                       onClick={handleSidebarUndo}
-                      className="btn-ink-outline py-1.5 px-2 text-xs font-mono font-bold flex items-center justify-center gap-1 cursor-pointer"
+                      className="btn-ink-outline py-1 px-2 text-xs font-mono font-bold flex items-center justify-center gap-1 cursor-pointer"
                       title="Deshacer último trazo (Ctrl+Z)"
                     >
                       <Undo2 className="w-3.5 h-3.5" />
@@ -1500,7 +1502,7 @@ export function App() {
                     </button>
                     <button
                       onClick={handleSidebarClear}
-                      className="btn-ink-outline py-1.5 px-2 text-xs font-mono font-bold flex items-center justify-center gap-1 cursor-pointer hover:bg-red-50 hover:text-red-700"
+                      className="btn-ink-outline py-1 px-2 text-xs font-mono font-bold flex items-center justify-center gap-1 cursor-pointer hover:bg-red-50 hover:text-red-700"
                       title="Borrar todo el lienzo"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -1510,7 +1512,7 @@ export function App() {
 
                   <button
                     onClick={handleSidebarNext}
-                    className="btn-ink w-full py-1.5 px-2 text-xs font-mono font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
+                    className="btn-ink-outline w-full py-1 px-2 text-xs font-mono font-bold flex items-center justify-center gap-1.5 cursor-pointer"
                     title="Generar nuevo reto con la misma lección o pasar al siguiente"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
@@ -1540,6 +1542,40 @@ export function App() {
                     </button>
                   </div>
                 </div>
+
+                {/* NOTA Y EVALUACIÓN EN LA BARRA LATERAL (SI SE HA EVALUADO EN TRAZOS) */}
+                {activeNode?.isCalisthenics && strokeEvaluation && (
+                  <div className="border-2 border-black p-2 bg-neutral-50 shadow-[2px_2px_0px_#000000] text-xs space-y-1">
+                    <div className="flex items-center justify-between font-mono font-bold">
+                      <span className="flex items-center gap-1">
+                        {strokeEvaluation.passed ? (
+                          <CheckCircle className="w-3.5 h-3.5 text-black" />
+                        ) : (
+                          <AlertTriangle className="w-3.5 h-3.5 text-black" />
+                        )}
+                        <span>NOTA: {Math.round(strokeEvaluation.overallScore)}%</span>
+                      </span>
+                      <span
+                        className={`text-[9px] px-1 py-0.2 uppercase font-bold ${
+                          strokeEvaluation.passed && strokeEvaluation.overallScore >= 90
+                            ? 'bg-black text-white'
+                            : strokeEvaluation.passed
+                            ? 'bg-neutral-200 text-black border border-black'
+                            : 'bg-white text-black border border-black'
+                        }`}
+                      >
+                        {strokeEvaluation.passed && strokeEvaluation.overallScore >= 90
+                          ? 'Excelente'
+                          : strokeEvaluation.passed
+                          ? 'Aprobado'
+                          : 'Reintentar'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] font-sans text-neutral-700 leading-snug">
+                      {strokeEvaluation.feedbackTitle}
+                    </p>
+                  </div>
+                )}
 
                 {/* 4. DETALLES Y GUÍA DE LA LECCIÓN ACTIVA */}
                 {activeNode && (
@@ -1599,6 +1635,7 @@ export function App() {
                     onDrawingStateChange={setIsUserDrawing}
                     onPhaseAdvance={(nextPhase) => setCurrentPhase(nextPhase)}
                     onEvaluationComplete={handleCalisthenicsEvaluationComplete}
+                    onNext={handleSidebarNext}
                   />
                 ) : (
                   <DrawingCanvas
