@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
-import { Undo2, Trash2, Check, ArrowRight, AlertTriangle, CheckCircle2, RefreshCw } from 'lucide-react';
+import { Undo2, Trash2, Check, ArrowRight, AlertTriangle, CheckCircle2, RefreshCw, Eye, EyeOff } from 'lucide-react';
 import {
   LabExerciseDef,
   RawStroke,
@@ -28,6 +28,8 @@ export interface StrokePracticeCanvasProps {
   seed?: number;
   onNewSeed?: (seed: number) => void;
   onNext?: () => void;
+  onToggleSolution?: () => void;
+  onToggleUserStrokes?: () => void;
 }
 
 export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePracticeCanvasProps>(
@@ -43,6 +45,8 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
       seed: externalSeed,
       onNewSeed,
       onNext,
+      onToggleSolution,
+      onToggleUserStrokes,
     },
     ref
   ) => {
@@ -867,6 +871,33 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                 >
                   <Trash2 className="w-3.5 h-3.5 stroke-[2.5]" />
                 </button>
+
+                {/* Alternar capas: Trazo y Solución */}
+                {onToggleUserStrokes && (
+                  <button
+                    type="button"
+                    onClick={onToggleUserStrokes}
+                    className={`p-1.5 text-xs font-bold border border-black cursor-pointer transition-colors shadow-[1px_1px_0px_#000000] ${
+                      showUserStrokes ? 'bg-black text-white' : 'bg-neutral-100 text-neutral-400 line-through'
+                    }`}
+                    title={showUserStrokes ? "Ocultar trazo" : "Mostrar trazo"}
+                  >
+                    {showUserStrokes ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                  </button>
+                )}
+                {onToggleSolution && (
+                  <button
+                    type="button"
+                    onClick={onToggleSolution}
+                    className={`px-2 py-1 text-xs font-bold border border-black flex items-center gap-1 cursor-pointer transition-colors shadow-[1px_1px_0px_#000000] ${
+                      showSolution ? 'bg-black text-white' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+                    }`}
+                    title={showSolution ? "Ocultar guía / solución" : "Mostrar guía / solución"}
+                  >
+                    {showSolution ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                    <span className="hidden sm:inline text-[10px]">Guía</span>
+                  </button>
+                )}
               </div>
 
               <button
@@ -927,6 +958,33 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                     <RefreshCw className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">Reintentar</span>
                   </button>
+
+                  {/* Alternar capas en evaluado */}
+                  {onToggleUserStrokes && (
+                    <button
+                      type="button"
+                      onClick={onToggleUserStrokes}
+                      className={`p-1.5 text-xs font-bold border border-black cursor-pointer transition-colors shadow-[1px_1px_0px_#000000] ${
+                        showUserStrokes ? 'bg-black text-white' : 'bg-neutral-100 text-neutral-400 line-through'
+                      }`}
+                      title={showUserStrokes ? "Ocultar trazo" : "Mostrar trazo"}
+                    >
+                      {showUserStrokes ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                    </button>
+                  )}
+                  {onToggleSolution && (
+                    <button
+                      type="button"
+                      onClick={onToggleSolution}
+                      className={`px-2 py-1 text-xs font-bold border border-black flex items-center gap-1 cursor-pointer transition-colors shadow-[1px_1px_0px_#000000] ${
+                        showSolution ? 'bg-black text-white' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+                      }`}
+                      title={showSolution ? "Ocultar guía / solución" : "Mostrar guía / solución"}
+                    >
+                      {showSolution ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                      <span className="hidden sm:inline text-[10px]">Solución</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Lado derecho: Botón Siguiente */}

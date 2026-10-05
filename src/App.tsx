@@ -34,7 +34,6 @@ import {
   Compass,
   Map,
   User,
-  RefreshCw,
   Gamepad2,
   BookOpen,
   Menu,
@@ -42,13 +41,9 @@ import {
   ChevronRight,
   ChevronLeft,
   Target,
-  Undo2,
-  Trash2,
-  Eye,
-  EyeOff,
-  Check,
-  CheckCircle,
-  AlertTriangle,
+  PanelLeft,
+  Maximize2,
+  Info,
 } from 'lucide-react';
 import { PaplitzSaveData, applySaveDataToLocalStorage, fastForwardCurriculum } from './lib/saveSystem';
 import { recordDailyPractice } from './lib/streakSystem';
@@ -188,7 +183,7 @@ export function App() {
 
   // Semilla y evaluación para calistenia
   const [calisthenicsSeed, setCalisthenicsSeed] = useState<number>(() => Math.floor(Math.random() * 90000 + 10000));
-  const [strokeEvaluation, setStrokeEvaluation] = useState<StrokeEvaluation | null>(null);
+  const [, setStrokeEvaluation] = useState<StrokeEvaluation | null>(null);
 
   // Control de versiones/variantes activas por nivel de calistenia
   const [nodeVariantIndices, setNodeVariantIndices] = useState<Record<string, number>>(() => {
@@ -505,31 +500,6 @@ export function App() {
     const targetAll = targetUnits.flatMap((u) => u.nodes);
     const nextNode = targetAll.find((n) => n.status === 'current') || targetAll[0];
     handleSelectNode(nextNode);
-  };
-
-  const handleSidebarUndo = () => {
-    if (activeNode?.isCalisthenics) {
-      strokeCanvasRef.current?.undo();
-    } else {
-      cubeCanvasRef.current?.undo();
-    }
-  };
-
-  const handleSidebarClear = () => {
-    setStrokeEvaluation(null);
-    if (activeNode?.isCalisthenics) {
-      strokeCanvasRef.current?.clear();
-    } else {
-      cubeCanvasRef.current?.clear();
-    }
-  };
-
-  const handleSidebarEvaluate = () => {
-    if (activeNode?.isCalisthenics) {
-      strokeCanvasRef.current?.evaluate();
-    } else {
-      handleValidate();
-    }
   };
 
   const handleSidebarNext = () => {
@@ -1276,19 +1246,35 @@ export function App() {
           </div>
         )}
 
-        {/* PESTAÑA 1: HOME / PRÁCTICA RÁPIDA (CON BARRA LATERAL ORGANIZADA Y LIENZO AGRANDADO) */}
+        {/* PESTAÑA 1: HOME / PRÁCTICA RÁPIDA (REDiseño LIMPIO, INTUITIVO Y SIN DISTRACCIONES) */}
         {activeTab === 'practice' && (
           <div className="flex-1 w-full flex flex-col md:flex-row overflow-hidden relative min-h-[calc(100vh-64px)] bg-neutral-100">
             {/* BARRA LATERAL IZQUIERDA (COLLAPSIBLE SIDEBAR) */}
-            <aside
-              className={`bg-white border-r-2 border-black transition-all duration-200 flex flex-col z-20 shrink-0 select-none ${
-                isSidebarCollapsed ? 'w-0 overflow-hidden border-r-0' : 'w-full md:w-80 shadow-[4px_0px_0px_#000000]'
-              }`}
-            >
-              <div className="w-full md:w-80 flex flex-col h-full overflow-y-auto p-3 sm:p-4 space-y-3 font-sans">
-                {/* 1. SELECTOR SUPERIOR: [ EL CAMINO ] vs [ RETO DIARIO ] */}
+            {!isSidebarCollapsed && (
+              <aside className="w-full md:w-80 bg-white border-r-2 border-black shadow-[4px_0px_0px_#000000] flex flex-col z-20 shrink-0 select-none">
+                <div className="w-full md:w-80 flex flex-col h-full overflow-y-auto p-3.5 space-y-3 font-sans">
+                {/* CABECERA DEL PANEL CON BOTÓN MINIMIZAR */}
+                <div className="flex items-center justify-between pb-1.5 border-b-2 border-black">
+                  <div className="flex items-center gap-1.5">
+                    <Compass className="w-4 h-4 stroke-[2.5]" />
+                    <span className="text-xs font-mono font-bold uppercase tracking-wider">
+                      Panel de Práctica
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsSidebarCollapsed(true)}
+                    className="p-1 border border-black hover:bg-neutral-100 active:scale-95 cursor-pointer shadow-[1px_1px_0px_#000000]"
+                    title="Ocultar panel (Modo Enfoque)"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* 1. SELECTOR DE MODO: [ EL CAMINO ] vs [ RETO DIARIO ] */}
                 <div className="grid grid-cols-2 gap-1.5 p-1 border-2 border-black bg-neutral-100 shadow-[2px_2px_0px_#000000]">
                   <button
+                    type="button"
                     onClick={() => setPracticeMode('camino')}
                     className={`py-1.5 px-2 text-xs font-mono font-bold flex items-center justify-center gap-1.5 cursor-pointer border border-black transition-colors ${
                       practiceMode === 'camino'
@@ -1300,6 +1286,7 @@ export function App() {
                     <span>El Camino</span>
                   </button>
                   <button
+                    type="button"
                     onClick={() => setPracticeMode('daily')}
                     className={`py-1.5 px-2 text-xs font-mono font-bold flex items-center justify-center gap-1.5 cursor-pointer border border-black transition-colors ${
                       practiceMode === 'daily'
@@ -1312,88 +1299,120 @@ export function App() {
                   </button>
                 </div>
 
-                {/* 2. SI MODO ES "EL CAMINO": CONTROLES DEL CAMINO */}
+                {/* 2. SI MODO ES "EL CAMINO": CONTEXTO Y PROGRESIÓN */}
                 {practiceMode === 'camino' && (
                   <div className="space-y-3">
-                    {/* Selector de Módulo (desplegable compacto) */}
-                    <div className="flex items-center gap-1.5 border-2 border-black px-2 py-1 bg-neutral-50 shadow-[2px_2px_0px_#000000]">
-                      <span className="text-[10px] font-mono uppercase font-bold text-neutral-500 shrink-0">
-                        Módulo:
-                      </span>
-                      <select
-                        value={activeModuleId}
-                        onChange={(e) => handleSelectModule(e.target.value)}
-                        className="flex-1 bg-white border border-black px-1.5 py-0.5 text-xs font-mono font-bold cursor-pointer truncate"
-                      >
-                        <option value="module-calisthenics">1. Trazos & Calistenia</option>
-                        <option value="module-cubes">2. Paralelepípedos & Cajas</option>
-                      </select>
-                    </div>
-
-                    {/* Selector de Nivel / Lección */}
-                    <div className="border-2 border-black p-2 bg-white shadow-[2px_2px_0px_#000000]">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-[10px] font-mono uppercase tracking-widest text-neutral-500 font-bold">
-                          Lección:
+                    {/* TARJETA UNIFICADA: MÓDULO & LECCIÓN ACTIVA */}
+                    <div className="border-2 border-black p-2.5 bg-white shadow-[2px_2px_0px_#000000] space-y-2">
+                      <div className="flex items-center justify-between gap-1.5 pb-2 border-b border-neutral-200">
+                        <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-500 font-bold shrink-0">
+                          Módulo:
                         </span>
-                        {activeNode?.status === 'completed' && (
-                          <span className="text-[9px] font-mono px-1 py-0.2 bg-black text-white font-bold">
-                            Superado ✓
-                          </span>
-                        )}
+                        <select
+                          value={activeModuleId}
+                          onChange={(e) => handleSelectModule(e.target.value)}
+                          className="flex-1 min-w-0 bg-neutral-100 border border-black px-1.5 py-0.5 text-xs font-mono font-bold cursor-pointer truncate hover:bg-neutral-200 transition-colors"
+                        >
+                          <option value="module-calisthenics">1 · Trazos & Calistenia</option>
+                          <option value="module-cubes">2 · Paralelepípedos & Cajas</option>
+                        </select>
                       </div>
-                      <select
-                        value={activeNode?.id || ''}
-                        onChange={(e) => handleSelectLessonById(e.target.value)}
-                        className="w-full border-2 border-black px-2 py-1.5 text-xs font-mono font-bold bg-white cursor-pointer truncate"
-                      >
-                        {unlockedNodes.map((n) => (
-                          <option key={n.id} value={n.id}>
-                            {n.code} · {n.title}
-                          </option>
-                        ))}
-                      </select>
+
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-500 font-bold">
+                            Lección:
+                          </span>
+                          {activeNode?.status === 'completed' && (
+                            <span className="text-[9px] font-mono px-1.5 py-0.2 bg-black text-white font-bold">
+                              Superada ✓
+                            </span>
+                          )}
+                        </div>
+                        <select
+                          value={activeNode?.id || ''}
+                          onChange={(e) => handleSelectLessonById(e.target.value)}
+                          className="w-full border-2 border-black px-2 py-1.5 text-xs font-mono font-bold bg-white cursor-pointer truncate shadow-[1px_1px_0px_#000000]"
+                        >
+                          {unlockedNodes.map((n) => (
+                            <option key={n.id} value={n.id}>
+                              {n.code} · {n.title}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {activeNode?.subtitle && (
+                        <p className="text-[11px] font-sans text-neutral-600 leading-snug pt-0.5">
+                          {activeNode.subtitle}
+                        </p>
+                      )}
                     </div>
 
-                    {/* SELECTOR DE VERSIONES DEL NIVEL (PARA CALISTENIA) */}
+                    {/* SELECTOR DE VARIANTES ELEGANTE (SIN SCROLLBAR HORIZONTAL CAÓTICO) */}
                     {activeNode?.isCalisthenics && activeVariants.length > 1 && (
-                      <div className="border-2 border-black p-2 bg-neutral-50 shadow-[2px_2px_0px_#000000] space-y-1.5">
+                      <div className="border-2 border-black p-2.5 bg-white shadow-[2px_2px_0px_#000000] space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-mono uppercase tracking-widest text-neutral-600 font-bold">
-                            Versiones a Superar:
+                          <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-500 font-bold">
+                            Variante:
                           </span>
-                          <span className="text-[11px] font-mono font-bold bg-black text-white px-1.5 py-0.2">
+                          <span className="text-xs font-mono font-bold bg-black text-white px-2 py-0.5">
                             {currentVariantIndex + 1} / {activeVariants.length}
                           </span>
                         </div>
 
-                        {/* Botones de versiones con scroll horizontal */}
-                        <div className="flex items-center gap-1 overflow-x-auto py-1 scrollbar-thin">
-                          {activeVariants.map((v, idx) => (
-                            <button
-                              key={v.id || idx}
-                              onClick={() => {
-                                setNodeVariantIndices((prev) => ({ ...prev, [activeNode.id]: idx }));
-                                setCalisthenicsSeed(Math.floor(Math.random() * 90000 + 10000));
-                              }}
-                              className={`w-6 h-6 shrink-0 border-2 border-black text-xs font-mono font-bold flex items-center justify-center cursor-pointer transition-colors ${
-                                currentVariantIndex === idx
-                                  ? 'bg-black text-white shadow-[1px_1px_0px_#000000]'
-                                  : 'bg-white text-black hover:bg-neutral-200'
-                              }`}
-                              title={`Versión ${idx + 1}: ${v.title}`}
-                            >
-                              {idx + 1}
-                            </button>
-                          ))}
+                        {/* Controles Stepper */}
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const nextIdx = (currentVariantIndex - 1 + activeVariants.length) % activeVariants.length;
+                              setNodeVariantIndices((prev) => ({ ...prev, [activeNode.id]: nextIdx }));
+                              setCalisthenicsSeed(Math.floor(Math.random() * 90000 + 10000));
+                            }}
+                            className="p-1.5 border border-black hover:bg-neutral-100 active:scale-95 cursor-pointer shadow-[1px_1px_0px_#000000] shrink-0"
+                            title="Variante anterior"
+                          >
+                            <ChevronLeft className="w-3.5 h-3.5" />
+                          </button>
+
+                          <select
+                            value={currentVariantIndex}
+                            onChange={(e) => {
+                              const idx = Number(e.target.value);
+                              setNodeVariantIndices((prev) => ({ ...prev, [activeNode.id]: idx }));
+                              setCalisthenicsSeed(Math.floor(Math.random() * 90000 + 10000));
+                            }}
+                            className="flex-1 min-w-0 border border-black px-2 py-1 text-xs font-mono font-bold bg-white cursor-pointer truncate shadow-[1px_1px_0px_#000000]"
+                          >
+                            {activeVariants.map((v, idx) => (
+                              <option key={v.id || idx} value={idx}>
+                                V{idx + 1}: {v.title}
+                              </option>
+                            ))}
+                          </select>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const nextIdx = (currentVariantIndex + 1) % activeVariants.length;
+                              setNodeVariantIndices((prev) => ({ ...prev, [activeNode.id]: nextIdx }));
+                              setCalisthenicsSeed(Math.floor(Math.random() * 90000 + 10000));
+                            }}
+                            className="p-1.5 border border-black hover:bg-neutral-100 active:scale-95 cursor-pointer shadow-[1px_1px_0px_#000000] shrink-0"
+                            title="Siguiente variante"
+                          >
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
                         </div>
 
-                        {/* Nombre de la versión activa */}
-                        <div className="text-[11px] font-sans text-neutral-800 leading-tight border-t border-neutral-300 pt-1.5">
-                          <span className="font-mono font-bold">V{currentVariantIndex + 1}: </span>
-                          <span className="font-semibold">{currentExerciseDef.title}</span>
+                        {/* Descripción concisa de la variante activa */}
+                        <div className="bg-neutral-50 border border-neutral-300 p-2 text-xs">
+                          <div className="font-semibold text-neutral-900 leading-tight">
+                            {currentExerciseDef.title}
+                          </div>
                           {currentExerciseDef.desc && (
-                            <p className="text-[10px] text-neutral-500 font-sans mt-0.5 leading-snug">
+                            <p className="text-[11px] text-neutral-600 mt-1 leading-snug">
                               {currentExerciseDef.desc}
                             </p>
                           )}
@@ -1401,68 +1420,77 @@ export function App() {
                       </div>
                     )}
 
-                    {/* INDICADORES COMPACTOS: MAESTRÍA (3 CUBOS) + FASES (3 BOTONES) EN 1 SOLA LÍNEA */}
-                    <div className="border-2 border-black px-2 py-1 bg-neutral-50 shadow-[2px_2px_0px_#000000] flex items-center justify-between gap-1 text-xs font-mono">
+                    {/* PROGRESO: RACHA DE MAESTRÍA Y FASES CINEMÁTICAS */}
+                    <div className="border-2 border-black p-2.5 bg-white shadow-[2px_2px_0px_#000000] space-y-2">
                       {/* Racha de Maestría */}
-                      <div className="flex items-center gap-1 shrink-0">
-                        <span className="text-[10px] font-bold uppercase text-neutral-500">Maestría:</span>
-                        <div className="flex items-center gap-0.5">
-                          {[0, 1, 2].map((i) => (
-                            <span
-                              key={i}
-                              className={`w-3.5 h-3.5 border border-black flex items-center justify-center text-[8px] font-bold ${
-                                i < currentMasteryStreak
-                                  ? 'bg-black text-white'
-                                  : 'bg-white text-transparent'
-                              }`}
-                            >
-                              ✓
-                            </span>
-                          ))}
+                      <div className="flex items-center justify-between text-xs font-mono">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold uppercase text-neutral-500">Maestría:</span>
+                          <div className="flex items-center gap-1">
+                            {[0, 1, 2].map((i) => (
+                              <span
+                                key={i}
+                                className={`w-4 h-4 border border-black flex items-center justify-center text-[9px] font-bold transition-colors ${
+                                  i < currentMasteryStreak ? 'bg-black text-white' : 'bg-neutral-100 text-transparent'
+                                }`}
+                              >
+                                ✓
+                              </span>
+                            ))}
+                          </div>
+                          <span className="text-xs font-bold tabular-nums ml-0.5">
+                            {currentMasteryStreak}/3
+                          </span>
                         </div>
-                        <span className="text-[10px] font-bold tabular-nums">
-                          {currentMasteryStreak}/3
-                        </span>
                         <button
+                          type="button"
                           onClick={() => setShowMasteryStreakInfo(true)}
-                          className="w-4 h-4 border border-black flex items-center justify-center text-[9px] font-bold hover:bg-black hover:text-white transition-colors cursor-pointer ml-0.5"
-                          title="Información sobre la Racha de Maestría"
+                          className="text-[10px] font-mono text-neutral-500 hover:text-black flex items-center gap-0.5 cursor-pointer underline decoration-dotted"
+                          title="Cómo funciona la racha de maestría"
                         >
-                          i
+                          <span>Info</span>
+                          <Info className="w-3 h-3" />
                         </button>
                       </div>
 
-                      {/* Fases Cinemáticas (SOLO EN TRAZOS) */}
+                      {/* Fases Cinemáticas (solo en calistenia) */}
                       {activeNode?.isCalisthenics && (
-                        <div className="flex items-center gap-1 pl-1.5 border-l border-neutral-300 shrink-0">
-                          <span className="text-[10px] font-bold uppercase text-neutral-500">Fase:</span>
-                          <div className="flex items-center gap-0.5">
+                        <div className="pt-2 border-t border-neutral-200">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[10px] font-bold uppercase font-mono text-neutral-500">
+                              Fase de Motricidad:
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setShowKinematicPhasesInfo(true)}
+                              className="text-[10px] font-mono text-neutral-500 hover:text-black flex items-center gap-0.5 cursor-pointer underline decoration-dotted"
+                              title="Cómo funcionan las 3 fases"
+                            >
+                              <span>Info</span>
+                              <Info className="w-3 h-3" />
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-3 gap-1">
                             {[
-                              { num: 1 as const, label: '1', title: 'Fase 1: Precisión' },
-                              { num: 2 as const, label: '2', title: 'Fase 2: Fluidez' },
-                              { num: 3 as const, label: '3', title: 'Fase 3: Velocidad' },
+                              { num: 1 as const, label: '1. Precisión', desc: 'Fase 1: Control de extremos' },
+                              { num: 2 as const, label: '2. Fluidez', desc: 'Fase 2: Velocidad constante' },
+                              { num: 3 as const, label: '3. Velocidad', desc: 'Fase 3: Inercia de hombro' },
                             ].map((f) => (
                               <button
                                 key={f.num}
+                                type="button"
                                 onClick={() => setCurrentPhase(f.num)}
-                                className={`w-4 h-4 border border-black text-[9px] font-bold flex items-center justify-center cursor-pointer transition-colors ${
+                                className={`py-1 text-[10px] font-mono font-bold border border-black text-center transition-colors cursor-pointer ${
                                   currentPhase === f.num
                                     ? 'bg-black text-white shadow-[1px_1px_0px_#000000]'
-                                    : 'bg-white text-black hover:bg-neutral-200'
+                                    : 'bg-neutral-50 text-neutral-700 hover:bg-neutral-100'
                                 }`}
-                                title={f.title}
+                                title={f.desc}
                               >
                                 {f.label}
                               </button>
                             ))}
                           </div>
-                          <button
-                            onClick={() => setShowKinematicPhasesInfo(true)}
-                            className="w-4 h-4 border border-black flex items-center justify-center text-[9px] font-bold hover:bg-black hover:text-white transition-colors cursor-pointer ml-0.5"
-                            title="Información sobre las 3 Fases Cinemáticas"
-                          >
-                            i
-                          </button>
                         </div>
                       )}
                     </div>
@@ -1481,154 +1509,45 @@ export function App() {
                   />
                 )}
 
-                {/* 3. BOTONES DE ACCIÓN DEL LIENZO (Corregir, Deshacer, Borrar, Siguiente, etc.) */}
-                <div className="border-2 border-black p-2 bg-white shadow-[2px_2px_0px_#000000] space-y-1.5">
-                  <div className="flex items-center justify-between mb-0.5">
-                    <span className="text-[10px] font-mono uppercase tracking-widest text-neutral-500 font-bold">
-                      Acciones:
-                    </span>
-                  </div>
-
-                  {/* Botón Principal Destacado: Corregir / Validar */}
-                  <button
-                    onClick={handleSidebarEvaluate}
-                    className="btn-ink w-full py-1.5 px-2 text-xs font-mono font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
-                    title={activeNode?.isCalisthenics ? "Corregir trazo y ver nota (Enter)" : "Validar perspectiva (Enter)"}
-                  >
-                    <Check className="w-3.5 h-3.5 stroke-[3]" />
-                    <span>{activeNode?.isCalisthenics ? "Corregir Trazo" : "Validar Dibujo"}</span>
-                  </button>
-
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <button
-                      onClick={handleSidebarUndo}
-                      className="btn-ink-outline py-1 px-2 text-xs font-mono font-bold flex items-center justify-center gap-1 cursor-pointer"
-                      title="Deshacer último trazo (Ctrl+Z)"
-                    >
-                      <Undo2 className="w-3.5 h-3.5" />
-                      <span>Deshacer</span>
-                    </button>
-                    <button
-                      onClick={handleSidebarClear}
-                      className="btn-ink-outline py-1 px-2 text-xs font-mono font-bold flex items-center justify-center gap-1 cursor-pointer hover:bg-red-50 hover:text-red-700"
-                      title="Borrar todo el lienzo"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>Borrar</span>
-                    </button>
-                  </div>
-
-                  <button
-                    onClick={handleSidebarNext}
-                    className="btn-ink-outline w-full py-1 px-2 text-xs font-mono font-bold flex items-center justify-center gap-1.5 cursor-pointer"
-                    title="Generar nuevo reto con la misma lección o pasar al siguiente"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    <span>Siguiente / Nuevo</span>
-                  </button>
-
-                  <div className="grid grid-cols-2 gap-1.5 pt-1 border-t border-neutral-200">
-                    <button
-                      onClick={() => setShowUserStrokes((prev) => !prev)}
-                      className={`py-1 px-1.5 text-[11px] font-mono font-bold flex items-center justify-center gap-1 border border-black cursor-pointer transition-colors ${
-                        showUserStrokes ? 'bg-neutral-100 text-black' : 'bg-neutral-200 text-neutral-500 line-through'
-                      }`}
-                      title="Ocultar o mostrar trazo dibujado"
-                    >
-                      {showUserStrokes ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                      <span className="truncate">Trazo</span>
-                    </button>
-                    <button
-                      onClick={() => setShowSolution((prev) => !prev)}
-                      className={`py-1 px-1.5 text-[11px] font-mono font-bold flex items-center justify-center gap-1 border border-black cursor-pointer transition-colors ${
-                        showSolution ? 'bg-neutral-100 text-black' : 'bg-neutral-200 text-neutral-500 line-through'
-                      }`}
-                      title="Ocultar o mostrar guías y solución"
-                    >
-                      {showSolution ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                      <span className="truncate">Solución</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* NOTA Y EVALUACIÓN EN LA BARRA LATERAL (SI SE HA EVALUADO EN TRAZOS) */}
-                {activeNode?.isCalisthenics && strokeEvaluation && (
-                  <div className="border-2 border-black p-2 bg-neutral-50 shadow-[2px_2px_0px_#000000] text-xs space-y-1">
-                    <div className="flex items-center justify-between font-mono font-bold">
-                      <span className="flex items-center gap-1">
-                        {strokeEvaluation.passed ? (
-                          <CheckCircle className="w-3.5 h-3.5 text-black" />
-                        ) : (
-                          <AlertTriangle className="w-3.5 h-3.5 text-black" />
-                        )}
-                        <span>NOTA: {Math.round(strokeEvaluation.overallScore)}%</span>
-                      </span>
-                      <span
-                        className={`text-[9px] px-1 py-0.2 uppercase font-bold ${
-                          strokeEvaluation.passed && strokeEvaluation.overallScore >= 90
-                            ? 'bg-black text-white'
-                            : strokeEvaluation.passed
-                            ? 'bg-neutral-200 text-black border border-black'
-                            : 'bg-white text-black border border-black'
-                        }`}
-                      >
-                        {strokeEvaluation.passed && strokeEvaluation.overallScore >= 90
-                          ? 'Excelente'
-                          : strokeEvaluation.passed
-                          ? 'Aprobado'
-                          : 'Reintentar'}
-                      </span>
-                    </div>
-                    <p className="text-[11px] font-sans text-neutral-700 leading-snug">
-                      {strokeEvaluation.feedbackTitle}
-                    </p>
-                  </div>
-                )}
-
-                {/* 4. DETALLES Y GUÍA DE LA LECCIÓN ACTIVA */}
-                {activeNode && (
-                  <div className="border border-black p-2.5 bg-neutral-50 text-xs">
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <span className="font-mono font-bold bg-black text-white px-1.5 py-0.2 text-[10px]">
-                        {activeNode.code}
-                      </span>
-                      <span className="font-display font-bold truncate">
-                        {activeNode.title}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-neutral-600 font-sans leading-snug">
-                      {activeNode.subtitle}
-                    </p>
-                  </div>
-                )}
-
-                {/* Sensei Cubo opcional al fondo del sidebar */}
-                <div className="pt-2 flex justify-center">
+                {/* SENSEI CUBO Y BOTÓN MODO ENFOQUE */}
+                <div className="pt-2 flex flex-col items-center gap-2">
                   <SenseiCubo
                     mood={avatarMood}
                     isDrawing={isUserDrawing}
-                    size={110}
+                    size={90}
                     onPoke={() => {
                       setAvatarMood('poked');
                       setTimeout(() => setAvatarMood('neutral'), 1800);
                     }}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setIsSidebarCollapsed(true)}
+                    className="w-full py-1.5 px-2 text-[11px] font-mono font-bold border border-neutral-300 text-neutral-600 hover:border-black hover:text-black hover:bg-neutral-50 flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-[1px_1px_0px_#000000]"
+                    title="Ocultar barra lateral para dibujar con el lienzo maximizado"
+                  >
+                    <Maximize2 className="w-3.5 h-3.5" />
+                    <span>Modo Enfoque (Maximizar)</span>
+                  </button>
                 </div>
               </div>
             </aside>
+          )}
 
-            {/* BOTÓN LATERAL PARA OCULTAR / DESPLEGAR LA BARRA */}
-            <div className="relative z-30">
+            {/* BOTÓN FLOTANTE PARA RESTAURAR EL PANEL CUANDO ESTÁ OCULTO */}
+            {isSidebarCollapsed && (
               <button
-                onClick={() => setIsSidebarCollapsed((prev) => !prev)}
-                className="absolute top-3 left-1 bg-black text-white p-2 border-2 border-black shadow-[2px_2px_0px_#ffffff] cursor-pointer hover:scale-105 active:scale-95 transition-all flex items-center justify-center"
-                title={isSidebarCollapsed ? "Mostrar panel lateral" : "Ocultar panel lateral (maximizar lienzo)"}
+                type="button"
+                onClick={() => setIsSidebarCollapsed(false)}
+                className="absolute top-3 left-3 z-30 bg-white hover:bg-neutral-100 text-black px-2.5 py-1.5 border-2 border-black shadow-[2px_2px_0px_#000000] text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer transition-transform hover:scale-105 active:scale-95"
+                title="Mostrar panel de práctica"
               >
-                {isSidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+                <PanelLeft className="w-4 h-4 stroke-[2.5]" />
+                <span className="hidden sm:inline">Panel</span>
               </button>
-            </div>
+            )}
 
-            {/* ÁREA CENTRAL: LIENZO 100% CENTRADO Y MÁS GRANDE */}
+            {/* ÁREA CENTRAL: LIENZO 100% CENTRADO Y PROTAGONISTA */}
             <div className="flex-1 flex flex-col items-center justify-center p-3 sm:p-6 overflow-hidden min-h-0">
               <div className="w-full flex flex-col items-center justify-center max-w-2xl lg:max-w-3xl">
                 {activeNode?.isCalisthenics ? (
@@ -1638,6 +1557,8 @@ export function App() {
                     currentPhase={currentPhase}
                     showSolution={showSolution}
                     showUserStrokes={showUserStrokes}
+                    onToggleSolution={() => setShowSolution((prev) => !prev)}
+                    onToggleUserStrokes={() => setShowUserStrokes((prev) => !prev)}
                     seed={calisthenicsSeed}
                     onNewSeed={setCalisthenicsSeed}
                     onDrawingStateChange={setIsUserDrawing}
