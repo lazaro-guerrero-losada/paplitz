@@ -77,13 +77,21 @@ function loadAndSanitizeUnits(savedKey: string, defaultUnits: Unit[]): Unit[] {
   if (saved) {
     try {
       const parsed: Unit[] = JSON.parse(saved);
+      const allSavedNodes = parsed.flatMap((u) => u.nodes || []);
       loadedUnits = defaultUnits.map((defaultUnit) => {
-        const savedUnit = parsed.find((u) => u.id === defaultUnit.id);
-        if (!savedUnit) return defaultUnit;
         return {
           ...defaultUnit,
           nodes: defaultUnit.nodes.map((defaultNode) => {
-            const savedNode = savedUnit.nodes.find((n) => n.id === defaultNode.id);
+            const savedNode = allSavedNodes.find(
+              (n) =>
+                n.id === defaultNode.id ||
+                n.title === defaultNode.title ||
+                (defaultNode.id === 'cal_u4_straight' && n.id === 'cal_u5_straight') ||
+                (defaultNode.id === 'cal_u4_curves' && n.id === 'cal_u5_curves') ||
+                (defaultNode.id === 'cal_u4_density' && n.id === 'cal_u5_density') ||
+                (defaultNode.id === 'cal_u5_c' && n.id === 'cal_u4_c') ||
+                (defaultNode.id === 'cal_u5_s' && n.id === 'cal_u4_s')
+            );
             return savedNode
               ? { ...defaultNode, status: savedNode.status, score: savedNode.score }
               : defaultNode;

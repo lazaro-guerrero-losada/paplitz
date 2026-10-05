@@ -268,44 +268,6 @@ function buildCalisthenicsModuleUnits(): Unit[] {
     {
       id: 'unit-cal-4',
       number: 4,
-      title: 'Arcos y Ondas Biomecánicas (Curvas en C y S)',
-      description: 'Transición a la forma orgánica: arcos parabólicos en C y curvas sinusoidales en S de cadencia continua.',
-      bookChapter: 'Paplitz Calisthenics — Arcos en C (CC.01-10) y Ondas en S (CS.11-20)',
-      guidebookContent: {
-        title: 'Curvatura Biomecánica Continua',
-        axioms: [
-          'Las curvas demandan una sincronía entre el codo y la muñeca sin tirones angulares.',
-          'En la onda en S, el punto de inflexión debe ser suave y continuo, sin formar esquinas.',
-          'Conecta con elasticidad los puntos de cresta y valle marcados en la trayectoria.',
-        ],
-        diagramNotes: 'Comienza despacio en Fase 1 (Precisión) y acelera a Fase 2 (Fluidez) y Fase 3 (Velocidad).',
-      },
-      nodes: [
-        createGroupedCalisthenicsNode(
-          'cal_u4_c',
-          'C4.1',
-          'Control de Curvatura: Arcos en C (⌒)',
-          'Arcos cóncavos y convexos de flecha suave, media y pronunciada',
-          all.filter((e) => e.id?.startsWith('cc_')),
-          globalIndex++,
-          'medium',
-          35
-        ),
-        createGroupedCalisthenicsNode(
-          'cal_u4_s',
-          'C4.2',
-          'Puntos de Inflexión: Ondas en S (∿)',
-          'Transición de doble curvatura continua sin aristas vivas ni saltos',
-          all.filter((e) => e.id?.startsWith('cs_')),
-          globalIndex++,
-          'hard',
-          45
-        ),
-      ],
-    },
-    {
-      id: 'unit-cal-5',
-      number: 5,
       title: 'Carriles de Ritmo y Espaciado Interlineal',
       description: 'Consistencia de trama en bandas acotadas: espaciado x y x/2, diagonales, quiebros en V, relámpagos y ondas.',
       bookChapter: 'Paplitz Calisthenics — Carriles y Espaciado Rítmico E1.1 a E17.1',
@@ -320,8 +282,8 @@ function buildCalisthenicsModuleUnits(): Unit[] {
       },
       nodes: [
         createGroupedCalisthenicsNode(
-          'cal_u5_straight',
-          'C5.1',
+          'cal_u4_straight',
+          'C4.1',
           'Espaciado Ortogonal y Cuñas Angulares',
           'Bandas paralelas rectas, diagonales, quiebros en V y chevron',
           all.filter(
@@ -340,8 +302,8 @@ function buildCalisthenicsModuleUnits(): Unit[] {
           40
         ),
         createGroupedCalisthenicsNode(
-          'cal_u5_curves',
-          'C5.2',
+          'cal_u4_curves',
+          'C4.2',
           'Espaciado de Arcos y Ondas Curvas',
           'Ondas sinusoidales, arcos en bóveda y curvas de nivel en carril',
           all.filter((e) => e.id?.startsWith('sp_') && e.spacingTrackConfig?.kinkType?.startsWith('curve_')),
@@ -350,8 +312,8 @@ function buildCalisthenicsModuleUnits(): Unit[] {
           45
         ),
         createGroupedCalisthenicsNode(
-          'cal_u5_density',
-          'C5.3',
+          'cal_u4_density',
+          'C4.3',
           'Fraccionamiento y Densidad de Trama',
           'Subdivisión de paso a la mitad (paso x/2), bloques discontinuos y densidad graduada',
           all.filter(
@@ -362,6 +324,44 @@ function buildCalisthenicsModuleUnits(): Unit[] {
           globalIndex++,
           'hard',
           50
+        ),
+      ],
+    },
+    {
+      id: 'unit-cal-5',
+      number: 5,
+      title: 'Arcos y Ondas Biomecánicas (Curvas en C y S)',
+      description: 'Transición a la forma orgánica: arcos parabólicos en C y curvas sinusoidales en S de cadencia continua.',
+      bookChapter: 'Paplitz Calisthenics — Arcos en C (CC.01-10) y Ondas en S (CS.11-20)',
+      guidebookContent: {
+        title: 'Curvatura Biomecánica Continua',
+        axioms: [
+          'Las curvas demandan una sincronía entre el codo y la muñeca sin tirones angulares.',
+          'En la onda en S, el punto de inflexión debe ser suave y continuo, sin formar esquinas.',
+          'Conecta con elasticidad los puntos de cresta y valle marcados en la trayectoria.',
+        ],
+        diagramNotes: 'Comienza despacio en Fase 1 (Precisión) y acelera a Fase 2 (Fluidez) y Fase 3 (Velocidad).',
+      },
+      nodes: [
+        createGroupedCalisthenicsNode(
+          'cal_u5_c',
+          'C5.1',
+          'Control de Curvatura: Arcos en C (⌒)',
+          'Arcos cóncavos y convexos de flecha suave, media y pronunciada',
+          all.filter((e) => e.id?.startsWith('cc_')),
+          globalIndex++,
+          'medium',
+          35
+        ),
+        createGroupedCalisthenicsNode(
+          'cal_u5_s',
+          'C5.2',
+          'Puntos de Inflexión: Ondas en S (∿)',
+          'Transición de doble curvatura continua sin aristas vivas ni saltos',
+          all.filter((e) => e.id?.startsWith('cs_')),
+          globalIndex++,
+          'hard',
+          45
         ),
       ],
     },
