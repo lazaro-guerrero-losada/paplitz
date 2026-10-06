@@ -15,6 +15,7 @@ import {
   Copy,
   X,
   AlertTriangle,
+  Target,
 } from 'lucide-react';
 import {
   LabExerciseDef,
@@ -1083,7 +1084,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                   return (
                     <span
                       key={i}
-                      className={`w-3.5 h-3.5 border border-black flex items-center justify-center text-[8px] font-bold transition-all ${
+                      className={`w-3.5 h-3.5 border border-black flex items-center justify-center transition-all ${
                         isJustFilled
                           ? 'bg-black text-white animate-mastery-pop scale-125 z-10 shadow-[0_0_0_2px_#000000]'
                           : isFilled
@@ -1091,7 +1092,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                           : 'bg-neutral-100 text-transparent'
                       }`}
                     >
-                      ✓
+                      {isFilled && <Check className="w-2.5 h-2.5 stroke-[3] text-white" />}
                     </span>
                   );
                 })}
@@ -1196,8 +1197,11 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                       </div>
                     </div>
 
-                    <p className="text-[11px] text-neutral-800 bg-neutral-50 p-2 border border-black leading-snug">
-                      🎯 Has superado las 3 fases (Precisión, Fluidez y Velocidad) de esta versión. Ahora comienza la versión {phaseTransitionNotice.toVersion} desde la Fase 1.
+                    <p className="text-[11px] text-neutral-800 bg-neutral-50 p-2 border border-black leading-snug flex items-start gap-1.5 text-left">
+                      <Sparkles className="w-4 h-4 text-black shrink-0 mt-0.5 stroke-[2.5]" />
+                      <span>
+                        Has superado las 3 fases (Precisión, Fluidez y Velocidad) de esta versión. Ahora comienza la versión {phaseTransitionNotice.toVersion} desde la Fase 1.
+                      </span>
                     </p>
 
                     <button
@@ -1238,10 +1242,22 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                       </div>
                     </div>
 
-                    <p className="text-[11px] text-neutral-800 bg-neutral-50 p-2 border border-black leading-snug">
-                      {phaseTransitionNotice.toPhase === 2
-                        ? '🎯 Has consolidado la precisión de extremos. Ahora en Fase 2 (Fluidez): Dibuja a velocidad constante sin titubeos ni paradas intermedias.'
-                        : '⚡ Has dominado la uniformidad del trazo. Ahora en Fase 3 (Velocidad): Ejecuta el trazo con inercia rápida e impulso reflejo.'}
+                    <p className="text-[11px] text-neutral-800 bg-neutral-50 p-2 border border-black leading-snug flex items-start gap-1.5 text-left">
+                      {phaseTransitionNotice.toPhase === 2 ? (
+                        <>
+                          <Target className="w-4 h-4 text-black shrink-0 mt-0.5 stroke-[2.5]" />
+                          <span>
+                            <strong>Fase 2 (Fluidez):</strong> Has consolidado la precisión de extremos. Dibuja a velocidad constante sin titubeos ni paradas intermedias.
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="w-4 h-4 text-black shrink-0 mt-0.5 stroke-[2.5]" />
+                          <span>
+                            <strong>Fase 3 (Velocidad):</strong> Has dominado la uniformidad del trazo. Ejecuta el trazo con inercia rápida e impulso reflejo.
+                          </span>
+                        </>
+                      )}
                     </p>
 
                     <button
@@ -1492,7 +1508,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                       evaluation.passed ? 'bg-black text-white' : 'bg-white text-neutral-800'
                     }`}
                   >
-                    {evaluation.passed ? 'Aprobado ✅' : 'Reintentar ⚠️'}
+                    {evaluation.passed ? 'Aprobado' : 'Reintentar'}
                   </span>
                   <span className="text-[10px] text-neutral-600">
                     Fase {currentPhase} · {evaluation.phasePassed ? 'Fase Superada' : 'Fase Pendiente'}
@@ -1539,7 +1555,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                     <div className="p-2 bg-neutral-50 border border-neutral-300">
                       <span className="text-[10px] text-neutral-500 block">Exigencia Fase {currentPhase}</span>
                       <span className="font-bold text-xs truncate block" title={evaluation.kinematics.phaseRequirementText}>
-                        {evaluation.phasePassed ? 'Cumplida ✅' : 'No alcanzada ❌'}
+                        {evaluation.phasePassed ? 'Cumplida' : 'No alcanzada'}
                       </span>
                       <span className="text-[10px] text-neutral-400 block">
                         {currentPhase === 1 ? 'Ritmo libre' : currentPhase === 2 ? 'Fluidez ≥60%' : 'Velocidad ≥480 px/s'}
