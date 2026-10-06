@@ -11,6 +11,8 @@ import {
   Shuffle,
   Target,
   AlertTriangle,
+  Flag,
+  Play,
 } from 'lucide-react';
 import { LessonNode, MODULE_CALISTHENICS } from '../lib/curriculumData';
 import { AvatarMood } from '../lib/avatarTypes';
@@ -162,10 +164,22 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
   const [selectedNodeId, setSelectedNodeId] = useState<string>(defaultCalNode.id);
   const selectedNode = selectableNodes.find((n) => n.id === selectedNodeId) || defaultCalNode;
 
-  // Modos de juego: 'survival' (evitar desbordamiento de 6 líneas) o 'blitz' (60s contrarreloj)
+  // Duración de cada Acto / Stage en segundos (30s)
+  const STAGE_DURATION = 30;
+
+  // Modos de juego: 'survival' (por actos de 30s) o 'blitz' (60s contrarreloj)
   const [gameMode, setGameMode] = useState<'survival' | 'blitz'>('survival');
-  const [gameState, setGameState] = useState<'idle' | 'playing' | 'gameover'>('idle');
-  const [gameOverReason, setGameOverReason] = useState<'overflow' | 'timeout'>('overflow');
+  const [gameState, setGameState] = useState<'idle' | 'playing' | 'stage_break' | 'gameover'>('idle');
+  const [gameOverReason, setGameOverReason] = useState<'overflow' | 'timeout' | 'manual'>('overflow');
+
+  // Sistema de Actos / Stages
+  const [currentStage, setCurrentStage] = useState<number>(1);
+  const [stageSecondsLeft, setStageSecondsLeft] = useState<number>(STAGE_DURATION);
+  const [stageClearedCount, setStageClearedCount] = useState<number>(0);
+  const [stageScores, setStageScores] = useState<number[]>([]);
+  const [stageBestCombo, setStageBestCombo] = useState<number>(0);
+  const [stagesCompleted, setStagesCompleted] = useState<number>(0);
+  const [bestStage, setBestStage] = useState<number>(1);
 
   // Líneas activas en pantalla
   const [activeLines, setActiveLines] = useState<ActiveRushLine[]>([]);
@@ -185,9 +199,12 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
     try {
       const s = localStorage.getItem(`paplitz_rush_survival_${scoreKey}`) || '0';
       const b = localStorage.getItem(`paplitz_rush_blitz_${scoreKey}`) || '0';
+      const stg = localStorage.getItem(`paplitz_rush_stage_${scoreKey}`) || '1';
       setHighScores({ survival: parseInt(s, 10), blitz: parseInt(b, 10) });
+      setBestStage(parseInt(stg, 10));
     } catch {
       setHighScores({ survival: 0, blitz: 0 });
+      setBestStage(1);
     }
   }, [scoreKey]);
 
@@ -196,11 +213,34 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
   const currentStrokeRef = useRef<Point[]>([]);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const spawnTimerRef = useRef<number | null>(null);
-  const gameLoopRef = useRef<number | null>(null);
+  const nextSpawnTimeRef = useRef<number>(0);
+  const activeLinesRef = useRef<ActiveRushLine[]>([]);
+  const currentStageRef = useRef<number>(1);
+
+  // Sincronizar referencias para callbacks y loops
+  useEffect(() => {
+    activeLinesRef.current = activeLines;
+  }, [activeLines]);
+
+  useEffect(() => {
+    currentStageRef.current = currentStage;
+  }, [currentStage]);
 
   // Máximo número de líneas simultáneas antes de desbordamiento (Game Over)
   const MAX_LINES_OVERFLOW = 6;
+
+  // Cálculo de intervalo de spawn según el Stage de dificultad y número de líneas
+  const getStageSpawnInterval = useCallback((stage: number, lineCount: number): number => {
+    // Stage 1: ~2300ms
+    // Stage 2: ~1800ms
+    // Stage 3: ~1400ms
+    // Stage 4: ~1100ms
+    // Stage 5+: ~900ms
+    const baseInterval = Math.max(900, 2300 - (stage - 1) * 350);
+    if (lineCount === 0) return 250;
+    if (lineCount === 1) return Math.max(450, Math.round(baseInterval * 0.75));
+    return baseInterval;
+  }, []);
 
   // Genera una nueva línea basada en un nodo de calistenia
   const spawnLineForNode = useCallback(
@@ -318,19 +358,34 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
     setLastEval(null);
     setFlashBanner(null);
 
+    // Reiniciar sistema de Actos / Stages
+    setCurrentStage(1);
+    currentStageRef.current = 1;
+    setStageSecondsLeft(STAGE_DURATION);
+    setStageClearedCount(0);
+    setStageScores([]);
+    setStageBestCombo(0);
+    setStagesCompleted(0);
+
     // Inicializar con 2 líneas en pantalla de inmediato
     const firstLine = spawnNextLine([]);
     const secondLine = spawnNextLine([firstLine]);
     setActiveLines([firstLine, secondLine]);
-  }, [gameMode, spawnNextLine]);
+    activeLinesRef.current = [firstLine, secondLine];
 
-  // Fin de la partida
+    // Programar primer spawn de la avalancha
+    const firstDelay = getStageSpawnInterval(1, 2);
+    nextSpawnTimeRef.current = Date.now() + firstDelay;
+  }, [gameMode, spawnNextLine, getStageSpawnInterval, STAGE_DURATION]);
+
+  // Fin de la partida (por desbordamiento, tiempo o finalización voluntaria del usuario)
   const finishGame = useCallback(
-    (reason: 'overflow' | 'timeout') => {
+    (reason: 'overflow' | 'timeout' | 'manual') => {
       setGameOverReason(reason);
       setGameState('gameover');
-      if (spawnTimerRef.current) clearTimeout(spawnTimerRef.current);
-      if (gameLoopRef.current) clearInterval(gameLoopRef.current);
+      setUserStroke(null);
+      setIsDrawing(false);
+      if (onDrawingStateChange) onDrawingStateChange(false);
 
       const count = clearedScores.length;
       try {
@@ -351,6 +406,15 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
             // Ignorar
           }
         }
+        try {
+          const prevBestStage = parseInt(localStorage.getItem(`paplitz_rush_stage_${scoreKey}`) || '1', 10);
+          if (currentStageRef.current > prevBestStage) {
+            localStorage.setItem(`paplitz_rush_stage_${scoreKey}`, currentStageRef.current.toString());
+            setBestStage(currentStageRef.current);
+          }
+        } catch {
+          // Ignorar
+        }
       } else {
         if (count > highScores.blitz) {
           setHighScores((prev) => ({ ...prev, blitz: count }));
@@ -368,57 +432,114 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
       }
 
       if (onAvatarMoodChange) {
-        onAvatarMoodChange(count > 6 ? 'success-stars' : 'fail-spiral');
+        if (reason === 'manual') {
+          onAvatarMoodChange('success-stars');
+        } else {
+          onAvatarMoodChange(count > 6 ? 'success-stars' : 'fail-spiral');
+        }
         setTimeout(() => onAvatarMoodChange('neutral'), 3000);
       }
     },
-    [clearedScores, gameMode, highScores, onAvatarMoodChange, onAwardXP, scoreKey]
+    [clearedScores, gameMode, highScores, onAvatarMoodChange, onAwardXP, onDrawingStateChange, scoreKey]
   );
 
-  // Spawner dinámico e inteligente: mucho más rápido y sin esperas si hay pocas o cero líneas
+  // Superación de un Acto / Stage (Pausa táctica y estadísticas)
+  const handleStageClear = useCallback(() => {
+    setGameState('stage_break');
+    setUserStroke(null);
+    setIsDrawing(false);
+    if (onDrawingStateChange) onDrawingStateChange(false);
+
+    // Bonus de XP por superar el Acto
+    const stageBonusXP = 30 + Math.round(stageClearedCount * 4);
+    onAwardXP(stageBonusXP);
+
+    if (onAvatarMoodChange) {
+      onAvatarMoodChange('success-stars');
+      setTimeout(() => onAvatarMoodChange('neutral'), 3000);
+    }
+
+    setStagesCompleted((prev) => {
+      const nextCompleted = prev + 1;
+      try {
+        const prevBestStage = parseInt(localStorage.getItem(`paplitz_rush_stage_${scoreKey}`) || '1', 10);
+        if (nextCompleted + 1 > prevBestStage) {
+          localStorage.setItem(`paplitz_rush_stage_${scoreKey}`, (nextCompleted + 1).toString());
+          setBestStage(nextCompleted + 1);
+        }
+      } catch {
+        // Ignorar
+      }
+      return nextCompleted;
+    });
+
+    // Limpiar líneas activas del lienzo para dar descanso visual
+    setActiveLines([]);
+    activeLinesRef.current = [];
+  }, [stageClearedCount, onAwardXP, onAvatarMoodChange, onDrawingStateChange, scoreKey]);
+
+  // Continuar al siguiente Acto / Stage con mayor dificultad
+  const handleNextStage = useCallback(() => {
+    const nextStage = currentStage + 1;
+    setCurrentStage(nextStage);
+    currentStageRef.current = nextStage;
+    setStageSecondsLeft(STAGE_DURATION);
+    setStageClearedCount(0);
+    setStageScores([]);
+    setStageBestCombo(0);
+    setUserStroke(null);
+    setLastEval(null);
+
+    // Inicializar con 2 líneas para el nuevo acto
+    const l1 = spawnNextLine([]);
+    const l2 = spawnNextLine([l1]);
+    setActiveLines([l1, l2]);
+    activeLinesRef.current = [l1, l2];
+
+    const firstDelay = getStageSpawnInterval(nextStage, 2);
+    nextSpawnTimeRef.current = Date.now() + firstDelay;
+
+    setGameState('playing');
+  }, [currentStage, spawnNextLine, getStageSpawnInterval, STAGE_DURATION]);
+
+  // Loop de la Avalancha: ticks continuos de 100ms que NO se resetean cada vez que el usuario dibuja
   useEffect(() => {
     if (gameState !== 'playing') return;
 
-    let delayMs: number;
-    const count = activeLines.length;
+    const spawnCheck = window.setInterval(() => {
+      const now = Date.now();
+      if (now >= nextSpawnTimeRef.current) {
+        setActiveLines((prev) => {
+          if (prev.length >= MAX_LINES_OVERFLOW) {
+            finishGame('overflow');
+            return prev;
+          }
 
-    if (count === 0) {
-      // 0 líneas en pantalla: spawn casi instantáneo (200ms) para cero aburrimiento
-      delayMs = 200;
-    } else if (count === 1) {
-      // 1 línea: aparición rápida y viva
-      const speedUp = Math.min(450, clearedScores.length * 30);
-      delayMs = Math.max(700, 1100 - speedUp);
-    } else {
-      // Líneas acumuladas (2, 3, 4, 5):
-      // El ritmo varía adaptativamente según la acumulación y las líneas resueltas
-      const baseDelay = 1600 + (count - 2) * 200;
-      const speedUp = Math.min(800, clearedScores.length * 35);
-      delayMs = Math.max(850, baseDelay - speedUp);
-    }
+          const stage = currentStageRef.current;
+          // Ráfaga doble a partir del Acto 2 si hay pocas líneas (≤2)
+          const shouldDouble = stage >= 2 && prev.length <= 2 && Math.random() < 0.22;
 
-    const timer = window.setTimeout(() => {
-      setActiveLines((prev) => {
-        if (prev.length >= MAX_LINES_OVERFLOW) {
-          finishGame('overflow');
-          return prev;
-        }
+          const l1 = spawnNextLine(prev);
+          const updated = [...prev, l1];
+          if (shouldDouble && updated.length < MAX_LINES_OVERFLOW) {
+            updated.push(spawnNextLine(updated));
+          }
 
-        const newLine = spawnNextLine(prev);
-        const updated = [...prev, newLine];
+          if (updated.length >= MAX_LINES_OVERFLOW) {
+            finishGame('overflow');
+          }
+          return updated;
+        });
 
-        if (updated.length >= MAX_LINES_OVERFLOW) {
-          finishGame('overflow');
-        }
-        return updated;
-      });
-    }, delayMs);
+        const nextDelay = getStageSpawnInterval(currentStageRef.current, activeLinesRef.current.length);
+        nextSpawnTimeRef.current = now + nextDelay;
+      }
+    }, 100);
 
-    spawnTimerRef.current = timer;
-    return () => clearTimeout(timer);
-  }, [gameState, activeLines.length, clearedScores.length, spawnNextLine, finishGame]);
+    return () => clearInterval(spawnCheck);
+  }, [gameState, finishGame, spawnNextLine, getStageSpawnInterval, MAX_LINES_OVERFLOW]);
 
-  // Temporizador principal de juego
+  // Temporizador principal de juego (1s)
   useEffect(() => {
     if (gameState !== 'playing') return;
 
@@ -432,13 +553,20 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
           return prev - 1;
         });
       } else {
+        // Supervivencia con Stages (Actos de 30s)
         setSurvivalTime((prev) => prev + 1);
+        setStageSecondsLeft((prev) => {
+          if (prev <= 1) {
+            handleStageClear();
+            return STAGE_DURATION;
+          }
+          return prev - 1;
+        });
       }
     }, 1000);
 
-    gameLoopRef.current = interval;
     return () => clearInterval(interval);
-  }, [gameState, gameMode, finishGame]);
+  }, [gameState, gameMode, finishGame, handleStageClear, STAGE_DURATION]);
 
   // Renderizado del lienzo
   const renderCanvas = useCallback(() => {
@@ -679,24 +807,21 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
       setActiveLines((prev) => {
         const nextLines = prev.filter((l) => l.id !== targetLine.id);
         // Si al eliminar esta línea la pantalla queda VACÍA (0 líneas),
-        // programar un spawn inmediato en 200ms para que nunca haya aburrimiento
+        // programar un spawn inmediato en 250ms para que nunca haya aburrimiento
         if (nextLines.length === 0) {
-          if (spawnTimerRef.current) clearTimeout(spawnTimerRef.current);
-          spawnTimerRef.current = window.setTimeout(() => {
-            setActiveLines((cur) => {
-              if (cur.length >= MAX_LINES_OVERFLOW) return cur;
-              return [...cur, spawnNextLine(cur)];
-            });
-          }, 200);
+          nextSpawnTimeRef.current = Math.min(nextSpawnTimeRef.current, Date.now() + 250);
         }
         return nextLines;
       });
 
       setClearedScores((prev) => [...prev, evalResult.score]);
+      setStageClearedCount((prev) => prev + 1);
+      setStageScores((prev) => [...prev, evalResult.score]);
 
       const nextCombo = comboStreak + 1;
       setComboStreak(nextCombo);
       if (nextCombo > bestCombo) setBestCombo(nextCombo);
+      setStageBestCombo((prev) => Math.max(prev, nextCombo));
 
       const xp = evalResult.score >= 90 ? 25 : 12;
       onAwardXP(xp);
@@ -863,14 +988,46 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
               </select>
             </div>
           ) : (
-            <div className="p-1.5 bg-neutral-50 border border-black text-[10px] text-neutral-600 leading-tight">
-              🎲 <strong>Modo Dinámico:</strong> Cada trazo generado es diferente (horizontales, verticales, diagonales y curvas).
+            <div className="p-1.5 bg-neutral-50 border border-black text-[10px] text-neutral-600 leading-tight flex items-center gap-1.5">
+              <Shuffle className="w-3.5 h-3.5 shrink-0 text-black stroke-[2.5]" />
+              <span><strong>Modo Dinámico:</strong> Cada trazo generado es diferente (horizontales, verticales, diagonales y curvas).</span>
             </div>
           )}
         </div>
 
         {/* PANEL DE ESTADÍSTICAS EN VIVO */}
         <div className="space-y-2 pt-1 border-t-2 border-black">
+          {/* Acto actual y temporizador hacia el descanso (en Supervivencia) */}
+          {gameMode === 'survival' && (
+            <div className="border-2 border-black p-2 bg-neutral-50 shadow-[2px_2px_0px_#000000] space-y-1.5">
+              <div className="flex items-center justify-between text-[10px] font-bold uppercase">
+                <span className="flex items-center gap-1 text-black font-black">
+                  <Sparkles className="w-3 h-3 text-black stroke-[2.5]" />
+                  <span>Acto {currentStage}</span>
+                </span>
+                <span className="text-neutral-500 font-mono">
+                  Descanso en: <strong className="text-black font-bold">{stageSecondsLeft}s</strong>
+                </span>
+              </div>
+              {/* Barra de progreso de tiempo del acto */}
+              <div className="w-full h-1.5 bg-neutral-200 border border-black overflow-hidden">
+                <div
+                  className="h-full bg-black transition-all duration-300"
+                  style={{
+                    width: `${Math.max(
+                      0,
+                      Math.min(100, ((STAGE_DURATION - stageSecondsLeft) / STAGE_DURATION) * 100)
+                    )}%`,
+                  }}
+                />
+              </div>
+              <div className="flex items-center justify-between text-[9px] text-neutral-500 font-mono">
+                <span>Dificultad Nivel {currentStage}</span>
+                <span>{(getStageSpawnInterval(currentStage, 2) / 1000).toFixed(1)}s / trazo</span>
+              </div>
+            </div>
+          )}
+
           {/* Saturación en pantalla con indicador visual */}
           <div
             className={`border-2 border-black p-2.5 shadow-[2px_2px_0px_#000000] space-y-1.5 ${
@@ -955,25 +1112,42 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
           </div>
           <div className="flex justify-between">
             <span className="text-neutral-500">Récord Supervivencia:</span>
-            <span className="font-bold">{highScores.survival}</span>
+            <span className="font-bold">{highScores.survival} líneas</span>
           </div>
+          {gameMode === 'survival' && (
+            <div className="flex justify-between">
+              <span className="text-neutral-500">Mejor Acto Alcanzado:</span>
+              <span className="font-bold">Acto {bestStage}</span>
+            </div>
+          )}
           <div className="flex justify-between">
             <span className="text-neutral-500">Récord Blitz:</span>
-            <span className="font-bold">{highScores.blitz}</span>
+            <span className="font-bold">{highScores.blitz} líneas</span>
           </div>
         </div>
 
-        {/* BOTÓN INICIAR O REINICIAR */}
+        {/* BOTONES DE ACCIÓN: FINALIZAR PARTIDA, REINICIAR O EMPEZAR */}
         <div className="pt-2 mt-auto">
           {gameState === 'playing' ? (
-            <button
-              type="button"
-              onClick={() => startGame(gameMode)}
-              className="w-full btn-ink-outline py-2 px-3 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] hover:bg-neutral-100"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reiniciar Partida</span>
-            </button>
+            <div className="space-y-1.5">
+              <button
+                type="button"
+                onClick={() => finishGame('manual')}
+                className="w-full btn-ink py-2 px-3 text-xs font-bold uppercase flex items-center justify-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] hover:bg-neutral-900"
+                title="Finalizar partida y registrar tu progreso actual"
+              >
+                <Flag className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>Finalizar Partida</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => startGame(gameMode)}
+                className="w-full btn-ink-outline py-1.5 px-3 text-[11px] font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-[1px_1px_0px_#000000] hover:bg-neutral-100"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Reiniciar</span>
+              </button>
+            </div>
           ) : (
             <button
               type="button"
@@ -1001,6 +1175,14 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
             </div>
           )}
 
+          {/* HUD de Acto en vivo en el lienzo */}
+          {gameState === 'playing' && gameMode === 'survival' && (
+            <div className="absolute top-2.5 right-2.5 z-20 flex items-center gap-1.5 px-2.5 py-1 bg-white/95 border-2 border-black font-mono text-[10px] font-bold shadow-[2px_2px_0px_#000000] pointer-events-none">
+              <span className="bg-black text-white px-1.5 py-0.2">ACTO {currentStage}</span>
+              <span className="text-neutral-600">Descanso en: {stageSecondsLeft}s</span>
+            </div>
+          )}
+
           {/* Pantalla de inicio previa sobre el lienzo */}
           {gameState === 'idle' && (
             <div className="absolute inset-0 bg-white/95 backdrop-blur-xs flex flex-col items-center justify-center p-6 border-2 border-black z-20 text-center font-mono">
@@ -1015,13 +1197,21 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
                   <>Las líneas aparecen según <strong>{selectedNode.code} · {selectedNode.title}</strong>. Traza de <strong>① a ②</strong> con nota <strong>≥70%</strong>.</>
                 )}
                 <br />
-                ¡Si fallas no se quitarán y se acumularán hasta desbordar la pantalla (máx. {MAX_LINES_OVERFLOW})!
+                {gameMode === 'survival' ? (
+                  <><strong>Supervivencia por Actos:</strong> Resiste oleadas de {STAGE_DURATION}s. Entre actos tendrás pausas de descanso con estadísticas y cada vez mayor dificultad.</>
+                ) : (
+                  <><strong>Blitz 60s:</strong> Elimina todas las líneas posibles antes de que termine el tiempo.</>
+                )}
               </p>
 
               <div className="my-4 p-3 border-2 border-black bg-neutral-50 text-xs w-64 space-y-1">
                 <div className="flex justify-between">
                   <span className="text-neutral-500">Récord Supervivencia:</span>
                   <span className="font-bold">{highScores.survival} líneas</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-neutral-500">Mejor Acto Alcanzado:</span>
+                  <span className="font-bold">Acto {bestStage}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-neutral-500">Récord Blitz (60s):</span>
@@ -1035,8 +1225,82 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
                 className="btn-ink px-6 py-2.5 text-xs uppercase font-bold flex items-center gap-2 cursor-pointer shadow-[3px_3px_0px_#000000] hover:bg-neutral-900"
               >
                 <Sparkles className="w-4 h-4 fill-white stroke-none" />
-                <span>Empezar Partida ({gameMode === 'survival' ? 'Supervivencia' : 'Blitz 60s'})</span>
+                <span>Empezar Partida ({gameMode === 'survival' ? 'Supervivencia por Actos' : 'Blitz 60s'})</span>
               </button>
+            </div>
+          )}
+
+          {/* Modal de Descanso entre Actos / Stages */}
+          {gameState === 'stage_break' && (
+            <div className="absolute inset-0 bg-white/95 backdrop-blur-xs flex flex-col items-center justify-center p-4 sm:p-6 border-2 border-black z-20 text-center font-mono animate-fade-in select-none">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-black text-white text-[11px] font-bold uppercase tracking-wider mb-2 border border-black shadow-[2px_2px_0px_#000000]">
+                <Check className="w-3.5 h-3.5 stroke-[3]" />
+                <span>¡ACTO {currentStage} SUPERADO!</span>
+                <Sparkles className="w-3.5 h-3.5" />
+              </div>
+
+              <h3 className="text-2xl font-black font-display uppercase tracking-tight text-black">
+                DESCANSO ENTRE ACTOS
+              </h3>
+              <p className="text-xs text-neutral-600 mt-0.5 max-w-sm">
+                ¡Lienzo despejado! Has resistido los {STAGE_DURATION}s del Acto {currentStage} sin saturar la pantalla.
+              </p>
+
+              {/* Resumen de estadísticas del Acto */}
+              <div className="my-3 p-3.5 border-2 border-black bg-neutral-50 w-full max-w-xs space-y-2 text-xs shadow-[3px_3px_0px_#000000]">
+                <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
+                  <span className="text-neutral-500 font-bold uppercase text-[10px]">Trazos en Acto {currentStage}:</span>
+                  <span className="font-bold text-sm bg-black text-white px-1.5 py-0.2">
+                    {stageClearedCount} líneas
+                  </span>
+                </div>
+                <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
+                  <span className="text-neutral-500 font-bold uppercase text-[10px]">Precisión Media del Acto:</span>
+                  <span className="font-bold text-sm">
+                    {stageScores.length > 0 ? Math.round(stageScores.reduce((a, b) => a + b, 0) / stageScores.length) : 0}%
+                  </span>
+                </div>
+                <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
+                  <span className="text-neutral-500 font-bold uppercase text-[10px]">Racha en este Acto:</span>
+                  <span className="font-bold text-sm">{stageBestCombo} seguidas</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-neutral-500 font-bold uppercase text-[10px]">Total Acumulado:</span>
+                  <span className="font-bold text-sm">{clearedScores.length} líneas ({stagesCompleted} actos)</span>
+                </div>
+              </div>
+
+              {/* Previa técnica del siguiente Acto */}
+              <div className="mb-3.5 p-2 bg-neutral-100 border border-black text-left w-full max-w-xs text-[11px] space-y-1">
+                <div className="font-bold text-black flex items-center gap-1">
+                  <Zap className="w-3.5 h-3.5 text-black stroke-[2.5]" />
+                  <span>Próximo Reto: Acto {currentStage + 1}</span>
+                </div>
+                <p className="text-neutral-600 text-[10px] leading-snug">
+                  La avalancha acelera su cadencia a <strong>{(getStageSpawnInterval(currentStage + 1, 2) / 1000).toFixed(1)}s</strong> por trazo
+                  {currentStage + 1 >= 2 ? ' con posibles ráfagas continuas' : ''}. Mantén la fluidez y velocidad sin dudar.
+                </p>
+              </div>
+
+              {/* Botones de acción */}
+              <div className="flex flex-col sm:flex-row gap-2 w-full max-w-xs">
+                <button
+                  type="button"
+                  onClick={handleNextStage}
+                  className="flex-1 btn-ink py-2.5 px-3 text-xs uppercase font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-[3px_3px_0px_#000000] hover:bg-neutral-900"
+                >
+                  <Play className="w-3.5 h-3.5 fill-white stroke-none" />
+                  <span>Comenzar Acto {currentStage + 1}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => finishGame('manual')}
+                  className="btn-ink-outline py-2.5 px-3 text-xs uppercase font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] hover:bg-neutral-100"
+                >
+                  <Flag className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Finalizar y Guardar</span>
+                </button>
+              </div>
             </div>
           )}
 
@@ -1045,16 +1309,30 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
             <div className="absolute inset-0 bg-white/95 backdrop-blur-xs flex flex-col items-center justify-center p-6 border-2 border-black z-20 text-center font-mono animate-fade-in">
               <Trophy className="w-12 h-12 text-black mb-2 animate-bounce stroke-[2.5]" />
               <h3 className="text-2xl font-bold font-display uppercase tracking-tight">
-                {gameOverReason === 'overflow' ? '¡Desbordamiento de Pantalla!' : '¡Tiempo Finalizado!'}
+                {gameOverReason === 'manual'
+                  ? '¡Partida Guardada!'
+                  : gameOverReason === 'overflow'
+                  ? '¡Desbordamiento de Pantalla!'
+                  : '¡Tiempo Finalizado!'}
               </h3>
               <p className="text-xs text-neutral-600 mt-1 max-w-sm">
-                {gameOverReason === 'overflow'
+                {gameOverReason === 'manual'
+                  ? 'Has finalizado la partida voluntariamente y tu progreso ha quedado guardado.'
+                  : gameOverReason === 'overflow'
                   ? 'Las líneas se acumularon hasta saturar el lienzo (6 líneas).'
                   : 'Completaste los 60 segundos de alta velocidad.'}
               </p>
 
               {/* TABLA DE RESULTADOS */}
               <div className="my-4 p-3.5 border-2 border-black bg-neutral-50 w-72 space-y-2 text-xs shadow-[3px_3px_0px_#000000]">
+                {gameMode === 'survival' && (
+                  <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
+                    <span className="text-neutral-500 font-bold uppercase text-[10px]">Actos Superados:</span>
+                    <span className="font-bold text-sm bg-black text-white px-1.5 py-0.2">
+                      {stagesCompleted} {stagesCompleted === 1 ? 'acto' : 'actos'} (Acto {currentStage})
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
                   <span className="text-neutral-500 font-bold uppercase text-[10px]">Líneas Eliminadas:</span>
                   <span className="font-bold text-sm bg-black text-white px-1.5 py-0.2">
@@ -1092,7 +1370,7 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
                   className="btn-ink px-4 py-2 text-xs uppercase font-bold flex items-center gap-1.5 cursor-pointer shadow-[3px_3px_0px_#000000]"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
-                  <span>Reintentar</span>
+                  <span>Jugar de Nuevo</span>
                 </button>
                 <button
                   type="button"
