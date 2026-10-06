@@ -76,7 +76,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
     );
 
     const [challenge, setChallenge] = useState<ProceduralStrokeChallenge>(() => {
-      const ch = generateStrokeChallenge(exerciseDef, challengeSeed, 600, 540);
+      const ch = generateStrokeChallenge(exerciseDef, challengeSeed, 750, 500);
       ch.activePhase = currentPhase;
       return ch;
     });
@@ -100,7 +100,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
       setChallengeSeed(newSeed);
       if (onNewSeed && externalSeed === undefined) onNewSeed(newSeed);
 
-      const ch = generateStrokeChallenge(exerciseDef, newSeed, 600, 540);
+      const ch = generateStrokeChallenge(exerciseDef, newSeed, 750, 500);
       ch.activePhase = currentPhase;
       setChallenge(ch);
       setStrokes([]);
@@ -145,7 +145,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
         const newSeed = Math.floor(Math.random() * 90000 + 10000);
         setChallengeSeed(newSeed);
         if (onNewSeed) onNewSeed(newSeed);
-        const ch = generateStrokeChallenge(exerciseDef, newSeed, 600, 540);
+        const ch = generateStrokeChallenge(exerciseDef, newSeed, 750, 500);
         ch.activePhase = currentPhase;
         setChallenge(ch);
         setStrokes([]);
@@ -245,8 +245,8 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
       if (!ctx) return;
 
       const dpr = Math.max(1, window.devicePixelRatio || 1);
-      const w = 600;
-      const h = 540;
+      const w = 750;
+      const h = 500;
       const targetW = Math.round(w * dpr);
       const targetH = Math.round(h * dpr);
 
@@ -871,13 +871,13 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
       return () => window.removeEventListener('resize', handleResize);
     }, [renderCanvas]);
 
-    // Normalización de coordenadas a resolución de referencia 600x540
+    // Normalización de coordenadas a resolución de referencia 750x500
     const getNormalizedCoords = (e: React.PointerEvent<HTMLCanvasElement>) => {
       const canvas = canvasRef.current;
       if (!canvas) return { x: 0, y: 0, pressure: 0.5 };
       const rect = canvas.getBoundingClientRect();
-      const scaleX = 600 / rect.width;
-      const scaleY = 540 / rect.height;
+      const scaleX = 750 / rect.width;
+      const scaleY = 500 / rect.height;
       return {
         x: (e.clientX - rect.left) * scaleX,
         y: (e.clientY - rect.top) * scaleY,
@@ -955,20 +955,20 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
     };
 
     return (
-      <div className="w-full flex flex-col items-center">
-        {/* Contenedor del lienzo con aspect-ratio 600/540 estrictamente bloqueado para evitar distorsiones o achatamiento */}
+      <div
+        className="w-full flex flex-col items-center mx-auto"
+        style={{
+          maxWidth: 'min(100%, 750px, calc((100vh - 230px) * (750 / 500)))',
+        }}
+      >
+        {/* Contenedor del lienzo con aspect-ratio 750/500 estrictamente bloqueado para evitar distorsiones o achatamiento */}
         <div
-          className="relative border-2 border-black bg-white shadow-[4px_4px_0px_#000000] select-none touch-none mx-auto overflow-hidden"
-          style={{
-            width: '100%',
-            maxWidth: 'min(100%, 600px, calc((100vh - 240px) * (600 / 540)))',
-            aspectRatio: '600 / 540',
-          }}
+          className="relative w-full aspect-[750/500] border-2 border-black bg-white shadow-[4px_4px_0px_#000000] select-none touch-none overflow-hidden"
         >
           <canvas
             ref={canvasRef}
-            width={600}
-            height={540}
+            width={750}
+            height={500}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}

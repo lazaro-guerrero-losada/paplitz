@@ -208,8 +208,8 @@ export function App() {
 
   // Modo de práctica en la barra lateral: 'camino' (por defecto) o 'daily' (reto diario)
   const [practiceMode, setPracticeMode] = useState<'camino' | 'daily'>('camino');
-  // Colapso de la barra lateral izquierda
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
+  // Colapso de la barra lateral izquierda (por defecto oculta en modo enfoque)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(true);
   // Visibilidad de trazos de usuario y soluciones/guías
   const [showUserStrokes, setShowUserStrokes] = useState<boolean>(true);
   const [showSolution, setShowSolution] = useState<boolean>(true);
@@ -1303,12 +1303,34 @@ export function App() {
 
         {/* PESTAÑA 1: HOME / PRÁCTICA RÁPIDA (REDiseño LIMPIO, INTUITIVO Y SIN DISTRACCIONES) */}
         {activeTab === 'practice' && (
-          <div className="flex-1 w-full flex flex-col md:flex-row overflow-hidden relative min-h-[calc(100vh-64px)] bg-neutral-100">
-            {/* BARRA LATERAL IZQUIERDA (COLLAPSIBLE SIDEBAR) */}
+          <div className="flex-1 w-full flex flex-col items-center justify-center overflow-hidden relative min-h-[calc(100vh-64px)] bg-neutral-100 p-2 sm:p-4">
+            {/* PESTAÑA / BOTÓN TOGGLE FLOTANTE DEL PANEL (SIEMPRE ACCESIBLE) */}
+            <button
+              type="button"
+              onClick={() => setIsSidebarCollapsed((prev) => !prev)}
+              className="absolute top-3 left-3 z-30 bg-white hover:bg-neutral-100 text-black px-2.5 py-1.5 border-2 border-black shadow-[2px_2px_0px_#000000] text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer transition-transform hover:scale-105 active:scale-95"
+              title={isSidebarCollapsed ? "Abrir panel de práctica" : "Ocultar panel"}
+            >
+              <PanelLeft className="w-4 h-4 stroke-[2.5]" />
+              <span className="hidden sm:inline">Panel</span>
+            </button>
+
+            {/* BACKDROP FLOTANTE CUANDO EL PANEL ESTÁ ABIERTO */}
             {!isSidebarCollapsed && (
-              <aside className="w-full md:w-80 bg-white border-r-2 border-black shadow-[4px_0px_0px_#000000] flex flex-col z-20 shrink-0 select-none">
-                <div className="w-full md:w-80 flex flex-col h-full overflow-y-auto p-3.5 space-y-3 font-sans">
-                {/* CABECERA DEL PANEL CON BOTÓN MINIMIZAR */}
+              <div
+                className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[1px] md:bg-black/20"
+                onClick={() => setIsSidebarCollapsed(true)}
+              />
+            )}
+
+            {/* DRAWER FLOTANTE DESPLEGABLE (MÓVIL: FULLSCREEN, DESKTOP: SLIDE-OVER W-80 SIN DESPLAZAR EL LIENZO) */}
+            <aside
+              className={`fixed md:absolute top-0 bottom-0 left-0 z-50 bg-white border-r-2 border-black shadow-[6px_0px_0px_#000000] flex flex-col select-none transition-transform duration-200 ease-in-out ${
+                isSidebarCollapsed ? '-translate-x-full pointer-events-none' : 'translate-x-0 pointer-events-auto'
+              } w-full sm:w-85 md:w-80 h-full`}
+            >
+              <div className="w-full flex flex-col h-full overflow-y-auto p-3.5 space-y-3 font-sans">
+                {/* CABECERA DEL PANEL CON BOTÓN CERRAR */}
                 <div className="flex items-center justify-between pb-1.5 border-b-2 border-black">
                   <div className="flex items-center gap-1.5">
                     <Compass className="w-4 h-4 stroke-[2.5]" />
@@ -1320,9 +1342,9 @@ export function App() {
                     type="button"
                     onClick={() => setIsSidebarCollapsed(true)}
                     className="p-1 border border-black hover:bg-neutral-100 active:scale-95 cursor-pointer shadow-[1px_1px_0px_#000000]"
-                    title="Ocultar panel (Modo Enfoque)"
+                    title="Cerrar panel"
                   >
-                    <ChevronLeft className="w-3.5 h-3.5" />
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
 
@@ -1355,7 +1377,6 @@ export function App() {
                 </div>
 
                 {/* 2. SI MODO ES "EL CAMINO": CONTEXTO Y PROGRESIÓN */}
-                {/* 2. SI MODO ES "EL CAMINO": INFORMACIÓN EN UNA SOLA LÍNEA Y BOTÓN A EL CAMINO */}
                 {practiceMode === 'camino' && (
                   <div className="border-2 border-black p-2.5 bg-white shadow-[2px_2px_0px_#000000] space-y-2 font-mono">
                     {/* Información completa del ejercicio en una misma línea */}
@@ -1431,7 +1452,7 @@ export function App() {
                   />
                 )}
 
-                {/* SENSEI CUBO Y BOTÓN MODO ENFOQUE */}
+                {/* SENSEI CUBO Y BOTÓN CERRAR PANEL */}
                 <div className="pt-2 flex flex-col items-center gap-2">
                   <SenseiCubo
                     mood={avatarMood}
@@ -1446,32 +1467,18 @@ export function App() {
                     type="button"
                     onClick={() => setIsSidebarCollapsed(true)}
                     className="w-full py-1.5 px-2 text-[11px] font-mono font-bold border border-neutral-300 text-neutral-600 hover:border-black hover:text-black hover:bg-neutral-50 flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-[1px_1px_0px_#000000]"
-                    title="Ocultar barra lateral para dibujar con el lienzo maximizado"
+                    title="Cerrar panel y volver al lienzo"
                   >
                     <Maximize2 className="w-3.5 h-3.5" />
-                    <span>Modo Enfoque (Maximizar)</span>
+                    <span>Cerrar Panel</span>
                   </button>
                 </div>
               </div>
             </aside>
-          )}
 
-            {/* BOTÓN FLOTANTE PARA RESTAURAR EL PANEL CUANDO ESTÁ OCULTO */}
-            {isSidebarCollapsed && (
-              <button
-                type="button"
-                onClick={() => setIsSidebarCollapsed(false)}
-                className="absolute top-3 left-3 z-30 bg-white hover:bg-neutral-100 text-black px-2.5 py-1.5 border-2 border-black shadow-[2px_2px_0px_#000000] text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer transition-transform hover:scale-105 active:scale-95"
-                title="Mostrar panel de práctica"
-              >
-                <PanelLeft className="w-4 h-4 stroke-[2.5]" />
-                <span className="hidden sm:inline">Panel</span>
-              </button>
-            )}
-
-            {/* ÁREA CENTRAL: LIENZO 100% CENTRADO Y PROTAGONISTA */}
-            <div className="flex-1 flex flex-col items-center justify-center p-3 sm:p-6 overflow-hidden min-h-0">
-              <div className="w-full flex flex-col items-center justify-center max-w-2xl lg:max-w-3xl">
+            {/* ÁREA CENTRAL: LIENZO 100% CENTRADO Y PERMANENTEMENTE INMÓVIL */}
+            <div className="flex-1 w-full flex flex-col items-center justify-center overflow-hidden min-h-0">
+              <div className="w-full flex flex-col items-center justify-center">
                 {activeNode?.isCalisthenics ? (
                   <StrokePracticeCanvas
                     ref={strokeCanvasRef}

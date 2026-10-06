@@ -422,24 +422,16 @@ export function evaluateSingleStrokeSubmission(
     overallScore = geometricScore;
     phasePassed = overallScore >= 75 && kinematics.phasePassed;
   } else if (activePhase === 2) {
-    // Fase 2: Fluidez (65% Geometría + 35% Fluidez cinemática)
-    overallScore = Math.round(geometricScore * 0.65 + kinematics.fluencyScore * 0.35);
-    // Si no cumple el criterio de fluidez de Fase 2, la nota queda capada
-    if (!kinematics.phasePassed) {
-      overallScore = Math.min(overallScore, 75);
-    }
+    // Fase 2: Fluidez (70% Geometría + 30% Fluidez cinemática)
+    overallScore = Math.round(geometricScore * 0.70 + kinematics.fluencyScore * 0.30);
     phasePassed = overallScore >= 75 && kinematics.phasePassed;
   } else {
-    // Fase 3: Velocidad Balística (50% Geometría + 50% Velocidad Balística)
-    const targetFastSpeed = Math.max(650, Math.round(kinematics.userBaselineSpeedPxPerSec * 1.35));
+    // Fase 3: Velocidad Balística (60% Geometría + 40% Velocidad Balística ponderada)
+    const targetFastSpeed = Math.max(480, Math.round(kinematics.userBaselineSpeedPxPerSec * 1.18));
     const speedRatio = kinematics.avgSpeedPxPerSec / targetFastSpeed;
     const speedScore = Math.min(100, Math.round(Math.max(0, speedRatio * 100)));
 
-    overallScore = Math.round(geometricScore * 0.50 + speedScore * 0.50);
-    // Si no alcanza la velocidad requerida de Fase 3, la nota queda capada a máx 75% impidiendo maestría
-    if (!kinematics.phasePassed) {
-      overallScore = Math.min(overallScore, 75);
-    }
+    overallScore = Math.round(geometricScore * 0.60 + speedScore * 0.40);
     phasePassed = overallScore >= 75 && kinematics.phasePassed;
   }
 
@@ -824,18 +816,12 @@ export function evaluateMultiLineSubmission(
   if (activePhase === 1) {
     overallScore = geometricScore;
   } else if (activePhase === 2) {
-    overallScore = Math.round(geometricScore * 0.65 + avgFluency * 0.35);
-    if (!allPhasesPassed) {
-      overallScore = Math.min(overallScore, 75);
-    }
+    overallScore = Math.round(geometricScore * 0.70 + avgFluency * 0.30);
   } else {
-    const targetFastSpeed = Math.max(650, Math.round(userBaseline * 1.35));
+    const targetFastSpeed = Math.max(480, Math.round(userBaseline * 1.18));
     const speedRatio = avgSpeed / targetFastSpeed;
     const speedScore = Math.min(100, Math.round(Math.max(0, speedRatio * 100)));
-    overallScore = Math.round(geometricScore * 0.50 + speedScore * 0.50);
-    if (!allPhasesPassed) {
-      overallScore = Math.min(overallScore, 75);
-    }
+    overallScore = Math.round(geometricScore * 0.60 + speedScore * 0.40);
   }
 
   if (hasAnyReversed) {

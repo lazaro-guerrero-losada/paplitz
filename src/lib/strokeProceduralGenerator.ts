@@ -53,8 +53,8 @@ function shuffleWithRNG<T>(array: T[], rng: SeededRNG): T[] {
 export function generateMultiLineChallenge(
   exercise: LabExerciseDef,
   seed: number,
-  canvasWidth = 600,
-  canvasHeight = 540,
+  canvasWidth = 750,
+  canvasHeight = 500,
   lineCount: 2 | 3 = 2
 ): ProceduralStrokeChallenge {
   const rng = new SeededRNG(seed);
@@ -335,8 +335,8 @@ export function generateMultiLineChallenge(
 export function generateRadialRosetteChallenge(
   exercise: LabExerciseDef,
   seed: number,
-  canvasWidth = 600,
-  canvasHeight = 540
+  canvasWidth = 750,
+  canvasHeight = 500
 ): ProceduralStrokeChallenge {
   const rng = new SeededRNG(seed);
   const cfg = exercise.singleStrokeConfig || {
@@ -653,8 +653,8 @@ export function generateZNStrokePoints(
 export function generateSpacingTrackChallenge(
   exercise: LabExerciseDef,
   seed: number,
-  canvasWidth = 600,
-  canvasHeight = 540
+  canvasWidth = 750,
+  canvasHeight = 500
 ): ProceduralStrokeChallenge {
   const cfg = exercise.spacingTrackConfig || {
     bandCount: 1,
@@ -1334,8 +1334,8 @@ export function generateSpacingTrackChallenge(
 export function generateSingleStrokeChallenge(
   exercise: LabExerciseDef,
   seed: number,
-  canvasWidth = 600,
-  canvasHeight = 540
+  canvasWidth = 750,
+  canvasHeight = 500
 ): ProceduralStrokeChallenge {
   // Si es un reto de espaciado en carriles (Consistencia 1.1)
   if (exercise.spacingTrackConfig) {
@@ -1697,8 +1697,8 @@ export function generateSingleStrokeChallenge(
 export function generateStrokeChallenge(
   exerciseOrPage: WorkbookExerciseDef | number,
   seed = Math.floor(Math.random() * 100000),
-  canvasWidth = 600,
-  canvasHeight = 540
+  canvasWidth = 750,
+  canvasHeight = 500
 ): ProceduralStrokeChallenge {
   const exercise: LabExerciseDef =
     typeof exerciseOrPage === 'number'
