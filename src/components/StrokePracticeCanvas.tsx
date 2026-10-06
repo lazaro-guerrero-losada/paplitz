@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
-import { Undo2, Trash2, Check, ArrowRight, AlertTriangle, RefreshCw, Eye, EyeOff, Zap, Sparkles } from 'lucide-react';
+import { Undo2, Trash2, Check, ArrowRight, RefreshCw, Eye, EyeOff, Zap, Sparkles } from 'lucide-react';
 import {
   LabExerciseDef,
   RawStroke,
@@ -24,7 +24,6 @@ export interface StrokePracticeCanvasProps {
   showUserStrokes: boolean;
   onEvaluationComplete: (evaluation: StrokeEvaluation | null) => void;
   onDrawingStateChange?: (isDrawing: boolean) => void;
-  onPhaseAdvance?: (nextPhase: 1 | 2 | 3) => void;
   seed?: number;
   onNewSeed?: (seed: number) => void;
   onNext?: () => void;
@@ -53,7 +52,6 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
       showUserStrokes,
       onEvaluationComplete,
       onDrawingStateChange,
-      onPhaseAdvance,
       seed: externalSeed,
       onNewSeed,
       onNext,
@@ -172,14 +170,14 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
       });
     }, []);
 
-    // Temporizador de 2 segundos de auto-avance tras corregir (se pausa si hay aviso de cambio de fase)
+    // Temporizador de 3 segundos de auto-avance tras corregir (se pausa si hay aviso de cambio de fase)
     useEffect(() => {
       if (!evaluation || !autoAdvance || phaseTransitionNotice) {
         setAutoAdvanceCountdown(null);
         return;
       }
 
-      setAutoAdvanceCountdown(2);
+      setAutoAdvanceCountdown(3);
 
       const intervalId = setInterval(() => {
         setAutoAdvanceCountdown((prev) => {
@@ -193,7 +191,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
 
       const timeoutId = setTimeout(() => {
         handleNext();
-      }, 2000);
+      }, 3000);
 
       return () => {
         clearInterval(intervalId);
@@ -729,8 +727,8 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
         ctx.stroke();
       }
 
-      // H. SUPERPOSICIÓN DE SOLUCIÓN TRAS CORRECCIÓN (SIEMPRE VISIBLE AL EVALUAR)
-      if (evaluation && evaluation.solutionOverlay) {
+      // H. SUPERPOSICIÓN DE SOLUCIÓN TRAS CORRECCIÓN (RESPETA SHOWSOLUTION, SIN BORRAR EL TRAZO)
+      if (evaluation && evaluation.solutionOverlay && showSolution) {
         const linesToDraw: { x: number; y: number }[][] =
           evaluation.solutionOverlay.multiLines && evaluation.solutionOverlay.multiLines.length > 0
             ? evaluation.solutionOverlay.multiLines.map((l) => l.points)
@@ -752,25 +750,12 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
           if (sPts.length < 2) continue;
           ctx.save();
 
-          // 1. Casing blanco de contraste para que la línea guía resalte nítidamente sobre los trazos dibujados
-          ctx.strokeStyle = '#FFFFFF';
-          ctx.lineWidth = 6;
+          // Guía técnica de la solución: línea discontinua limpia sin casing blanco para no cortar los trazos del usuario
+          ctx.strokeStyle = '#777777';
+          ctx.lineWidth = 2.0;
           ctx.lineCap = 'round';
           ctx.lineJoin = 'round';
-          ctx.setLineDash([]);
-          ctx.beginPath();
-          ctx.moveTo(sPts[0].x, sPts[0].y);
-          for (let i = 1; i < sPts.length; i++) {
-            ctx.lineTo(sPts[i].x, sPts[i].y);
-          }
-          ctx.stroke();
-
-          // 2. Línea discontinua negra técnica
-          ctx.strokeStyle = '#000000';
-          ctx.lineWidth = 2.4;
-          ctx.lineCap = 'round';
-          ctx.lineJoin = 'round';
-          ctx.setLineDash([5, 4]);
+          ctx.setLineDash([6, 5]);
 
           if (challenge.spacingTrackParams) {
             ctx.beginPath();
@@ -784,7 +769,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
               const pEnd = sPts[sPts.length - 1];
               const pPrev = sPts[Math.max(0, sPts.length - 3)];
               const th = Math.atan2(pEnd.y - pPrev.y, pEnd.x - pPrev.x);
-              ctx.fillStyle = '#000000';
+              ctx.fillStyle = '#777777';
               ctx.beginPath();
               ctx.moveTo(pEnd.x, pEnd.y);
               ctx.lineTo(pEnd.x - 7 * Math.cos(th - 0.45), pEnd.y - 7 * Math.sin(th - 0.45));
@@ -813,11 +798,12 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
           }
           ctx.stroke();
 
-          ctx.fillStyle = '#000000';
+          // Flecha de dirección de la solución en el mismo tono gris técnico
+          ctx.fillStyle = '#777777';
           ctx.beginPath();
           ctx.moveTo(arrowTip.x, arrowTip.y);
-          ctx.lineTo(arrowTip.x - 11 * Math.cos(theta - 0.38), arrowTip.y - 11 * Math.sin(theta - 0.38));
-          ctx.lineTo(arrowTip.x - 11 * Math.cos(theta + 0.38), arrowTip.y - 11 * Math.sin(theta + 0.38));
+          ctx.lineTo(arrowTip.x - 10 * Math.cos(theta - 0.38), arrowTip.y - 10 * Math.sin(theta - 0.38));
+          ctx.lineTo(arrowTip.x - 10 * Math.cos(theta + 0.38), arrowTip.y - 10 * Math.sin(theta + 0.38));
           ctx.closePath();
           ctx.fill();
           ctx.restore();
@@ -898,10 +884,6 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
           const result = evaluateStrokeSubmission(newStrokes, challenge);
           setEvaluation(result);
           onEvaluationComplete(result);
-
-          if (result.phasePassed && currentPhase < 3 && onPhaseAdvance) {
-            onPhaseAdvance((currentPhase + 1) as 1 | 2 | 3);
-          }
           renderCanvas();
           return;
         }
@@ -1119,10 +1101,10 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                   className={`px-2 py-1 text-xs font-bold border border-black flex items-center gap-1 cursor-pointer transition-colors shadow-[1px_1px_0px_#000000] ${
                     autoAdvance ? 'bg-black text-white' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
                   }`}
-                  title={autoAdvance ? "Auto-avance activado (espera 2s tras corregir). Haz clic para desactivar." : "Auto-avance desactivado. Haz clic para activar."}
+                  title={autoAdvance ? "Auto-avance activado (espera 3s tras corregir). Haz clic para desactivar." : "Auto-avance desactivado. Haz clic para activar."}
                 >
                   <Zap className={`w-3.5 h-3.5 ${autoAdvance ? 'fill-white' : ''}`} />
-                  <span className="text-[10px]">Auto: {autoAdvance ? 'ON (2s)' : 'OFF'}</span>
+                  <span className="text-[10px]">Auto: {autoAdvance ? 'ON (3s)' : 'OFF'}</span>
                 </button>
 
                 {/* Alternar capas: Trazo y Solución */}
@@ -1165,7 +1147,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
               </button>
             </div>
           ) : (
-            /* Estado EVALUADO: NOTA visible, Siguiente, Reintentar y panel de diagnóstico */
+            /* Estado EVALUADO: NOTA visible, Siguiente, Reintentar */
             <div className="flex flex-col gap-1.5 w-full">
               <div className="flex items-center justify-between gap-2 p-2 border-2 border-black bg-white shadow-[2px_2px_0px_#000000]">
                 {/* Lado izquierdo: Reintentar, Auto-toggle y capas */}
@@ -1187,10 +1169,10 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                     className={`px-2 py-1 text-xs font-bold border border-black flex items-center gap-1 cursor-pointer transition-colors shadow-[1px_1px_0px_#000000] ${
                       autoAdvance ? 'bg-black text-white' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
                     }`}
-                    title={autoAdvance ? "Auto-avance activado (espera 2s tras corregir). Haz clic para pausar." : "Auto-avance desactivado. Haz clic para activar."}
+                    title={autoAdvance ? "Auto-avance activado (espera 3s tras corregir). Haz clic para pausar." : "Auto-avance desactivado. Haz clic para activar."}
                   >
                     <Zap className={`w-3.5 h-3.5 ${autoAdvance ? 'fill-white' : ''}`} />
-                    <span className="text-[10px]">Auto: {autoAdvance ? 'ON (2s)' : 'OFF'}</span>
+                    <span className="text-[10px]">Auto: {autoAdvance ? 'ON (3s)' : 'OFF'}</span>
                   </button>
 
                   {/* Alternar capas en evaluado */}
@@ -1232,7 +1214,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                     <div
                       className="absolute bottom-0 left-0 top-0 bg-white/25 pointer-events-none transition-all duration-1000 ease-linear"
                       style={{
-                        width: `${((2 - autoAdvanceCountdown) / 2) * 100}%`,
+                        width: `${((3 - autoAdvanceCountdown) / 3) * 100}%`,
                       }}
                     />
                   )}
@@ -1244,32 +1226,6 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                   </span>
                   <ArrowRight className="w-4 h-4 stroke-[2.5]" />
                 </button>
-              </div>
-
-              {/* Banner de feedback y explicación */}
-              <div className="w-full p-2.5 border-2 border-black bg-neutral-50 flex flex-col gap-1 text-xs shadow-[2px_2px_0px_#000000]">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-bold font-display text-xs sm:text-sm text-black">
-                    {evaluation.feedbackTitle}
-                  </span>
-                  <span className="text-[10px] text-neutral-500 font-bold shrink-0">
-                    Objetivo maestría: ≥90%
-                  </span>
-                </div>
-                <p className="text-[11px] font-sans text-neutral-700 leading-snug">
-                  {evaluation.feedbackMessage}
-                </p>
-                {evaluation.directionWarning && (
-                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-amber-900 bg-amber-100 border border-amber-400 px-2 py-0.5 mt-0.5">
-                    <AlertTriangle className="w-3 h-3 shrink-0" />
-                    <span>{evaluation.directionWarning}</span>
-                  </div>
-                )}
-                {evaluation.tipMessage && (
-                  <p className="text-[10px] font-sans text-neutral-500 italic mt-0.5">
-                    Consejo: {evaluation.tipMessage}
-                  </p>
-                )}
               </div>
             </div>
           )}

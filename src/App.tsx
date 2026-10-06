@@ -516,7 +516,12 @@ export function App() {
   };
 
   const handleDismissPhaseTransition = () => {
+    if (phaseTransitionNotice && activeNode) {
+      setCurrentPhase(phaseTransitionNotice.toPhase);
+      setMasteryStreaks((prev) => ({ ...prev, [activeNode.id]: 0 }));
+    }
     setPhaseTransitionNotice(null);
+    setStrokeEvaluation(null);
     setCalisthenicsSeed(Math.floor(Math.random() * 90000 + 10000));
   };
 
@@ -567,25 +572,18 @@ export function App() {
       setTimeout(() => setJustEarnedMastery(false), 900);
 
       if (newStreak < 3) {
-        // Aún no ha completado la fase actual
+        // Aún no ha completado la fase actual: incrementar racha (sin toast intrusivo)
         setMasteryStreaks((prev) => ({ ...prev, [activeNode.id]: newStreak }));
-        showToast(
-          '🎯',
-          `Racha Fase ${currentPhase}: ${newStreak}/3 (≥90%)`,
-          activeVariants.length > 1
-            ? `¡Variante ${currentVariantIndex + 1}/${activeVariants.length} superada con ${recordedScore}%! Necesitas ${3 - newStreak} más seguidos para superar la Fase ${currentPhase}.`
-            : `¡Gran precisión con ${recordedScore}%! Necesitas ${3 - newStreak} más seguidos ≥90% para superar la Fase ${currentPhase}.`
-        );
       } else {
         // ¡HA CONSEGUIDO 3 SEGUIDOS DE MAESTRÍA EN LA FASE ACTUAL!
-        setMasteryStreaks((prev) => ({ ...prev, [activeNode.id]: 0 }));
+        // Dejarlo visible como 3/3 para que se vea completo en el HUD
+        setMasteryStreaks((prev) => ({ ...prev, [activeNode.id]: 3 }));
 
         if (currentPhase < 3) {
           // PASA DE FASE DE MOTRICIDAD (Fase 1 -> Fase 2, o Fase 2 -> Fase 3)
           const nextPhase = (currentPhase + 1) as 1 | 2 | 3;
-          setCurrentPhase(nextPhase);
-
-          // Pop-up / mini-animación de paso de fase
+          // Mostramos la ventana de paso de fase pero dejamos el trazo y nota visibles.
+          // El cambio a nextPhase y reseteo de racha a 0 ocurre al pulsar "Continuar a Fase X".
           setPhaseTransitionNotice({
             fromPhase: currentPhase,
             toPhase: nextPhase,
@@ -632,13 +630,8 @@ export function App() {
       setAvatarMood('fail-spiral');
       setTimeout(() => setAvatarMood('neutral'), 3000);
 
-      const prevStreak = masteryStreaks[activeNode.id] || 0;
+      // Reiniciar racha al fallar (sin toast intrusivo)
       setMasteryStreaks((prev) => ({ ...prev, [activeNode.id]: 0 }));
-      showToast(
-        '⚠️',
-        prevStreak > 0 ? `Racha Fase ${currentPhase} reiniciada (${recordedScore}%)` : `Precisión: ${recordedScore}% (Requiere ≥90%)`,
-        `Para superar la Fase ${currentPhase} necesitas 3 aciertos seguidos con nota ≥90%. ¡Ánimo!`
-      );
     }
   };
 
@@ -1460,7 +1453,6 @@ export function App() {
                     seed={calisthenicsSeed}
                     onNewSeed={setCalisthenicsSeed}
                     onDrawingStateChange={setIsUserDrawing}
-                    onPhaseAdvance={(nextPhase) => setCurrentPhase(nextPhase)}
                     onEvaluationComplete={handleCalisthenicsEvaluationComplete}
                     onNext={handleSidebarNext}
                     masteryStreak={currentMasteryStreak}
