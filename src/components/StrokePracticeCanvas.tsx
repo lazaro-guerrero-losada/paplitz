@@ -1327,15 +1327,14 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                   </button>
                 )}
 
-                {/* Botón Reporte accesible antes de evaluar */}
+                {/* Botón Reporte accesible antes de evaluar (solo icono de triángulo) */}
                 <button
                   type="button"
                   onClick={() => setShowReportModal(true)}
-                  className="btn-ink-outline px-2 py-1 text-xs font-bold flex items-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000000] hover:bg-neutral-100"
+                  className="p-1.5 text-xs font-bold border border-black cursor-pointer shadow-[1px_1px_0px_#000000] bg-white hover:bg-neutral-100 flex items-center justify-center transition-colors"
                   title="Reportar anomalía o problema en este reto"
                 >
-                  <FileText className="w-3.5 h-3.5" />
-                  <span className="hidden md:inline text-[10px]">Reporte</span>
+                  <AlertTriangle className="w-3.5 h-3.5 stroke-[2.5]" />
                 </button>
               </div>
 
@@ -1406,26 +1405,24 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                     </button>
                   )}
 
-                  {/* BOTÓN STATS DEL TRAZO (PAUSA AUTO-AVANCE MOMENTÁNEAMENTE) */}
+                  {/* BOTÓN STATS DEL TRAZO (SOLO ICONO, PAUSA AUTO-AVANCE MOMENTÁNEAMENTE) */}
                   <button
                     type="button"
                     onClick={() => setShowStatsModal(true)}
-                    className="btn-ink-outline px-2 py-1 text-xs font-bold flex items-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000000] hover:bg-neutral-100"
+                    className="p-1.5 text-xs font-bold border border-black cursor-pointer shadow-[1px_1px_0px_#000000] bg-white hover:bg-neutral-100 flex items-center justify-center transition-colors"
                     title="Ver estadísticas detalladas del trazo y biomecánica (pausa el auto-avance)"
                   >
                     <Activity className="w-3.5 h-3.5 stroke-[2.5]" />
-                    <span className="text-[10px] font-bold">Stats</span>
                   </button>
 
-                  {/* BOTÓN DE REPORTE */}
+                  {/* BOTÓN DE REPORTE (SOLO ICONO TRIANGULAR) */}
                   <button
                     type="button"
                     onClick={() => setShowReportModal(true)}
-                    className="btn-ink-outline px-2 py-1 text-xs font-bold flex items-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000000] hover:bg-neutral-100"
+                    className="p-1.5 text-xs font-bold border border-black cursor-pointer shadow-[1px_1px_0px_#000000] bg-white hover:bg-neutral-100 flex items-center justify-center transition-colors"
                     title="Escribir nota y descargar reporte de depuración (pausa el auto-avance)"
                   >
-                    <FileText className="w-3.5 h-3.5 stroke-[2]" />
-                    <span className="hidden sm:inline text-[10px] font-bold">Reporte</span>
+                    <AlertTriangle className="w-3.5 h-3.5 stroke-[2.5]" />
                   </button>
                 </div>
 
