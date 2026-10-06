@@ -1,5 +1,21 @@
-import React, { useRef, useEffect, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
-import { Undo2, Trash2, Check, ArrowRight, RefreshCw, Eye, EyeOff, Zap, Sparkles } from 'lucide-react';
+import React, { useRef, useEffect, useState, useCallback, useMemo, useImperativeHandle, forwardRef } from 'react';
+import {
+  Undo2,
+  Trash2,
+  Check,
+  ArrowRight,
+  RefreshCw,
+  Eye,
+  EyeOff,
+  Zap,
+  Sparkles,
+  Activity,
+  FileText,
+  Download,
+  Copy,
+  X,
+  AlertTriangle,
+} from 'lucide-react';
 import {
   LabExerciseDef,
   RawStroke,
@@ -8,7 +24,8 @@ import {
   StrokeEvaluation,
 } from '../lib/strokeTypes';
 import { generateStrokeChallenge } from '../lib/strokeProceduralGenerator';
-import { evaluateStrokeSubmission } from '../lib/strokeEvaluator';
+import { evaluateStrokeSubmission, buildStrokeDebugReport } from '../lib/strokeEvaluator';
+import { copyReportToClipboard, downloadReportJson } from '../lib/debugReport';
 
 export interface StrokePracticeCanvasRef {
   undo: () => void;
@@ -89,6 +106,14 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
       return saved !== null ? saved === 'true' : true;
     });
     const [autoAdvanceCountdown, setAutoAdvanceCountdown] = useState<number | null>(null);
+
+    // Estados para modales de estadísticas detalladas y reporte de depuración
+    const [showStatsModal, setShowStatsModal] = useState<boolean>(false);
+    const [showReportModal, setShowReportModal] = useState<boolean>(false);
+    const [userNote, setUserNote] = useState<string>('');
+    const [copiedReport, setCopiedReport] = useState<boolean>(false);
+    const [downloadedReport, setDownloadedReport] = useState<boolean>(false);
+
     const currentStrokeRef = useRef<PointWithMeta[]>([]);
     const activePointerIdRef = useRef<number | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -108,6 +133,9 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
       setIsDrawing(false);
       setEvaluation(null);
       setAutoAdvanceCountdown(null);
+      setShowStatsModal(false);
+      setShowReportModal(false);
+      setUserNote('');
       onEvaluationComplete(null);
     }, [exerciseDef.code, currentPhase, externalSeed]);
 
@@ -117,6 +145,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
       setStrokes((prev) => {
         const next = prev.slice(0, -1);
         setEvaluation(null);
+        setShowStatsModal(false);
         onEvaluationComplete(null);
         return next;
       });
@@ -127,6 +156,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
       setStrokes([]);
       currentStrokeRef.current = [];
       setEvaluation(null);
+      setShowStatsModal(false);
       onEvaluationComplete(null);
     }, [onEvaluationComplete]);
 
@@ -139,6 +169,9 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
 
     const handleNext = useCallback(() => {
       setAutoAdvanceCountdown(null);
+      setShowStatsModal(false);
+      setShowReportModal(false);
+      setUserNote('');
       if (onNext) {
         onNext();
       } else {
@@ -157,6 +190,8 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
 
     const handleRetry = useCallback(() => {
       setAutoAdvanceCountdown(null);
+      setShowStatsModal(false);
+      setShowReportModal(false);
       setStrokes([]);
       currentStrokeRef.current = [];
       setEvaluation(null);
@@ -174,34 +209,94 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
       });
     }, []);
 
-    // Temporizador de 2 segundos de auto-avance tras corregir (se pausa si hay aviso de cambio de fase)
+    // Temporizador de 1.5 segundos de auto-avance tras corregir
+    // Se pausa momentáneamente si se abren los modales de Stats o Reporte, o si hay aviso de cambio de fase
     useEffect(() => {
-      if (!evaluation || !autoAdvance || phaseTransitionNotice) {
+      if (!evaluation || !autoAdvance || phaseTransitionNotice || showStatsModal || showReportModal) {
         setAutoAdvanceCountdown(null);
         return;
       }
 
-      setAutoAdvanceCountdown(2);
+      const TOTAL_MS = 1500;
+      const STEP_MS = 100;
+      let remainingMs = TOTAL_MS;
+      setAutoAdvanceCountdown(1.5);
 
       const intervalId = setInterval(() => {
-        setAutoAdvanceCountdown((prev) => {
-          if (prev === null || prev <= 1) {
-            clearInterval(intervalId);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-
-      const timeoutId = setTimeout(() => {
-        handleNext();
-      }, 2000);
+        remainingMs -= STEP_MS;
+        if (remainingMs <= 0) {
+          clearInterval(intervalId);
+          setAutoAdvanceCountdown(0);
+          handleNext();
+        } else {
+          setAutoAdvanceCountdown(Math.round(remainingMs / 100) / 10);
+        }
+      }, STEP_MS);
 
       return () => {
         clearInterval(intervalId);
-        clearTimeout(timeoutId);
       };
-    }, [evaluation, autoAdvance, phaseTransitionNotice, handleNext]);
+    }, [evaluation, autoAdvance, phaseTransitionNotice, showStatsModal, showReportModal, handleNext]);
+
+    // Generación dinámica del reporte en Markdown y JSON para diagnóstico
+    const currentReportMarkdown = useMemo(() => {
+      const dummyEvaluation: StrokeEvaluation = evaluation || {
+        overallScore: 0,
+        passed: false,
+        metrics: { parallelismScore: 0, spacingScore: 0, straightnessScore: 0, tonalDensityScore: 0, boundaryScore: 0 },
+        detectedStats: { strokeCount: strokes.length, measuredAvgSpacingPx: 0, spacingVariance: 0, measuredAvgAngleDeg: 0, measuredOpticalDensityPct: 0 },
+        feedbackTitle: 'Sin evaluar',
+        feedbackMessage: 'Trazo en proceso de dibujo',
+        tipMessage: '',
+      };
+      const reportText = buildStrokeDebugReport(challenge, strokes, dummyEvaluation);
+      if (userNote.trim()) {
+        return `### NOTA DEL USUARIO:\n> ${userNote.trim()}\n\n${reportText}`;
+      }
+      return reportText;
+    }, [challenge, strokes, evaluation, userNote]);
+
+    const currentReportJsonString = useMemo(() => {
+      const data = {
+        reportType: 'paplitz_stroke_practice',
+        timestamp: new Date().toISOString(),
+        userNote: userNote.trim() || undefined,
+        challenge: {
+          id: challenge.id,
+          code: challenge.code,
+          title: challenge.title,
+          seed: challenge.seed,
+          activePhase: challenge.activePhase,
+          targetAngleDeg: challenge.targetAngleDeg,
+          targetSpacingPx: challenge.targetSpacingPx,
+          targetLengthPx: challenge.targetLengthPx,
+          minRequiredStrokes: challenge.minRequiredStrokes,
+        },
+        userStrokes: strokes.map((s, idx) => ({
+          index: idx + 1,
+          pointCount: s.points.length,
+          points: s.points,
+        })),
+        evaluation: evaluation || null,
+        environment: {
+          userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+          devicePixelRatio: typeof window !== 'undefined' ? window.devicePixelRatio : 1,
+        },
+      };
+      return JSON.stringify(data, null, 2);
+    }, [challenge, strokes, evaluation, userNote]);
+
+    const handleDownloadReport = useCallback(() => {
+      downloadReportJson(currentReportJsonString, challenge.seed, userNote || challenge.code);
+      setDownloadedReport(true);
+      setTimeout(() => setDownloadedReport(false), 2500);
+    }, [currentReportJsonString, challenge.seed, userNote, challenge.code]);
+
+    const handleCopyReport = useCallback(async () => {
+      await copyReportToClipboard(currentReportMarkdown);
+      setCopiedReport(true);
+      setTimeout(() => setCopiedReport(false), 2500);
+    }, [currentReportMarkdown]);
 
     // Métodos expuestos para la barra de herramientas lateral
     useImperativeHandle(ref, () => ({
@@ -1167,9 +1262,9 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
         {/* BARRA DE CONTROL INFERIOR Y EVALUACIÓN */}
         <div className="w-full mt-2 font-mono">
           {!evaluation ? (
-            /* Estado SIN EVALUAR: contador de trazos, undo, clear y botón CORREGIR destacado */
+            /* Estado SIN EVALUAR: contador de trazos, undo, clear, auto-avance, capas y botón CORREGIR destacado */
             <div className="flex items-center justify-between gap-2 p-2 border-2 border-black bg-white shadow-[2px_2px_0px_#000000]">
-              <div className="flex items-center gap-1.5 sm:gap-2">
+              <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
                 <span className="text-[11px] font-bold text-neutral-700 bg-neutral-100 px-2 py-1 border border-black shadow-[1px_1px_0px_#000000]">
                   Trazos: {strokes.length} / {Math.max(1, challenge.minRequiredStrokes || (challenge.targetLines ? challenge.targetLines.length : 1))}
                 </span>
@@ -1199,10 +1294,10 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                   className={`px-2 py-1 text-xs font-bold border border-black flex items-center gap-1 cursor-pointer transition-colors shadow-[1px_1px_0px_#000000] ${
                     autoAdvance ? 'bg-black text-white' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
                   }`}
-                  title={autoAdvance ? "Auto-avance activado (espera 2s tras corregir). Haz clic para desactivar." : "Auto-avance desactivado. Haz clic para activar."}
+                  title={autoAdvance ? "Auto-avance activado (espera 1.5s tras corregir). Haz clic para desactivar." : "Auto-avance desactivado. Haz clic para activar."}
                 >
                   <Zap className={`w-3.5 h-3.5 ${autoAdvance ? 'fill-white' : ''}`} />
-                  <span className="text-[10px]">Auto: {autoAdvance ? 'ON (2s)' : 'OFF'}</span>
+                  <span className="text-[10px]">Auto: {autoAdvance ? 'ON (1.5s)' : 'OFF'}</span>
                 </button>
 
                 {/* Alternar capas: Trazo y Solución */}
@@ -1231,13 +1326,24 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                     <span className="hidden sm:inline text-[10px]">Guía</span>
                   </button>
                 )}
+
+                {/* Botón Reporte accesible antes de evaluar */}
+                <button
+                  type="button"
+                  onClick={() => setShowReportModal(true)}
+                  className="btn-ink-outline px-2 py-1 text-xs font-bold flex items-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000000] hover:bg-neutral-100"
+                  title="Reportar anomalía o problema en este reto"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span className="hidden md:inline text-[10px]">Reporte</span>
+                </button>
               </div>
 
               <button
                 type="button"
                 onClick={handleEvaluate}
                 disabled={strokes.length === 0}
-                className="btn-ink px-3 sm:px-4 py-1.5 text-xs font-bold uppercase disabled:opacity-30 disabled:pointer-events-none cursor-pointer shadow-[2px_2px_0px_#000000] flex items-center gap-1.5"
+                className="btn-ink px-3 sm:px-4 py-1.5 text-xs font-bold uppercase disabled:opacity-30 disabled:pointer-events-none cursor-pointer shadow-[2px_2px_0px_#000000] flex items-center gap-1.5 shrink-0"
                 title={strokes.length === 0 ? "Dibuja en el lienzo antes de corregir" : "Corregir trazo y ver nota (Enter)"}
               >
                 <span>Corregir</span>
@@ -1245,11 +1351,11 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
               </button>
             </div>
           ) : (
-            /* Estado EVALUADO: NOTA visible, Siguiente, Reintentar */
+            /* Estado EVALUADO: NOTA visible, Siguiente, Reintentar, Stats del Trazo y Reporte */
             <div className="flex flex-col gap-1.5 w-full">
               <div className="flex items-center justify-between gap-2 p-2 border-2 border-black bg-white shadow-[2px_2px_0px_#000000]">
-                {/* Lado izquierdo: Reintentar, Auto-toggle y capas */}
-                <div className="flex items-center gap-1.5 sm:gap-2">
+                {/* Lado izquierdo: Reintentar, Auto-toggle, capas, Stats y Reporte */}
+                <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
                   <button
                     type="button"
                     onClick={handleRetry}
@@ -1267,10 +1373,10 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                     className={`px-2 py-1 text-xs font-bold border border-black flex items-center gap-1 cursor-pointer transition-colors shadow-[1px_1px_0px_#000000] ${
                       autoAdvance ? 'bg-black text-white' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
                     }`}
-                    title={autoAdvance ? "Auto-avance activado (espera 2s tras corregir). Haz clic para pausar." : "Auto-avance desactivado. Haz clic para activar."}
+                    title={autoAdvance ? "Auto-avance activado (espera 1.5s tras corregir). Haz clic para pausar." : "Auto-avance desactivado. Haz clic para activar."}
                   >
                     <Zap className={`w-3.5 h-3.5 ${autoAdvance ? 'fill-white' : ''}`} />
-                    <span className="text-[10px]">Auto: {autoAdvance ? 'ON (2s)' : 'OFF'}</span>
+                    <span className="text-[10px]">Auto: {autoAdvance ? 'ON (1.5s)' : 'OFF'}</span>
                   </button>
 
                   {/* Alternar capas en evaluado */}
@@ -1296,30 +1402,52 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                       title={showSolution ? "Ocultar guía / solución" : "Mostrar guía / solución"}
                     >
                       {showSolution ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                      <span className="hidden sm:inline text-[10px]">Solución</span>
+                      <span className="hidden md:inline text-[10px]">Solución</span>
                     </button>
                   )}
+
+                  {/* BOTÓN STATS DEL TRAZO (PAUSA AUTO-AVANCE MOMENTÁNEAMENTE) */}
+                  <button
+                    type="button"
+                    onClick={() => setShowStatsModal(true)}
+                    className="btn-ink-outline px-2 py-1 text-xs font-bold flex items-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000000] hover:bg-neutral-100"
+                    title="Ver estadísticas detalladas del trazo y biomecánica (pausa el auto-avance)"
+                  >
+                    <Activity className="w-3.5 h-3.5 stroke-[2.5]" />
+                    <span className="text-[10px] font-bold">Stats</span>
+                  </button>
+
+                  {/* BOTÓN DE REPORTE */}
+                  <button
+                    type="button"
+                    onClick={() => setShowReportModal(true)}
+                    className="btn-ink-outline px-2 py-1 text-xs font-bold flex items-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000000] hover:bg-neutral-100"
+                    title="Escribir nota y descargar reporte de depuración (pausa el auto-avance)"
+                  >
+                    <FileText className="w-3.5 h-3.5 stroke-[2]" />
+                    <span className="hidden sm:inline text-[10px] font-bold">Reporte</span>
+                  </button>
                 </div>
 
                 {/* Lado derecho: Botón Siguiente con cuenta atrás */}
                 <button
                   type="button"
                   onClick={handleNext}
-                  className="btn-ink px-4 py-1.5 text-xs uppercase font-bold flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] relative overflow-hidden"
+                  className="btn-ink px-4 py-1.5 text-xs uppercase font-bold flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] relative overflow-hidden shrink-0"
                   title="Siguiente ejercicio o versión (Enter / Espacio)"
                 >
                   {autoAdvance && autoAdvanceCountdown !== null && autoAdvanceCountdown > 0 && (
                     <div
-                      className="absolute bottom-0 left-0 top-0 bg-white/25 pointer-events-none transition-all duration-1000 ease-linear"
+                      className="absolute bottom-0 left-0 top-0 bg-white/25 pointer-events-none transition-all duration-100 ease-linear"
                       style={{
-                        width: `${((2 - autoAdvanceCountdown) / 2) * 100}%`,
+                        width: `${((1.5 - autoAdvanceCountdown) / 1.5) * 100}%`,
                       }}
                     />
                   )}
                   <span>
                     Siguiente
                     {autoAdvance && autoAdvanceCountdown !== null && autoAdvanceCountdown > 0
-                      ? ` (${autoAdvanceCountdown}s)`
+                      ? ` (${autoAdvanceCountdown.toFixed(1)}s)`
                       : ''}
                   </span>
                   <ArrowRight className="w-4 h-4 stroke-[2.5]" />
@@ -1328,6 +1456,331 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
             </div>
           )}
         </div>
+
+        {/* MODAL DE ESTADÍSTICAS DETALLADAS DEL TRAZO */}
+        {showStatsModal && evaluation && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 animate-fade-in font-mono">
+            <div className="bg-white border-4 border-black p-4 sm:p-5 max-w-lg w-full shadow-[8px_8px_0px_#000000] flex flex-col gap-3.5 max-h-[92vh] overflow-y-auto">
+              {/* Cabecera */}
+              <div className="flex items-center justify-between border-b-2 border-black pb-2">
+                <div className="flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-black stroke-[2.5]" />
+                  <h3 className="font-display font-bold text-sm sm:text-base uppercase tracking-tight">
+                    Estadísticas Detalladas del Trazo
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowStatsModal(false)}
+                  className="p-1 hover:bg-neutral-100 border border-black cursor-pointer active:scale-95 shadow-[1px_1px_0px_#000000]"
+                  title="Cerrar modal (Esc)"
+                >
+                  <X className="w-4 h-4 text-black stroke-[2.5]" />
+                </button>
+              </div>
+
+              {/* Resumen Global: Nota y Estado */}
+              <div className="flex items-center justify-between p-2.5 bg-neutral-100 border-2 border-black shadow-[2px_2px_0px_#000000]">
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-neutral-500 uppercase font-bold tracking-wider">
+                    Calificación Global
+                  </span>
+                  <span className="text-2xl font-bold tracking-tight">
+                    {evaluation.overallScore}%
+                  </span>
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                  <span
+                    className={`text-xs px-2 py-0.5 border border-black font-bold uppercase shadow-[1px_1px_0px_#000000] ${
+                      evaluation.passed ? 'bg-black text-white' : 'bg-white text-neutral-800'
+                    }`}
+                  >
+                    {evaluation.passed ? 'Aprobado ✅' : 'Reintentar ⚠️'}
+                  </span>
+                  <span className="text-[10px] text-neutral-600">
+                    Fase {currentPhase} · {evaluation.phasePassed ? 'Fase Superada' : 'Fase Pendiente'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Sección 1: Cinemática & Biomecánica */}
+              {evaluation.kinematics && (
+                <div className="flex flex-col gap-2 p-2.5 border-2 border-black bg-white shadow-[2px_2px_0px_#000000]">
+                  <div className="flex items-center justify-between border-b border-neutral-200 pb-1">
+                    <span className="text-xs font-bold uppercase tracking-wide flex items-center gap-1.5">
+                      <Zap className="w-3.5 h-3.5 text-black" />
+                      <span>Cinemática & Dinámica de Mano</span>
+                    </span>
+                    <span className="text-[10px] text-neutral-500">
+                      {evaluation.kinematics.durationMs}ms duración
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="p-2 bg-neutral-50 border border-neutral-300">
+                      <span className="text-[10px] text-neutral-500 block">Velocidad Media</span>
+                      <span className="font-bold text-sm">{evaluation.kinematics.avgSpeedPxPerSec} px/s</span>
+                      <span className="text-[10px] text-neutral-400 block">Pico: {evaluation.kinematics.peakSpeedPxPerSec} px/s</span>
+                    </div>
+
+                    <div className="p-2 bg-neutral-50 border border-neutral-300">
+                      <span className="text-[10px] text-neutral-500 block">Índice de Fluidez</span>
+                      <span className="font-bold text-sm">{evaluation.kinematics.fluencyScore}/100</span>
+                      <span className="text-[10px] text-neutral-400 block">
+                        {evaluation.kinematics.microStopCount} frenazo{evaluation.kinematics.microStopCount === 1 ? '' : 's'}
+                      </span>
+                    </div>
+
+                    <div className="p-2 bg-neutral-50 border border-neutral-300">
+                      <span className="text-[10px] text-neutral-500 block">Media de Usuario</span>
+                      <span className="font-bold text-sm">{evaluation.kinematics.userBaselineSpeedPxPerSec} px/s</span>
+                      <span className="text-[10px] text-neutral-400 block">
+                        Ratio: {Math.round(evaluation.kinematics.speedRatioVsBaseline * 100)}%
+                      </span>
+                    </div>
+
+                    <div className="p-2 bg-neutral-50 border border-neutral-300">
+                      <span className="text-[10px] text-neutral-500 block">Exigencia Fase {currentPhase}</span>
+                      <span className="font-bold text-xs truncate block" title={evaluation.kinematics.phaseRequirementText}>
+                        {evaluation.phasePassed ? 'Cumplida ✅' : 'No alcanzada ❌'}
+                      </span>
+                      <span className="text-[10px] text-neutral-400 block">
+                        {currentPhase === 1 ? 'Ritmo libre' : currentPhase === 2 ? 'Fluidez ≥60%' : 'Velocidad ≥480 px/s'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="text-[11px] bg-neutral-100 p-1.5 border border-neutral-300 text-neutral-700">
+                    <span className="font-bold text-black">Diagnóstico: </span>
+                    {evaluation.kinematics.speedDiagnosisLabel}
+                  </div>
+                </div>
+              )}
+
+              {/* Sección 2: Geometría & Precisión de Trazo */}
+              <div className="flex flex-col gap-2 p-2.5 border-2 border-black bg-white shadow-[2px_2px_0px_#000000]">
+                <div className="flex items-center justify-between border-b border-neutral-200 pb-1">
+                  <span className="text-xs font-bold uppercase tracking-wide flex items-center gap-1.5">
+                    <Check className="w-3.5 h-3.5 text-black" />
+                    <span>Precisión Geométrica</span>
+                  </span>
+                  <span className="text-[10px] text-neutral-500">
+                    {strokes.length} trazo{strokes.length === 1 ? '' : 's'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="p-2 bg-neutral-50 border border-neutral-300 text-center">
+                    <span className="text-[10px] text-neutral-500 block">Puntería</span>
+                    <span className="font-bold text-sm">{evaluation.metrics.boundaryScore}%</span>
+                  </div>
+                  <div className="p-2 bg-neutral-50 border border-neutral-300 text-center">
+                    <span className="text-[10px] text-neutral-500 block">Rectitud</span>
+                    <span className="font-bold text-sm">{evaluation.metrics.straightnessScore}%</span>
+                  </div>
+                  <div className="p-2 bg-neutral-50 border border-neutral-300 text-center">
+                    <span className="text-[10px] text-neutral-500 block">Paralelismo</span>
+                    <span className="font-bold text-sm">{evaluation.metrics.parallelismScore}%</span>
+                  </div>
+                </div>
+
+                {challenge.spacingTrackParams && (
+                  <div className="p-2 bg-neutral-50 border border-neutral-300 text-xs flex justify-between">
+                    <div>
+                      <span className="text-[10px] text-neutral-500 block">Paso Medido</span>
+                      <span className="font-bold">{evaluation.detectedStats.measuredAvgSpacingPx} px</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-neutral-500 block">Objetivo</span>
+                      <span className="font-bold">{challenge.targetSpacingPx} px</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-neutral-500 block">Dispersión</span>
+                      <span className="font-bold">±{evaluation.detectedStats.spacingVariance} px</span>
+                    </div>
+                  </div>
+                )}
+
+                {evaluation.directionWarning && (
+                  <div className="p-2 bg-red-50 border border-red-500 text-red-700 text-xs font-bold flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    <span>{evaluation.directionWarning}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Consejo didáctico */}
+              {evaluation.tipMessage && (
+                <div className="text-xs p-2 bg-neutral-50 border border-neutral-300 text-neutral-600">
+                  <strong className="text-black">Consejo: </strong>
+                  {evaluation.tipMessage}
+                </div>
+              )}
+
+              {/* Botones inferiores */}
+              <div className="flex items-center justify-between gap-2 pt-2 border-t border-neutral-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowStatsModal(false);
+                    handleRetry();
+                  }}
+                  className="btn-ink-outline px-3 py-1.5 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-[1px_1px_0px_#000000]"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Reintentar</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowStatsModal(false)}
+                    className="px-3 py-1.5 text-xs font-bold border border-black bg-neutral-100 hover:bg-neutral-200 cursor-pointer shadow-[1px_1px_0px_#000000]"
+                  >
+                    Cerrar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowStatsModal(false);
+                      handleNext();
+                    }}
+                    className="btn-ink px-3 py-1.5 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
+                  >
+                    <span>Siguiente</span>
+                    <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL DE REPORTE DE EVALUACIÓN Y DEPURACIÓN */}
+        {showReportModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 animate-fade-in font-mono">
+            <div className="bg-white border-4 border-black p-4 sm:p-5 max-w-lg w-full shadow-[8px_8px_0px_#000000] flex flex-col gap-3 max-h-[92vh] overflow-y-auto">
+              {/* Cabecera */}
+              <div className="flex items-center justify-between border-b-2 border-black pb-2">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-black stroke-[2.5]" />
+                  <h3 className="font-display font-bold text-sm sm:text-base uppercase tracking-tight">
+                    Reporte de Evaluación y Depuración
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowReportModal(false)}
+                  className="p-1 hover:bg-neutral-100 border border-black cursor-pointer active:scale-95 shadow-[1px_1px_0px_#000000]"
+                  title="Cerrar modal (Esc)"
+                >
+                  <X className="w-4 h-4 text-black stroke-[2.5]" />
+                </button>
+              </div>
+
+              {/* Metadatos del reto */}
+              <div className="flex items-center justify-between text-xs font-mono bg-neutral-50 p-2 border border-black">
+                <div>
+                  <span className="text-neutral-500">Semilla:</span> <strong>#{challenge.seed}</strong>
+                </div>
+                <div>
+                  <span className="text-neutral-500">Reto:</span> <strong>{challenge.code}</strong>
+                </div>
+                <div>
+                  <span className="text-neutral-500">Nota:</span>{' '}
+                  <strong>{evaluation ? `${evaluation.overallScore}%` : 'Sin evaluar'}</strong>
+                </div>
+              </div>
+
+              {/* Campo de Nota / Explicación del problema */}
+              <div className="flex flex-col gap-1.5 bg-neutral-50 p-3 border-2 border-black">
+                <label className="text-xs font-mono font-bold text-black flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 stroke-[2.5]" />
+                    <span>Nota o explicación del problema:</span>
+                  </span>
+                  <span className="text-[10px] text-neutral-500 font-normal hidden sm:inline">
+                    (Se guardará en el .JSON y en el texto copiado)
+                  </span>
+                </label>
+                <textarea
+                  value={userNote}
+                  onChange={(e) => setUserNote(e.target.value)}
+                  placeholder="Escribe aquí qué ocurrió (ej: 'El trazo iba fluido pero dio 75%', 'Sentido inverso erróneo', 'Dianas desalineadas')..."
+                  className="w-full h-20 p-2 text-xs font-mono bg-white border border-black resize-none focus:outline-none focus:ring-2 focus:ring-black selection:bg-black selection:text-white"
+                  autoFocus
+                />
+                <div className="flex flex-wrap gap-1 items-center pt-0.5">
+                  <span className="text-[10px] font-mono text-neutral-500 font-bold mr-1">Rápido:</span>
+                  {['Nota injusta', 'Trazo no detectado', 'Fallo en velocidad', 'Sentido invertido', 'Guía incorrecta'].map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => setUserNote((prev) => (prev ? `${prev} · ${tag}` : tag))}
+                      className="text-[10px] font-mono bg-white hover:bg-black hover:text-white border border-black px-1.5 py-0.5 cursor-pointer transition-colors shadow-[1px_1px_0px_#000000]"
+                    >
+                      +{tag}
+                    </button>
+                  ))}
+                  {userNote && (
+                    <button
+                      type="button"
+                      onClick={() => setUserNote('')}
+                      className="text-[10px] font-mono text-neutral-500 hover:text-black ml-auto underline cursor-pointer"
+                    >
+                      Borrar nota
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Vista previa del contenido */}
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] font-mono font-bold text-neutral-600">
+                  Vista previa del reporte (Markdown con tu nota):
+                </label>
+                <textarea
+                  readOnly
+                  value={currentReportMarkdown}
+                  className="w-full h-24 p-2 font-mono text-[10px] bg-neutral-50 border border-black resize-none selection:bg-black selection:text-white"
+                />
+              </div>
+
+              {/* Acciones de exportación */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-neutral-200">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleDownloadReport}
+                    className="btn-ink px-3 py-1.5 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
+                    title="Descargar archivo .JSON incluyendo tu nota"
+                  >
+                    {downloadedReport ? <Check className="w-3.5 h-3.5 stroke-[2.5]" /> : <Download className="w-3.5 h-3.5" />}
+                    <span>{downloadedReport ? '¡Descargado!' : 'Descargar JSON'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleCopyReport}
+                    className="btn-ink-outline px-3 py-1.5 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
+                    title="Copiar texto con tu nota al portapapeles"
+                  >
+                    {copiedReport ? <Check className="w-3.5 h-3.5 text-black stroke-[2.5]" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedReport ? '¡Copiado!' : 'Copiar Texto'}</span>
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowReportModal(false)}
+                  className="px-3 py-1.5 text-xs font-mono text-neutral-600 hover:text-black border border-neutral-300 hover:border-black cursor-pointer ml-auto"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
