@@ -174,14 +174,14 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
       });
     }, []);
 
-    // Temporizador de 3 segundos de auto-avance tras corregir (se pausa si hay aviso de cambio de fase)
+    // Temporizador de 2 segundos de auto-avance tras corregir (se pausa si hay aviso de cambio de fase)
     useEffect(() => {
       if (!evaluation || !autoAdvance || phaseTransitionNotice) {
         setAutoAdvanceCountdown(null);
         return;
       }
 
-      setAutoAdvanceCountdown(3);
+      setAutoAdvanceCountdown(2);
 
       const intervalId = setInterval(() => {
         setAutoAdvanceCountdown((prev) => {
@@ -195,7 +195,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
 
       const timeoutId = setTimeout(() => {
         handleNext();
-      }, 3000);
+      }, 2000);
 
       return () => {
         clearInterval(intervalId);
@@ -709,24 +709,24 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
           }
 
           // 4. Badge circular nítido (fondo blanco opaco que limpia la cuadrícula + borde entintado negro)
-          const badgeR = 8.5;
+          const badgeR = 9.5;
           ctx.fillStyle = '#FFFFFF';
           ctx.beginPath();
           ctx.arc(badgeX, badgeY, badgeR, 0, Math.PI * 2);
           ctx.fill();
 
           ctx.strokeStyle = '#000000';
-          ctx.lineWidth = 1.8;
+          ctx.lineWidth = 1.6;
           ctx.beginPath();
           ctx.arc(badgeX, badgeY, badgeR, 0, Math.PI * 2);
           ctx.stroke();
 
-          // 5. Número vectorial nítido con tipografía moderna del sistema
+          // 5. Número vectorial nítido perfectamente proporcionado y centrado
           ctx.fillStyle = '#000000';
-          ctx.font = 'bold 10px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+          ctx.font = 'bold 11px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText(labelText, badgeX, badgeY);
+          ctx.fillText(labelText, badgeX, badgeY + 0.3);
 
           ctx.restore();
         }
@@ -956,8 +956,15 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
 
     return (
       <div className="w-full flex flex-col items-center">
-        {/* Contenedor del lienzo 100% centrado */}
-        <div className="relative w-full flex items-center justify-center select-none touch-none">
+        {/* Contenedor del lienzo con aspect-ratio 600/540 estrictamente bloqueado para evitar distorsiones o achatamiento */}
+        <div
+          className="relative border-2 border-black bg-white shadow-[4px_4px_0px_#000000] select-none touch-none mx-auto overflow-hidden"
+          style={{
+            width: '100%',
+            maxWidth: 'min(100%, 600px, calc((100vh - 240px) * (600 / 540)))',
+            aspectRatio: '600 / 540',
+          }}
+        >
           <canvas
             ref={canvasRef}
             width={600}
@@ -966,11 +973,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerUp}
-            className="w-full h-auto aspect-[600/540] border-2 border-black bg-white shadow-[4px_4px_0px_#000000] cursor-crosshair touch-none select-none"
-            style={{
-              maxWidth: '100%',
-              maxHeight: 'calc(100vh - 220px)',
-            }}
+            className="block w-full h-full cursor-crosshair touch-none select-none"
           />
 
           {/* HUD SUPERIOR IZQUIERDO: MAESTRÍA Y FASE CINEMÁTICA (NÚMEROS, CUADRITOS E INFO) */}
@@ -1196,10 +1199,10 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                   className={`px-2 py-1 text-xs font-bold border border-black flex items-center gap-1 cursor-pointer transition-colors shadow-[1px_1px_0px_#000000] ${
                     autoAdvance ? 'bg-black text-white' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
                   }`}
-                  title={autoAdvance ? "Auto-avance activado (espera 3s tras corregir). Haz clic para desactivar." : "Auto-avance desactivado. Haz clic para activar."}
+                  title={autoAdvance ? "Auto-avance activado (espera 2s tras corregir). Haz clic para desactivar." : "Auto-avance desactivado. Haz clic para activar."}
                 >
                   <Zap className={`w-3.5 h-3.5 ${autoAdvance ? 'fill-white' : ''}`} />
-                  <span className="text-[10px]">Auto: {autoAdvance ? 'ON (3s)' : 'OFF'}</span>
+                  <span className="text-[10px]">Auto: {autoAdvance ? 'ON (2s)' : 'OFF'}</span>
                 </button>
 
                 {/* Alternar capas: Trazo y Solución */}
@@ -1264,10 +1267,10 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                     className={`px-2 py-1 text-xs font-bold border border-black flex items-center gap-1 cursor-pointer transition-colors shadow-[1px_1px_0px_#000000] ${
                       autoAdvance ? 'bg-black text-white' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
                     }`}
-                    title={autoAdvance ? "Auto-avance activado (espera 3s tras corregir). Haz clic para pausar." : "Auto-avance desactivado. Haz clic para activar."}
+                    title={autoAdvance ? "Auto-avance activado (espera 2s tras corregir). Haz clic para pausar." : "Auto-avance desactivado. Haz clic para activar."}
                   >
                     <Zap className={`w-3.5 h-3.5 ${autoAdvance ? 'fill-white' : ''}`} />
-                    <span className="text-[10px]">Auto: {autoAdvance ? 'ON (3s)' : 'OFF'}</span>
+                    <span className="text-[10px]">Auto: {autoAdvance ? 'ON (2s)' : 'OFF'}</span>
                   </button>
 
                   {/* Alternar capas en evaluado */}
@@ -1309,7 +1312,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                     <div
                       className="absolute bottom-0 left-0 top-0 bg-white/25 pointer-events-none transition-all duration-1000 ease-linear"
                       style={{
-                        width: `${((3 - autoAdvanceCountdown) / 3) * 100}%`,
+                        width: `${((2 - autoAdvanceCountdown) / 2) * 100}%`,
                       }}
                     />
                   )}

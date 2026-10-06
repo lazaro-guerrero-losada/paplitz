@@ -570,7 +570,7 @@ export function App() {
     const recordedScore = Math.round(evalResult.overallScore);
     setScoresHistory((prev) => [...prev.slice(-19), recordedScore]);
 
-    if (evalResult.passed && recordedScore >= 90) {
+    if (evalResult.passed && evalResult.phasePassed !== false && recordedScore >= 90) {
       setAvatarMood('success-stars');
       setTimeout(() => setAvatarMood('neutral'), 2600);
       setXp((prev) => prev + 25);

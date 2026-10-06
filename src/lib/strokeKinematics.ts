@@ -219,29 +219,31 @@ export function analyzeStrokeKinematics(
     }
   } else if (currentPhase === 2) {
     // FASE 2: RITMO Y FLUIDEZ
-    // Exige velocidad continua sin titubeos ni micro-paradas (fluidez >= 65% y velocidad >= 60% de su media)
-    const minSpeed = userBaseline * 0.55;
-    phaseRequirementText = `Fase 2: Trazo continuo y fluido (≥${Math.round(minSpeed)} px/s sin frenazos)`;
-    phasePassed = fluencyScore >= 62 && avgSpeedPxPerSec >= minSpeed && microStopCount <= 2;
+    // Exige velocidad continua de dibujo sin titubeos ni micro-paradas (fluidez >= 68% y velocidad sostenida >= 380 px/s o 80% baseline)
+    const minSpeed = Math.max(380, Math.round(userBaseline * 0.80));
+    phaseRequirementText = `Fase 2: Trazo continuo y fluido (≥${minSpeed} px/s sin vacilaciones)`;
+    phasePassed = fluencyScore >= 68 && avgSpeedPxPerSec >= minSpeed && microStopCount <= 1;
 
-    if (fluencyScore < 62 || microStopCount > 2) {
+    if (fluencyScore < 68 || microStopCount > 1) {
       speedDiagnosisLabel = 'Se detectó titubeo o micro-paradas';
     } else if (avgSpeedPxPerSec < minSpeed) {
-      speedDiagnosisLabel = 'Demasiado cauto para Fase 2';
+      speedDiagnosisLabel = `Demasiado lento para Fase 2 (${avgSpeedPxPerSec} px/s, requieres ≥${minSpeed} px/s)`;
     } else {
       speedDiagnosisLabel = 'Fluidez constante excelente';
     }
   } else {
     // FASE 3: VELOCIDAD Y DISPARO BALÍSTICO
-    // Exige golpe decidido y rápido: >= 1.25x su media personal (o duración rápida <= 360ms)
-    const targetFastSpeed = Math.round(userBaseline * 1.25);
-    phaseRequirementText = `Fase 3: Trazo balístico rápido (≥${targetFastSpeed} px/s)`;
-    phasePassed = avgSpeedPxPerSec >= targetFastSpeed || durationMs <= 360;
+    // Exige golpe decidido y rápido: >= 650 px/s y >= 1.35x su media, en un impulso rápido (<=380ms)
+    const targetFastSpeed = Math.max(650, Math.round(userBaseline * 1.35));
+    phaseRequirementText = `Fase 3: Trazo balístico rápido (≥${targetFastSpeed} px/s en ≤380ms)`;
+    phasePassed = avgSpeedPxPerSec >= targetFastSpeed && durationMs <= 380;
 
     if (phasePassed) {
-      speedDiagnosisLabel = '¡Disparo balístico certero!';
+      speedDiagnosisLabel = '¡Disparo balístico certero a gran velocidad!';
+    } else if (avgSpeedPxPerSec < targetFastSpeed) {
+      speedDiagnosisLabel = `Velocidad insuficiente: vas a ${avgSpeedPxPerSec} px/s (requieres ≥${targetFastSpeed} px/s)`;
     } else {
-      speedDiagnosisLabel = `Aumenta la velocidad: requieres ≥${targetFastSpeed} px/s`;
+      speedDiagnosisLabel = `Demasiado tiempo en el lienzo: ${durationMs}ms (requieres impulso rápido ≤380ms)`;
     }
   }
 

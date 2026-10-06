@@ -393,37 +393,7 @@ export function evaluateSingleStrokeSubmission(
     }
   }
 
-  // 6. Cálculo Global Ponderado
-  let overallScore = Math.round(
-    boundaryScore * 0.40 + straightnessScore * 0.35 + parallelismScore * 0.25
-  );
-  let directionWarning: string | undefined;
-
-  if (isReversed) {
-    overallScore = 0;
-    boundaryScore = 0;
-    straightnessScore = 0;
-    parallelismScore = 0;
-    directionWarning = '⚠️ DIRECCIÓN INVERTIDA: Has trazado en sentido contrario (de ② hacia ①). Debes iniciar en ① y proyectar hacia ②.';
-  }
-
-  // Criterios estrictos de aprobación (evitar falsos positivos)
-  let passed = overallScore >= 70;
-  if (isReversed) {
-    passed = false;
-  }
-  // No se aprueba si erró excesivamente los puntos diana o se torció
-  if (startErr > 38 || endErr > 44) {
-    passed = false;
-  }
-  if (!isCurve && angleDiff > 20) {
-    passed = false;
-  }
-  if (!isCurve && straightnessScore < 60) {
-    passed = false;
-  }
-
-  // 7. Análisis Cinemático y Derivadas (Velocidad, Aceleración, Fluidez y Fase)
+  // 6. Análisis Cinemático y Derivadas (Velocidad, Aceleración, Fluidez y Fase)
   const activePhase = challenge.activePhase || 1;
   const directionKey =
     challenge.directionKey || (challenge.category === 'single_stroke_curve' ? 'curve_c' : 'general');
@@ -439,8 +409,61 @@ export function evaluateSingleStrokeSubmission(
     recordStrokeSpeed(directionKey, kinematics.avgSpeedPxPerSec);
   }
 
-  // La fase se aprueba si cumple tanto la geometría como el criterio de velocidad/fluidez de su fase
-  const phasePassed = passed && kinematics.phasePassed;
+  // 7. Cálculo Global Ponderado según Fase de Motricidad
+  const geometricScore = Math.round(
+    boundaryScore * 0.40 + straightnessScore * 0.35 + parallelismScore * 0.25
+  );
+
+  let overallScore = geometricScore;
+  let phasePassed = false;
+
+  if (activePhase === 1) {
+    // Fase 1: Precisión pura de puntería y rectitud
+    overallScore = geometricScore;
+    phasePassed = overallScore >= 75 && kinematics.phasePassed;
+  } else if (activePhase === 2) {
+    // Fase 2: Fluidez (65% Geometría + 35% Fluidez cinemática)
+    overallScore = Math.round(geometricScore * 0.65 + kinematics.fluencyScore * 0.35);
+    // Si no cumple el criterio de fluidez de Fase 2, la nota queda capada
+    if (!kinematics.phasePassed) {
+      overallScore = Math.min(overallScore, 75);
+    }
+    phasePassed = overallScore >= 75 && kinematics.phasePassed;
+  } else {
+    // Fase 3: Velocidad Balística (50% Geometría + 50% Velocidad Balística)
+    const targetFastSpeed = Math.max(650, Math.round(kinematics.userBaselineSpeedPxPerSec * 1.35));
+    const speedRatio = kinematics.avgSpeedPxPerSec / targetFastSpeed;
+    const speedScore = Math.min(100, Math.round(Math.max(0, speedRatio * 100)));
+
+    overallScore = Math.round(geometricScore * 0.50 + speedScore * 0.50);
+    // Si no alcanza la velocidad requerida de Fase 3, la nota queda capada a máx 75% impidiendo maestría
+    if (!kinematics.phasePassed) {
+      overallScore = Math.min(overallScore, 75);
+    }
+    phasePassed = overallScore >= 75 && kinematics.phasePassed;
+  }
+
+  let directionWarning: string | undefined;
+  if (isReversed) {
+    overallScore = 0;
+    boundaryScore = 0;
+    straightnessScore = 0;
+    parallelismScore = 0;
+    phasePassed = false;
+    directionWarning = '⚠️ DIRECCIÓN INVERTIDA: Has trazado en sentido contrario (de ② hacia ①). Debes iniciar en ① y proyectar hacia ②.';
+  }
+
+  // Criterios estrictos de aprobación (Geometría + Cinemática de Fase cumplida)
+  let passed = !isReversed && overallScore >= 75 && phasePassed;
+  if (startErr > 38 || endErr > 44) {
+    passed = false;
+  }
+  if (!isCurve && angleDiff > 20) {
+    passed = false;
+  }
+  if (!isCurve && straightnessScore < 60) {
+    passed = false;
+  }
 
   let feedbackTitle = '¡Buen Trazo!';
   let feedbackMessage = `Puntería: ${boundaryScore}%, Rectitud: ${straightnessScore}%, Ángulo: ${parallelismScore}%.`;
@@ -453,7 +476,17 @@ export function evaluateSingleStrokeSubmission(
     tipMessage = 'Observa el número 1 antes de apoyar el lápiz.';
     avatarMood = 'fail-spiral';
   } else if (!passed) {
-    if (overallScore >= 50) {
+    if (activePhase === 2 && !kinematics.phasePassed) {
+      feedbackTitle = 'Línea Precisa pero Falta Fluidez 〰️';
+      feedbackMessage = `${kinematics.speedDiagnosisLabel}. Fluidez: ${kinematics.fluencyScore}%. ${kinematics.phaseRequirementText}.`;
+      tipMessage = 'Bloquea la muñeca y mueve el antebrazo en un único impulso sin corregir a mitad de camino.';
+      avatarMood = 'curious';
+    } else if (activePhase === 3 && !kinematics.phasePassed) {
+      feedbackTitle = 'Buena Línea pero Requiere Velocidad ⚡';
+      feedbackMessage = `${kinematics.speedDiagnosisLabel}. Velocidad: ${kinematics.avgSpeedPxPerSec} px/s. ${kinematics.phaseRequirementText}.`;
+      tipMessage = 'Proyecta el movimiento con dos pasadas rápidas en el aire (ghosting) y dispara sin miedo con impulso balístico.';
+      avatarMood = 'curious';
+    } else if (overallScore >= 50) {
       feedbackTitle = 'Cerca de la Diana 🏹';
       feedbackMessage = `Desviación en extremos (error: ${Math.round(avgEndpointErr)}px) o ángulo desviado (${Math.round(angleDiff)}°).`;
       tipMessage = 'Haz 1 o 2 pasadas en el aire antes de tocar la pantalla (Ghosting).';
@@ -463,19 +496,6 @@ export function evaluateSingleStrokeSubmission(
       feedbackMessage = `El trazo se desvió del objetivo (${overallScore}%).`;
       tipMessage = 'Fija la mirada en el punto ② antes de iniciar el movimiento en ①.';
       avatarMood = 'fail-spiral';
-    }
-  } else if (!kinematics.phasePassed) {
-    // Geometría aprobada, pero no cumplió la velocidad/fluidez requerida para esta fase
-    if (activePhase === 2) {
-      feedbackTitle = 'Línea Precisa pero Falta Fluidez 〰️';
-      feedbackMessage = `${kinematics.speedDiagnosisLabel}. Fluidez: ${kinematics.fluencyScore}%. ${kinematics.phaseRequirementText}.`;
-      tipMessage = 'Bloquea la muñeca y mueve el antebrazo en un único impulso sin corregir a mitad de camino.';
-      avatarMood = 'curious';
-    } else if (activePhase === 3) {
-      feedbackTitle = 'Buena Línea pero Requiere Velocidad ⚡';
-      feedbackMessage = `Velocidad: ${kinematics.avgSpeedPxPerSec} px/s (${kinematics.speedDiagnosisLabel}). ${kinematics.phaseRequirementText}.`;
-      tipMessage = 'Proyecta el movimiento con dos pasadas rápidas en el aire y dispara sin miedo a fallar.';
-      avatarMood = 'wink';
     }
   } else {
     // Fase plenamente superada (Geometría + Cinemática)
@@ -769,21 +789,8 @@ export function evaluateMultiLineSubmission(
   const avgBoundary = Math.round(lineResults.reduce((a, b) => a + b.boundaryScore, 0) / lineResults.length);
   const avgStraightness = Math.round(lineResults.reduce((a, b) => a + b.straightnessScore, 0) / lineResults.length);
   const avgAngle = Math.round(lineResults.reduce((a, b) => a + b.angleScore, 0) / lineResults.length);
-  let overallScore = Math.round(lineResults.reduce((a, b) => a + b.overallLineScore, 0) / lineResults.length);
-
+  const geometricScore = Math.round(lineResults.reduce((a, b) => a + b.overallLineScore, 0) / lineResults.length);
   const hasAnyReversed = lineResults.some((r) => r.isReversed);
-  if (hasAnyReversed) {
-    overallScore = 0;
-  }
-
-  // Criterios estrictos de aprobación
-  let passed = overallScore >= 70 && !hasAnyReversed;
-  for (const r of lineResults) {
-    if (r.startErr > 40 || r.endErr > 46 || r.angleDiff > 22 || r.straightnessScore < 55) {
-      passed = false;
-      break;
-    }
-  }
 
   // 4. Cinemática de cada trazo y agregación
   const activePhase = challenge.activePhase || 1;
@@ -812,7 +819,39 @@ export function evaluateMultiLineSubmission(
   const speedRatio = Math.round((avgSpeed / userBaseline) * 100) / 100;
 
   const allPhasesPassed = kinematicResults.every((k) => k.phasePassed);
-  const phasePassed = passed && allPhasesPassed;
+
+  let overallScore = geometricScore;
+  if (activePhase === 1) {
+    overallScore = geometricScore;
+  } else if (activePhase === 2) {
+    overallScore = Math.round(geometricScore * 0.65 + avgFluency * 0.35);
+    if (!allPhasesPassed) {
+      overallScore = Math.min(overallScore, 75);
+    }
+  } else {
+    const targetFastSpeed = Math.max(650, Math.round(userBaseline * 1.35));
+    const speedRatio = avgSpeed / targetFastSpeed;
+    const speedScore = Math.min(100, Math.round(Math.max(0, speedRatio * 100)));
+    overallScore = Math.round(geometricScore * 0.50 + speedScore * 0.50);
+    if (!allPhasesPassed) {
+      overallScore = Math.min(overallScore, 75);
+    }
+  }
+
+  if (hasAnyReversed) {
+    overallScore = 0;
+  }
+
+  const phasePassed = !hasAnyReversed && allPhasesPassed && overallScore >= 75;
+
+  // Criterios estrictos de aprobación (Geometría + Cinemática de Fase)
+  let passed = !hasAnyReversed && overallScore >= 75 && phasePassed;
+  for (const r of lineResults) {
+    if (r.startErr > 40 || r.endErr > 46 || r.angleDiff > 22 || r.straightnessScore < 55) {
+      passed = false;
+      break;
+    }
+  }
 
   let speedDiagnosis = 'Ritmo constante en todas las líneas';
   if (avgSpeed < userBaseline * 0.5) speedDiagnosis = 'Ritmo calmado de calibración';
