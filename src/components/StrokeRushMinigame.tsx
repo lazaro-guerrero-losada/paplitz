@@ -7,8 +7,10 @@ import {
   Clock,
   Check,
   Undo2,
-  Filter,
   Sparkles,
+  Shuffle,
+  Target,
+  AlertTriangle,
 } from 'lucide-react';
 import { LessonNode } from '../lib/curriculumData';
 import { AvatarMood } from '../lib/avatarTypes';
@@ -111,7 +113,7 @@ function evaluateUserStrokeAgainstLine(userPts: Point[], linePts: Point[]): { sc
 
   let sumRev = 0;
   for (let i = 0; i < N; i++) {
-    sumRev += Math.hypot(sUser[i].x - sLine[N - 1 - i].x, sUser[i].y - sLine[N - 1 - i].y);
+    sumRev += Math.hypot(sUser[i].x - sLine[N - 1 - i].x, sLine[N - 1 - i].y - sUser[i].y);
   }
   const avgRev = sumRev / N;
 
@@ -153,7 +155,8 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
   const calNodes = unlockedNodes.filter((n) => n.isCalisthenics);
   const defaultCalNode = calNodes.find((n) => n.id === activeNode.id) || calNodes[0] || activeNode;
 
-  // Nivel seleccionado de calistenia
+  // Selección de ejercicios: Modo Aleatorio (cada trazo diferente) vs Por Nivel
+  const [isRandomMode, setIsRandomMode] = useState<boolean>(true);
   const [selectedNodeId, setSelectedNodeId] = useState<string>(defaultCalNode.id);
   const selectedNode = calNodes.find((n) => n.id === selectedNodeId) || defaultCalNode;
 
@@ -172,16 +175,19 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
   const [lastEval, setLastEval] = useState<LineEvaluation | null>(null);
   const [flashBanner, setFlashBanner] = useState<{ text: string; positive: boolean } | null>(null);
 
-  // Récords
-  const [highScores, setHighScores] = useState<{ survival: number; blitz: number }>(() => {
+  // Récords según modo aleatorio o nodo específico
+  const scoreKey = isRandomMode ? 'random' : selectedNode.code;
+  const [highScores, setHighScores] = useState<{ survival: number; blitz: number }>({ survival: 0, blitz: 0 });
+
+  useEffect(() => {
     try {
-      const s = localStorage.getItem(`paplitz_rush_survival_${selectedNode.code}`) || '0';
-      const b = localStorage.getItem(`paplitz_rush_blitz_${selectedNode.code}`) || '0';
-      return { survival: parseInt(s, 10), blitz: parseInt(b, 10) };
+      const s = localStorage.getItem(`paplitz_rush_survival_${scoreKey}`) || '0';
+      const b = localStorage.getItem(`paplitz_rush_blitz_${scoreKey}`) || '0';
+      setHighScores({ survival: parseInt(s, 10), blitz: parseInt(b, 10) });
     } catch {
-      return { survival: 0, blitz: 0 };
+      setHighScores({ survival: 0, blitz: 0 });
     }
-  });
+  }, [scoreKey]);
 
   // Trazado en curso
   const [userStroke, setUserStroke] = useState<Point[] | null>(null);
@@ -194,7 +200,7 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
   // Máximo número de líneas simultáneas antes de desbordamiento (Game Over)
   const MAX_LINES_OVERFLOW = 6;
 
-  // Genera una nueva línea basada estrictamente en el nivel de calistenia seleccionado
+  // Genera una nueva línea basada en un nodo de calistenia
   const spawnLineForNode = useCallback(
     (node: LessonNode, existingLines: ActiveRushLine[]): ActiveRushLine => {
       const rng = new SeededRNG(Math.floor(Math.random() * 900000 + 10000));
@@ -218,7 +224,7 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
         }
       }
 
-      // Si no hay puntos generados, fallback a línea basada en dirección del nivel
+      // Si no hay puntos generados, fallback a línea horizontal
       if (rawPoints.length < 2) {
         rawPoints = [
           { x: 120, y: 270 },
@@ -286,8 +292,19 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
     []
   );
 
+  // Selector dinámico de la siguiente línea: Aleatoria de cualquier ejercicio o del nivel elegido
+  const spawnNextLine = useCallback(
+    (existingLines: ActiveRushLine[]): ActiveRushLine => {
+      const nodeToUse = isRandomMode
+        ? (calNodes[Math.floor(Math.random() * calNodes.length)] || selectedNode)
+        : selectedNode;
+      return spawnLineForNode(nodeToUse, existingLines);
+    },
+    [isRandomMode, calNodes, selectedNode, spawnLineForNode]
+  );
+
   // Iniciar partida
-  const startGame = (mode: 'survival' | 'blitz' = gameMode) => {
+  const startGame = useCallback((mode: 'survival' | 'blitz' = gameMode) => {
     setGameMode(mode);
     setGameState('playing');
     setClearedScores([]);
@@ -299,18 +316,18 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
     setLastEval(null);
     setFlashBanner(null);
 
-    // Inicializar con 2 líneas en pantalla
-    const firstLine = spawnLineForNode(selectedNode, []);
-    const secondLine = spawnLineForNode(selectedNode, [firstLine]);
+    // Inicializar con 2 líneas en pantalla de inmediato
+    const firstLine = spawnNextLine([]);
+    const secondLine = spawnNextLine([firstLine]);
     setActiveLines([firstLine, secondLine]);
-  };
+  }, [gameMode, spawnNextLine]);
 
   // Fin de la partida
   const finishGame = useCallback(
     (reason: 'overflow' | 'timeout') => {
       setGameOverReason(reason);
       setGameState('gameover');
-      if (spawnTimerRef.current) clearInterval(spawnTimerRef.current);
+      if (spawnTimerRef.current) clearTimeout(spawnTimerRef.current);
       if (gameLoopRef.current) clearInterval(gameLoopRef.current);
 
       const count = clearedScores.length;
@@ -327,7 +344,7 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
         if (count > highScores.survival) {
           setHighScores((prev) => ({ ...prev, survival: count }));
           try {
-            localStorage.setItem(`paplitz_rush_survival_${selectedNode.code}`, count.toString());
+            localStorage.setItem(`paplitz_rush_survival_${scoreKey}`, count.toString());
           } catch {
             // Ignorar
           }
@@ -336,14 +353,14 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
         if (count > highScores.blitz) {
           setHighScores((prev) => ({ ...prev, blitz: count }));
           try {
-            localStorage.setItem(`paplitz_rush_blitz_${selectedNode.code}`, count.toString());
+            localStorage.setItem(`paplitz_rush_blitz_${scoreKey}`, count.toString());
           } catch {
             // Ignorar
           }
         }
       }
 
-      const xpEarned = Math.round(count * 12 + (clearedScores.length > 0 ? (clearedScores.reduce((a, b) => a + b, 0) / count) * 0.3 : 0));
+      const xpEarned = Math.round(count * 14 + (clearedScores.length > 0 ? (clearedScores.reduce((a, b) => a + b, 0) / count) * 0.3 : 0));
       if (xpEarned > 0 && onAwardXP) {
         onAwardXP(xpEarned);
       }
@@ -353,25 +370,39 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
         setTimeout(() => onAvatarMoodChange('neutral'), 3000);
       }
     },
-    [clearedScores, gameMode, highScores, onAvatarMoodChange, onAwardXP, selectedNode.code]
+    [clearedScores, gameMode, highScores, onAvatarMoodChange, onAwardXP, scoreKey]
   );
 
-  // Spawner periódico de líneas que se acumulan
+  // Spawner dinámico e inteligente: mucho más rápido y sin esperas si hay pocas o cero líneas
   useEffect(() => {
     if (gameState !== 'playing') return;
 
-    // Intervalo de aparición: empieza en 3.5s y se acelera suavemente conforme eliminas líneas
-    const currentSpeedMs = Math.max(1800, 3500 - clearedScores.length * 120);
+    let delayMs: number;
+    const count = activeLines.length;
 
-    const timer = window.setInterval(() => {
+    if (count === 0) {
+      // 0 líneas en pantalla: spawn casi instantáneo (280ms) para cero aburrimiento
+      delayMs = 280;
+    } else if (count === 1) {
+      // 1 línea: aparición rápida y viva
+      const speedUp = Math.min(450, clearedScores.length * 30);
+      delayMs = Math.max(750, 1200 - speedUp);
+    } else {
+      // Líneas acumuladas (2, 3, 4, 5):
+      // El ritmo varía adaptativamente según la acumulación y las líneas resueltas
+      const baseDelay = 1750 + (count - 2) * 150;
+      const speedUp = Math.min(750, clearedScores.length * 35);
+      delayMs = Math.max(900, baseDelay - speedUp);
+    }
+
+    const timer = window.setTimeout(() => {
       setActiveLines((prev) => {
-        // Si ya hay MAX_LINES_OVERFLOW, se produce el desbordamiento
         if (prev.length >= MAX_LINES_OVERFLOW) {
           finishGame('overflow');
           return prev;
         }
 
-        const newLine = spawnLineForNode(selectedNode, prev);
+        const newLine = spawnNextLine(prev);
         const updated = [...prev, newLine];
 
         if (updated.length >= MAX_LINES_OVERFLOW) {
@@ -379,11 +410,11 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
         }
         return updated;
       });
-    }, currentSpeedMs);
+    }, delayMs);
 
     spawnTimerRef.current = timer;
-    return () => clearInterval(timer);
-  }, [gameState, clearedScores.length, selectedNode, spawnLineForNode, finishGame]);
+    return () => clearTimeout(timer);
+  }, [gameState, activeLines.length, clearedScores.length, spawnNextLine, finishGame]);
 
   // Temporizador principal de juego
   useEffect(() => {
@@ -447,11 +478,11 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
 
       ctx.save();
 
-      // Si está en fallo (shake), resalta en rojo técnico; si no, gris suave con halo
+      // Si está en fallo (shake), resalta en rojo técnico; si no, gris con halo
       const strokeColor = isShaking ? '#DC2626' : '#71717A';
       const glowColor = isShaking ? '#FEE2E2' : '#F4F4F5';
 
-      // Halo
+      // Halo protector
       ctx.strokeStyle = glowColor;
       ctx.lineWidth = 8;
       ctx.lineCap = 'round';
@@ -550,7 +581,7 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
     renderCanvas();
   }, [renderCanvas]);
 
-  // Coordenadas normalizadas
+  // Coordenadas normalizadas perfectamente al canvas 600x540
   const getCoords = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0, pressure: 0.5 };
@@ -641,12 +672,24 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
       targetLineId: targetLine.id,
     });
 
-    // 2. REGLA PEDIDA POR EL USUARIO:
-    // "cuando la haces se quita, pero si no la haces se van acumulando porque van a apareciendo más y más,
-    // y si haces una línea por debajo de un umbral pues no se quita porque está mal"
     if (evalResult.passed) {
       // APROBADA (≥70%): SE QUITA DE LA PANTALLA
-      setActiveLines((prev) => prev.filter((l) => l.id !== targetLine.id));
+      setActiveLines((prev) => {
+        const nextLines = prev.filter((l) => l.id !== targetLine.id);
+        // Si al eliminar esta línea la pantalla queda VACÍA (0 líneas),
+        // programar un spawn inmediato en 250ms para que nunca haya aburrimiento
+        if (nextLines.length === 0) {
+          if (spawnTimerRef.current) clearTimeout(spawnTimerRef.current);
+          spawnTimerRef.current = window.setTimeout(() => {
+            setActiveLines((cur) => {
+              if (cur.length >= MAX_LINES_OVERFLOW) return cur;
+              return [...cur, spawnNextLine(cur)];
+            });
+          }, 250);
+        }
+        return nextLines;
+      });
+
       setClearedScores((prev) => [...prev, evalResult.score]);
 
       const nextCombo = comboStreak + 1;
@@ -662,10 +705,10 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
       }
 
       setFlashBanner({
-        text: evalResult.score >= 90 ? `¡IMPECABLE! ${evalResult.score}% (Línea eliminada)` : `¡ELIMINADA! ${evalResult.score}%`,
+        text: evalResult.score >= 90 ? `¡IMPECABLE! ${evalResult.score}% (Eliminada)` : `¡ELIMINADA! ${evalResult.score}%`,
         positive: true,
       });
-      setTimeout(() => setFlashBanner(null), 1600);
+      setTimeout(() => setFlashBanner(null), 1500);
     } else {
       // SUSPENSA (<70%): NO SE QUITA, SE QUEDA ACUMULADA Y PARPADEA EN ROJO
       setActiveLines((prev) =>
@@ -695,280 +738,413 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
       : 0;
 
   return (
-    <div className="max-w-4xl w-full mx-auto px-3 sm:px-4 py-4 flex flex-col gap-4 font-sans select-none">
-      {/* 1. CABECERA DEL MINIJUEGO */}
-      <div className="flex items-center justify-between border-b-2 border-black pb-3">
-        <div className="flex items-center gap-2.5">
-          <div className="w-10 h-10 border-2 border-black bg-neutral-100 flex items-center justify-center shadow-[2px_2px_0px_#000000]">
-            <Zap className="w-5 h-5 text-black stroke-[2.5]" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-mono uppercase bg-black text-white px-1.5 py-0.2 font-bold">
-                MINIJUEGO
+    <div className="w-full flex-1 flex flex-col md:flex-row overflow-hidden bg-neutral-100 min-h-[calc(100vh-64px)] font-sans select-none">
+      {/* 1. BARRA LATERAL IZQUIERDA: TODA LA INFORMACIÓN, CONFIGURACIÓN Y ESTADÍSTICAS */}
+      <aside className="w-full md:w-80 bg-white border-r-2 border-black p-3.5 space-y-3 font-mono shadow-[4px_0px_0px_#000000] flex flex-col shrink-0 overflow-y-auto">
+        {/* CABECERA Y BOTÓN SALIR */}
+        <div className="flex items-center justify-between pb-2 border-b-2 border-black">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 bg-black text-white flex items-center justify-center shadow-[1px_1px_0px_#000000]">
+              <Zap className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-neutral-500 uppercase block leading-none">
+                Minijuego
               </span>
-              <span className="text-[10px] font-mono text-neutral-500 font-bold uppercase">
-                · Limpieza de Pantalla
+              <span className="text-xs font-bold font-display uppercase tracking-wider text-black">
+                Avalancha
               </span>
             </div>
-            <h2 className="text-xl sm:text-2xl font-bold font-display leading-tight flex items-center gap-1.5">
-              <span>Avalancha de Trazos</span>
-            </h2>
           </div>
-        </div>
 
-        <button
-          onClick={onExit}
-          className="btn-ink-outline px-3 py-1.5 text-xs font-mono font-bold flex items-center gap-1 cursor-pointer shadow-[2px_2px_0px_#000000]"
-          title="Volver al menú de minijuegos"
-        >
-          <Undo2 className="w-3.5 h-3.5" />
-          <span>Volver</span>
-        </button>
-      </div>
-
-      {/* 2. SELECTOR DE NIVEL DE TRAZOS: "Las líneas que hayan hecho tiene que ir en función del nivel por el que vayas de trazos" */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-2 border-black p-2 bg-neutral-50 shadow-[2px_2px_0px_#000000] text-xs font-mono">
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-black shrink-0" />
-          <span className="font-bold uppercase text-[10px] text-neutral-600">Nivel de Calistenia:</span>
-          <select
-            value={selectedNodeId}
-            onChange={(e) => {
-              setSelectedNodeId(e.target.value);
-              if (gameState === 'playing') {
-                startGame(gameMode);
-              }
-            }}
-            disabled={gameState === 'playing'}
-            className="border-2 border-black px-2 py-1 text-xs font-mono font-bold bg-white cursor-pointer max-w-[220px] sm:max-w-xs truncate shadow-[1px_1px_0px_#000000]"
+          <button
+            type="button"
+            onClick={onExit}
+            className="btn-ink-outline px-2.5 py-1 text-xs font-bold flex items-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000000]"
+            title="Volver al menú de minijuegos"
           >
-            {calNodes.map((n) => (
-              <option key={n.id} value={n.id}>
-                {n.code} · {n.title}
-              </option>
-            ))}
-          </select>
+            <Undo2 className="w-3.5 h-3.5" />
+            <span>Volver</span>
+          </button>
         </div>
 
-        {gameState === 'idle' && (
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-bold text-neutral-500 uppercase mr-1">Modo:</span>
+        {/* SELECTOR DE MODALIDAD: SUPERVIVENCIA VS BLITZ */}
+        <div className="space-y-1">
+          <span className="text-[10px] uppercase font-bold text-neutral-500">Modalidad:</span>
+          <div className="grid grid-cols-2 gap-1.5 p-1 border-2 border-black bg-neutral-100 shadow-[2px_2px_0px_#000000]">
             <button
-              onClick={() => setGameMode('survival')}
-              className={`px-2 py-1 border border-black font-bold cursor-pointer ${
-                gameMode === 'survival' ? 'bg-black text-white' : 'bg-white text-black'
+              type="button"
+              onClick={() => {
+                setGameMode('survival');
+                if (gameState === 'playing') startGame('survival');
+              }}
+              className={`py-1.5 px-2 text-xs font-mono font-bold flex items-center justify-center gap-1 cursor-pointer border border-black transition-colors ${
+                gameMode === 'survival'
+                  ? 'bg-black text-white shadow-[1px_1px_0px_#000000]'
+                  : 'bg-white text-black hover:bg-neutral-200'
               }`}
             >
-              Supervivencia
+              <span>Supervivencia</span>
             </button>
             <button
-              onClick={() => setGameMode('blitz')}
-              className={`px-2 py-1 border border-black font-bold cursor-pointer ${
-                gameMode === 'blitz' ? 'bg-black text-white' : 'bg-white text-black'
+              type="button"
+              onClick={() => {
+                setGameMode('blitz');
+                if (gameState === 'playing') startGame('blitz');
+              }}
+              className={`py-1.5 px-2 text-xs font-mono font-bold flex items-center justify-center gap-1 cursor-pointer border border-black transition-colors ${
+                gameMode === 'blitz'
+                  ? 'bg-black text-white shadow-[1px_1px_0px_#000000]'
+                  : 'bg-white text-black hover:bg-neutral-200'
               }`}
             >
-              Blitz 60s
+              <span>Blitz 60s</span>
             </button>
           </div>
-        )}
-      </div>
-
-      {/* 3. BARRA DE ESTADÍSTICAS Y ALARMA DE SATURACIÓN DE LÍNEAS */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-xs">
-        {/* Acumulación en pantalla */}
-        <div
-          className={`border-2 border-black p-2 shadow-[2px_2px_0px_#000000] flex items-center justify-between ${
-            activeLines.length >= 5
-              ? 'bg-red-100 text-red-900 border-red-600 animate-pulse'
-              : activeLines.length >= 4
-              ? 'bg-amber-50 text-amber-900'
-              : 'bg-neutral-50'
-          }`}
-        >
-          <span className="text-[10px] uppercase font-bold">En Pantalla:</span>
-          <span className="font-bold text-sm tabular-nums">
-            {activeLines.length} / {MAX_LINES_OVERFLOW}
-          </span>
         </div>
 
-        {/* Eliminadas */}
-        <div className="border-2 border-black p-2 bg-neutral-50 shadow-[2px_2px_0px_#000000] flex items-center justify-between">
-          <span className="text-[10px] uppercase font-bold text-neutral-500">Eliminadas:</span>
-          <span className="font-bold text-sm tabular-nums flex items-center gap-1">
-            <Check className="w-3.5 h-3.5" />
-            {clearedScores.length}
-          </span>
+        {/* SELECTOR DE TRAZOS: MODO ALEATORIO (CADA TRAZO DIFERENTE) VS POR NIVEL */}
+        <div className="space-y-1">
+          <span className="text-[10px] uppercase font-bold text-neutral-500">Repertorio de Trazos:</span>
+          <div className="grid grid-cols-2 gap-1.5 p-1 border-2 border-black bg-neutral-100 shadow-[2px_2px_0px_#000000]">
+            <button
+              type="button"
+              onClick={() => {
+                setIsRandomMode(true);
+                if (gameState === 'playing') startGame(gameMode);
+              }}
+              className={`py-1 px-1.5 text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer border border-black transition-colors ${
+                isRandomMode
+                  ? 'bg-black text-white shadow-[1px_1px_0px_#000000]'
+                  : 'bg-white text-black hover:bg-neutral-200'
+              }`}
+              title="Cada línea será un trazo diferente y aleatorio de todo el repertorio"
+            >
+              <Shuffle className="w-3.5 h-3.5" />
+              <span>Aleatorio</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsRandomMode(false);
+                if (gameState === 'playing') startGame(gameMode);
+              }}
+              className={`py-1 px-1.5 text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer border border-black transition-colors ${
+                !isRandomMode
+                  ? 'bg-black text-white shadow-[1px_1px_0px_#000000]'
+                  : 'bg-white text-black hover:bg-neutral-200'
+              }`}
+              title="Practicar un ejercicio de trazo específico"
+            >
+              <Target className="w-3.5 h-3.5" />
+              <span>Por Nivel</span>
+            </button>
+          </div>
+
+          {/* Desplegable de nivel si no es aleatorio */}
+          {!isRandomMode ? (
+            <div className="pt-1">
+              <select
+                value={selectedNodeId}
+                onChange={(e) => {
+                  setSelectedNodeId(e.target.value);
+                  if (gameState === 'playing') startGame(gameMode);
+                }}
+                disabled={gameState === 'playing'}
+                className="w-full border-2 border-black p-1.5 text-xs font-mono font-bold bg-white cursor-pointer shadow-[2px_2px_0px_#000000] truncate"
+              >
+                {calNodes.map((n) => (
+                  <option key={n.id} value={n.id}>
+                    {n.code} · {n.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className="p-1.5 bg-neutral-50 border border-black text-[10px] text-neutral-600 leading-tight">
+              🎲 <strong>Modo Dinámico:</strong> Cada trazo generado es diferente (horizontales, verticales, diagonales y curvas).
+            </div>
+          )}
         </div>
 
-        {/* Racha / Combo */}
-        <div className="border-2 border-black p-2 bg-neutral-50 shadow-[2px_2px_0px_#000000] flex items-center justify-between">
-          <span className="text-[10px] uppercase font-bold text-neutral-500 flex items-center gap-1">
-            <Flame className="w-3 h-3 text-black fill-black" />
-            <span>Racha:</span>
-          </span>
-          <span className="font-bold text-sm tabular-nums">{comboStreak}</span>
-        </div>
-
-        {/* Tiempo o Cronómetro */}
-        <div className="border-2 border-black p-2 bg-neutral-50 shadow-[2px_2px_0px_#000000] flex items-center justify-between">
-          <span className="text-[10px] uppercase font-bold text-neutral-500 flex items-center gap-1">
-            <Clock className="w-3 h-3" />
-            <span>{gameMode === 'blitz' ? 'Tiempo:' : 'Supervivencia:'}</span>
-          </span>
-          <span className="font-bold text-sm tabular-nums">
-            {gameMode === 'blitz' ? `${blitzTimer}s` : `${survivalTime}s`}
-          </span>
-        </div>
-      </div>
-
-      {/* 4. LIENZO Y ESTADO DE JUEGO */}
-      <div className="relative w-full flex flex-col items-center justify-center">
-        {/* Banner de Feedback instantáneo */}
-        {flashBanner && (
+        {/* PANEL DE ESTADÍSTICAS EN VIVO */}
+        <div className="space-y-2 pt-1 border-t-2 border-black">
+          {/* Saturación en pantalla con indicador visual */}
           <div
-            className={`absolute top-3 z-20 px-3 py-1.5 font-mono text-xs font-bold border-2 shadow-[3px_3px_0px_#000000] animate-bounce ${
-              flashBanner.positive ? 'bg-black text-white border-white' : 'bg-red-600 text-white border-black'
+            className={`border-2 border-black p-2.5 shadow-[2px_2px_0px_#000000] space-y-1.5 ${
+              activeLines.length >= 5
+                ? 'bg-red-100 text-red-900 border-red-600 animate-pulse'
+                : activeLines.length >= 4
+                ? 'bg-amber-50 text-amber-900'
+                : 'bg-neutral-50'
             }`}
           >
-            {flashBanner.text}
-          </div>
-        )}
-
-        {/* Pantalla de inicio previa */}
-        {gameState === 'idle' && (
-          <div className="absolute inset-0 bg-white/95 backdrop-blur-xs flex flex-col items-center justify-center p-6 border-2 border-black z-30 text-center font-mono animate-fade-in">
-            <Zap className="w-12 h-12 text-black mb-2 animate-bounce stroke-[2.5]" />
-            <h3 className="text-2xl font-bold font-display uppercase tracking-tight">
-              Avalancha de Trazos
-            </h3>
-            <p className="text-xs text-neutral-600 mt-1 max-w-md">
-              Las líneas van apareciendo según tu lección activa (<strong>{selectedNode.code} · {selectedNode.title}</strong>).
-              Trázalas de <strong>① a ②</strong> con nota <strong>≥70%</strong> para eliminarlas.
-              ¡Si fallas no se quitarán y se acumularán hasta desbordar la pantalla (máx. 6)!
-            </p>
-
-            <div className="my-4 p-3 border-2 border-black bg-neutral-50 text-xs w-64 space-y-1">
-              <div className="flex justify-between">
-                <span className="text-neutral-500">Récord Supervivencia:</span>
-                <span className="font-bold">{highScores.survival} líneas</span>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase font-bold">Líneas en Pantalla:</span>
+              <span className="font-bold text-sm tabular-nums">
+                {activeLines.length} / {MAX_LINES_OVERFLOW}
+              </span>
+            </div>
+            {/* 6 cuadritos visuales de saturación */}
+            <div className="grid grid-cols-6 gap-1">
+              {[0, 1, 2, 3, 4, 5].map((idx) => (
+                <div
+                  key={idx}
+                  className={`h-2.5 border border-black transition-colors ${
+                    idx < activeLines.length
+                      ? idx >= 4
+                        ? 'bg-red-600'
+                        : 'bg-black'
+                      : 'bg-white'
+                  }`}
+                />
+              ))}
+            </div>
+            {activeLines.length >= 4 && (
+              <div className="flex items-center gap-1 text-[10px] font-bold text-red-700">
+                <AlertTriangle className="w-3 h-3 shrink-0" />
+                <span>¡Saturación! Desborda en {MAX_LINES_OVERFLOW - activeLines.length}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-neutral-500">Récord Blitz (60s):</span>
-                <span className="font-bold">{highScores.blitz} líneas</span>
+            )}
+          </div>
+
+          {/* Eliminadas & Nota Media */}
+          <div className="grid grid-cols-2 gap-1.5">
+            <div className="border-2 border-black p-2 bg-neutral-50 shadow-[1px_1px_0px_#000000]">
+              <div className="text-[9px] uppercase font-bold text-neutral-500">Eliminadas</div>
+              <div className="text-base font-black tabular-nums flex items-center gap-1">
+                <Check className="w-3.5 h-3.5 stroke-[3]" />
+                {clearedScores.length}
               </div>
             </div>
+            <div className="border-2 border-black p-2 bg-neutral-50 shadow-[1px_1px_0px_#000000]">
+              <div className="text-[9px] uppercase font-bold text-neutral-500">Nota Media</div>
+              <div className="text-base font-black tabular-nums">
+                {averageGrade > 0 ? `${averageGrade}%` : '-'}
+              </div>
+            </div>
+          </div>
 
+          {/* Racha & Tiempo */}
+          <div className="grid grid-cols-2 gap-1.5">
+            <div className="border-2 border-black p-2 bg-neutral-50 shadow-[1px_1px_0px_#000000]">
+              <div className="text-[9px] uppercase font-bold text-neutral-500 flex items-center gap-0.5">
+                <Flame className="w-3 h-3 text-black fill-black" />
+                <span>Racha</span>
+              </div>
+              <div className="text-base font-black tabular-nums">{comboStreak}</div>
+            </div>
+            <div className="border-2 border-black p-2 bg-neutral-50 shadow-[1px_1px_0px_#000000]">
+              <div className="text-[9px] uppercase font-bold text-neutral-500 flex items-center gap-0.5">
+                <Clock className="w-3 h-3" />
+                <span>{gameMode === 'blitz' ? 'Tiempo' : 'Superv.'}</span>
+              </div>
+              <div className="text-base font-black tabular-nums">
+                {gameMode === 'blitz' ? `${blitzTimer}s` : `${survivalTime}s`}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* RÉCORDS */}
+        <div className="border-2 border-black p-2 bg-neutral-50 text-[10px] space-y-1 shadow-[1px_1px_0px_#000000]">
+          <div className="font-bold text-neutral-700 uppercase pb-0.5 border-b border-neutral-200">
+            Mejores Marcas ({isRandomMode ? 'Aleatorio' : selectedNode.code}):
+          </div>
+          <div className="flex justify-between">
+            <span className="text-neutral-500">Récord Supervivencia:</span>
+            <span className="font-bold">{highScores.survival}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-neutral-500">Récord Blitz:</span>
+            <span className="font-bold">{highScores.blitz}</span>
+          </div>
+        </div>
+
+        {/* BOTÓN INICIAR O REINICIAR */}
+        <div className="pt-2 mt-auto">
+          {gameState === 'playing' ? (
             <button
+              type="button"
               onClick={() => startGame(gameMode)}
-              className="btn-ink px-6 py-2.5 text-xs uppercase font-bold flex items-center gap-2 cursor-pointer shadow-[3px_3px_0px_#000000]"
+              className="w-full btn-ink-outline py-2 px-3 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] hover:bg-neutral-100"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Reiniciar Partida</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => startGame(gameMode)}
+              className="w-full btn-ink py-2.5 px-3 text-xs font-bold uppercase flex items-center justify-center gap-2 cursor-pointer shadow-[3px_3px_0px_#000000] hover:bg-neutral-900"
             >
               <Sparkles className="w-4 h-4 fill-white stroke-none" />
-              <span>Empezar Partida ({gameMode === 'survival' ? 'Supervivencia' : 'Blitz 60s'})</span>
+              <span>Empezar Partida</span>
             </button>
-          </div>
-        )}
+          )}
+        </div>
+      </aside>
 
-        <canvas
-          ref={canvasRef}
-          width={600}
-          height={540}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerUp}
-          className="w-full h-auto aspect-[600/540] border-2 border-black bg-white shadow-[4px_4px_0px_#000000] cursor-crosshair touch-none select-none"
-          style={{
-            maxWidth: '100%',
-            maxHeight: 'calc(100vh - 270px)',
-          }}
-        />
-
-        {/* 5. MODAL DE FIN DE PARTIDA: "luego al final ves cuantas has hecho y la nota" */}
-        {gameState === 'gameover' && (
-          <div className="absolute inset-0 bg-white/95 backdrop-blur-xs flex flex-col items-center justify-center p-6 border-2 border-black z-30 text-center font-mono animate-fade-in">
-            <Trophy className="w-12 h-12 text-black mb-2 animate-bounce stroke-[2.5]" />
-            <h3 className="text-2xl font-bold font-display uppercase tracking-tight">
-              {gameOverReason === 'overflow' ? '¡Desbordamiento de Pantalla!' : '¡Tiempo Finalizado!'}
-            </h3>
-            <p className="text-xs text-neutral-600 mt-1 max-w-sm">
-              {gameOverReason === 'overflow'
-                ? 'Las líneas se acumularon hasta saturar el lienzo.'
-                : 'Completaste los 60 segundos de alta velocidad.'}
-            </p>
-
-            {/* TABLA DE RESULTADOS: CUÁNTAS HAS HECHO Y LA NOTA */}
-            <div className="my-4 p-3.5 border-2 border-black bg-neutral-50 w-72 space-y-2 text-xs shadow-[3px_3px_0px_#000000]">
-              <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
-                <span className="text-neutral-500 font-bold uppercase text-[10px]">Líneas Eliminadas:</span>
-                <span className="font-bold text-sm bg-black text-white px-1.5 py-0.2">
-                  {clearedScores.length} líneas
-                </span>
-              </div>
-              <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
-                <span className="text-neutral-500 font-bold uppercase text-[10px]">Nota Media:</span>
-                <span className="font-bold text-sm">
-                  {averageGrade}%
-                </span>
-              </div>
-              <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
-                <span className="text-neutral-500 font-bold uppercase text-[10px]">Mejor Precisión:</span>
-                <span className="font-bold text-sm">
-                  {clearedScores.length > 0 ? `${Math.max(...clearedScores)}%` : '0%'}
-                </span>
-              </div>
-              <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
-                <span className="text-neutral-500 font-bold uppercase text-[10px]">Racha Máxima:</span>
-                <span className="font-bold text-sm">{bestCombo} seguidas</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-neutral-500 font-bold uppercase text-[10px]">Nivel:</span>
-                <span className="font-bold truncate max-w-[140px] text-right">{selectedNode.code}</span>
-              </div>
+      {/* 2. ÁREA CENTRAL: LIENZO CENTRADO EN SU PROPORCIÓN ORIGINAL (SIN ESTIRAR) */}
+      <div className="flex-1 flex flex-col items-center justify-center p-3 sm:p-6 overflow-hidden min-h-0 relative">
+        <div className="relative flex items-center justify-center select-none touch-none max-w-full">
+          {/* Banner de Feedback instantáneo */}
+          {flashBanner && (
+            <div
+              className={`absolute top-3 z-30 px-3 py-1.5 font-mono text-xs font-bold border-2 shadow-[3px_3px_0px_#000000] animate-bounce ${
+                flashBanner.positive ? 'bg-black text-white border-white' : 'bg-red-600 text-white border-black'
+              }`}
+            >
+              {flashBanner.text}
             </div>
+          )}
 
-            <div className="flex gap-2">
+          {/* Pantalla de inicio previa sobre el lienzo */}
+          {gameState === 'idle' && (
+            <div className="absolute inset-0 bg-white/95 backdrop-blur-xs flex flex-col items-center justify-center p-6 border-2 border-black z-20 text-center font-mono">
+              <Zap className="w-12 h-12 text-black mb-2 animate-bounce stroke-[2.5]" />
+              <h3 className="text-2xl font-bold font-display uppercase tracking-tight">
+                Avalancha de Trazos
+              </h3>
+              <p className="text-xs text-neutral-600 mt-1 max-w-md">
+                {isRandomMode ? (
+                  <>Modo Aleatorio activado: traza cada línea diferente de <strong>① a ②</strong> con nota <strong>≥70%</strong> para eliminarla.</>
+                ) : (
+                  <>Las líneas aparecen según <strong>{selectedNode.code} · {selectedNode.title}</strong>. Traza de <strong>① a ②</strong> con nota <strong>≥70%</strong>.</>
+                )}
+                <br />
+                ¡Si fallas no se quitarán y se acumularán hasta desbordar la pantalla (máx. {MAX_LINES_OVERFLOW})!
+              </p>
+
+              <div className="my-4 p-3 border-2 border-black bg-neutral-50 text-xs w-64 space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-neutral-500">Récord Supervivencia:</span>
+                  <span className="font-bold">{highScores.survival} líneas</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-neutral-500">Récord Blitz (60s):</span>
+                  <span className="font-bold">{highScores.blitz} líneas</span>
+                </div>
+              </div>
+
               <button
+                type="button"
                 onClick={() => startGame(gameMode)}
-                className="btn-ink px-4 py-2 text-xs uppercase font-bold flex items-center gap-1.5 cursor-pointer shadow-[3px_3px_0px_#000000]"
+                className="btn-ink px-6 py-2.5 text-xs uppercase font-bold flex items-center gap-2 cursor-pointer shadow-[3px_3px_0px_#000000] hover:bg-neutral-900"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Reintentar</span>
-              </button>
-              <button
-                onClick={() => setGameState('idle')}
-                className="btn-ink-outline px-4 py-2 text-xs uppercase font-bold flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
-              >
-                <span>Cambiar Nivel</span>
+                <Sparkles className="w-4 h-4 fill-white stroke-none" />
+                <span>Empezar Partida ({gameMode === 'survival' ? 'Supervivencia' : 'Blitz 60s'})</span>
               </button>
             </div>
+          )}
+
+          {/* Modal de Fin de Partida */}
+          {gameState === 'gameover' && (
+            <div className="absolute inset-0 bg-white/95 backdrop-blur-xs flex flex-col items-center justify-center p-6 border-2 border-black z-20 text-center font-mono animate-fade-in">
+              <Trophy className="w-12 h-12 text-black mb-2 animate-bounce stroke-[2.5]" />
+              <h3 className="text-2xl font-bold font-display uppercase tracking-tight">
+                {gameOverReason === 'overflow' ? '¡Desbordamiento de Pantalla!' : '¡Tiempo Finalizado!'}
+              </h3>
+              <p className="text-xs text-neutral-600 mt-1 max-w-sm">
+                {gameOverReason === 'overflow'
+                  ? 'Las líneas se acumularon hasta saturar el lienzo (6 líneas).'
+                  : 'Completaste los 60 segundos de alta velocidad.'}
+              </p>
+
+              {/* TABLA DE RESULTADOS */}
+              <div className="my-4 p-3.5 border-2 border-black bg-neutral-50 w-72 space-y-2 text-xs shadow-[3px_3px_0px_#000000]">
+                <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
+                  <span className="text-neutral-500 font-bold uppercase text-[10px]">Líneas Eliminadas:</span>
+                  <span className="font-bold text-sm bg-black text-white px-1.5 py-0.2">
+                    {clearedScores.length} líneas
+                  </span>
+                </div>
+                <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
+                  <span className="text-neutral-500 font-bold uppercase text-[10px]">Nota Media:</span>
+                  <span className="font-bold text-sm">
+                    {averageGrade}%
+                  </span>
+                </div>
+                <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
+                  <span className="text-neutral-500 font-bold uppercase text-[10px]">Mejor Precisión:</span>
+                  <span className="font-bold text-sm">
+                    {clearedScores.length > 0 ? `${Math.max(...clearedScores)}%` : '0%'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
+                  <span className="text-neutral-500 font-bold uppercase text-[10px]">Racha Máxima:</span>
+                  <span className="font-bold text-sm">{bestCombo} seguidas</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-neutral-500 font-bold uppercase text-[10px]">Modo:</span>
+                  <span className="font-bold truncate max-w-[140px] text-right">
+                    {isRandomMode ? 'Aleatorio' : selectedNode.code}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => startGame(gameMode)}
+                  className="btn-ink px-4 py-2 text-xs uppercase font-bold flex items-center gap-1.5 cursor-pointer shadow-[3px_3px_0px_#000000]"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Reintentar</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGameState('idle')}
+                  className="btn-ink-outline px-4 py-2 text-xs uppercase font-bold flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
+                >
+                  <span>Configuración</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* LIENZO: PROPORCIÓN EXACTA 600x540 (NUNCA ESTIRADO) */}
+          <canvas
+            ref={canvasRef}
+            width={600}
+            height={540}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+            className="border-2 border-black bg-white shadow-[4px_4px_0px_#000000] cursor-crosshair touch-none select-none max-w-full"
+            style={{
+              width: 'min(100%, min(600px, calc((100vh - 140px) * (600 / 540))))',
+              height: 'auto',
+              aspectRatio: '600 / 540',
+            }}
+          />
+        </div>
+
+        {/* FEEDBACK DEL ÚLTIMO INTENTO AL PIE DEL LIENZO */}
+        {lastEval && gameState === 'playing' && (
+          <div className="mt-2 w-full max-w-xl p-2 border-2 border-black bg-white shadow-[2px_2px_0px_#000000] font-mono text-xs flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span
+                className={`px-2 py-0.5 font-bold border border-black ${
+                  lastEval.passed ? 'bg-black text-white' : 'bg-red-100 text-red-800'
+                }`}
+              >
+                {lastEval.passed ? '✓' : '✗'} {lastEval.score}%
+              </span>
+              <span className="text-[11px] text-neutral-600 font-sans">
+                {lastEval.passed
+                  ? '¡Línea eliminada!'
+                  : `Precisión insuficiente (${lastEval.avgDistPx}px). Requiere ≥70%.`}
+              </span>
+            </div>
+
+            <span className="text-[10px] text-neutral-500 font-mono">
+              Objetivo: ≥70%
+            </span>
           </div>
         )}
       </div>
-
-      {/* 6. BARRA INFERIOR DE INSTRUCCIÓN DIDÁCTICA */}
-      {lastEval && gameState === 'playing' && (
-        <div className="w-full p-2 border-2 border-black bg-white shadow-[2px_2px_0px_#000000] font-mono text-xs flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span
-              className={`px-2 py-0.5 font-bold border border-black ${
-                lastEval.passed ? 'bg-black text-white' : 'bg-red-100 text-red-800'
-              }`}
-            >
-              Último intento: {lastEval.score}%
-            </span>
-            <span className="text-[11px] text-neutral-600 font-sans">
-              {lastEval.passed
-                ? '¡Línea superada y eliminada!'
-                : `Error (${lastEval.avgDistPx}px). No se elimina hasta alcanzar ≥70%.`}
-            </span>
-          </div>
-
-          <span className="text-[10px] text-neutral-500 hidden sm:inline">
-            Umbral mínimo: 70%
-          </span>
-        </div>
-      )}
     </div>
   );
 };

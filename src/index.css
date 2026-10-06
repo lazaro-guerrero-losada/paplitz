@@ -147,3 +147,26 @@
   }
 }
 
+/* Animación de pop / resplandor para cuando se gana un punto de maestría */
+@keyframes mastery-pulse {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.4); background-color: #000000; color: #ffffff; box-shadow: 0 0 0 2px #000000; }
+  70% { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+
+.animate-mastery-pop {
+  animation: mastery-pulse 0.65s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Animación de entrada con rebote para pop-up de paso de fase */
+@keyframes phase-pop-in {
+  0% { transform: scale(0.85) translateY(12px); opacity: 0; }
+  65% { transform: scale(1.04) translateY(-3px); opacity: 1; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.animate-phase-pop {
+  animation: phase-pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+

@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
-import { Undo2, Trash2, Check, ArrowRight, AlertTriangle, RefreshCw, Eye, EyeOff, Zap } from 'lucide-react';
+import { Undo2, Trash2, Check, ArrowRight, AlertTriangle, RefreshCw, Eye, EyeOff, Zap, Sparkles } from 'lucide-react';
 import {
   LabExerciseDef,
   RawStroke,
@@ -31,6 +31,14 @@ export interface StrokePracticeCanvasProps {
   onToggleSolution?: () => void;
   onToggleUserStrokes?: () => void;
   masteryStreak?: number;
+  justEarnedMastery?: boolean;
+  phaseTransitionNotice?: {
+    fromPhase: 1 | 2 | 3;
+    toPhase: 1 | 2 | 3;
+    nodeCode: string;
+    nodeTitle?: string;
+  } | null;
+  onDismissPhaseTransition?: () => void;
   onOpenMasteryInfo?: () => void;
   onOpenPhaseInfo?: () => void;
   onPhaseChange?: (phase: 1 | 2 | 3) => void;
@@ -52,6 +60,9 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
       onToggleSolution,
       onToggleUserStrokes,
       masteryStreak,
+      justEarnedMastery,
+      phaseTransitionNotice,
+      onDismissPhaseTransition,
       onOpenMasteryInfo,
       onOpenPhaseInfo,
       onPhaseChange,
@@ -122,10 +133,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
       const res = evaluateStrokeSubmission(strokes, challenge);
       setEvaluation(res);
       onEvaluationComplete(res);
-      if (res.phasePassed && currentPhase < 3 && onPhaseAdvance) {
-        onPhaseAdvance((currentPhase + 1) as 1 | 2 | 3);
-      }
-    }, [strokes, challenge, currentPhase, onPhaseAdvance, onEvaluationComplete]);
+    }, [strokes, challenge, onEvaluationComplete]);
 
     const handleNext = useCallback(() => {
       setAutoAdvanceCountdown(null);
@@ -164,9 +172,9 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
       });
     }, []);
 
-    // Temporizador de 2 segundos de auto-avance tras corregir
+    // Temporizador de 2 segundos de auto-avance tras corregir (se pausa si hay aviso de cambio de fase)
     useEffect(() => {
-      if (!evaluation || !autoAdvance) {
+      if (!evaluation || !autoAdvance || phaseTransitionNotice) {
         setAutoAdvanceCountdown(null);
         return;
       }
@@ -191,7 +199,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
         clearInterval(intervalId);
         clearTimeout(timeoutId);
       };
-    }, [evaluation, autoAdvance, handleNext]);
+    }, [evaluation, autoAdvance, phaseTransitionNotice, handleNext]);
 
     // Métodos expuestos para la barra de herramientas lateral
     useImperativeHandle(ref, () => ({
@@ -924,23 +932,36 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
           {/* HUD SUPERIOR IZQUIERDO: MAESTRÍA Y FASE CINEMÁTICA (NÚMEROS, CUADRITOS E INFO) */}
           <div className="absolute top-2.5 left-2.5 z-20 flex flex-col gap-1.5 p-1.5 bg-white/95 border-2 border-black shadow-[2px_2px_0px_#000000] font-mono pointer-events-auto select-none">
             {/* Maestría: M [✓][✓][ ] 0/3 [i] */}
-            <div className="flex items-center gap-1.5 text-xs">
+            <div className={`flex items-center gap-1.5 text-xs transition-transform ${justEarnedMastery ? 'scale-105' : ''}`}>
               <span className="text-[10px] font-bold text-neutral-600">M:</span>
               <div className="flex items-center gap-0.5">
-                {[0, 1, 2].map((i) => (
-                  <span
-                    key={i}
-                    className={`w-3.5 h-3.5 border border-black flex items-center justify-center text-[8px] font-bold ${
-                      i < (masteryStreak ?? 0) ? 'bg-black text-white' : 'bg-neutral-100 text-transparent'
-                    }`}
-                  >
-                    ✓
-                  </span>
-                ))}
+                {[0, 1, 2].map((i) => {
+                  const isFilled = i < (masteryStreak ?? 0);
+                  const isJustFilled = justEarnedMastery && i === (masteryStreak ?? 0) - 1;
+                  return (
+                    <span
+                      key={i}
+                      className={`w-3.5 h-3.5 border border-black flex items-center justify-center text-[8px] font-bold transition-all ${
+                        isJustFilled
+                          ? 'bg-black text-white animate-mastery-pop scale-125 z-10 shadow-[0_0_0_2px_#000000]'
+                          : isFilled
+                          ? 'bg-black text-white'
+                          : 'bg-neutral-100 text-transparent'
+                      }`}
+                    >
+                      ✓
+                    </span>
+                  );
+                })}
               </div>
-              <span className="text-[10px] font-bold tabular-nums">
+              <span className={`text-[10px] font-bold tabular-nums transition-colors ${justEarnedMastery ? 'text-black font-black' : ''}`}>
                 {masteryStreak ?? 0}/3
               </span>
+              {justEarnedMastery && (
+                <span className="bg-black text-white text-[8px] font-black px-1 border border-black animate-bounce shadow-[1px_1px_0px_#000]">
+                  +1
+                </span>
+              )}
               {onOpenMasteryInfo && (
                 <button
                   type="button"
@@ -1010,6 +1031,55 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                   ? 'Aprobado'
                   : 'Reintentar'}
               </span>
+            </div>
+          )}
+
+          {/* MINI-POPUP / ANIMACIÓN DE PASO DE FASE DE MOTRICIDAD */}
+          {phaseTransitionNotice && (
+            <div className="absolute inset-0 z-30 bg-black/40 backdrop-blur-[2px] flex items-center justify-center p-3 sm:p-4 select-none pointer-events-auto">
+              <div className="bg-white border-3 border-black p-4 sm:p-5 shadow-[6px_6px_0px_#000000] max-w-sm w-full text-center font-mono space-y-3 animate-phase-pop">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-black text-white text-[10px] font-bold uppercase tracking-wider">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>¡Fase {phaseTransitionNotice.fromPhase} Superada! (3/3)</span>
+                </div>
+
+                <div className="space-y-1">
+                  <h3 className="text-lg sm:text-xl font-black font-display text-black">
+                    PASAS A FASE {phaseTransitionNotice.toPhase}: {phaseTransitionNotice.toPhase === 2 ? 'FLUIDEZ' : 'VELOCIDAD'}
+                  </h3>
+                  <div className="flex items-center justify-center gap-1.5 pt-1">
+                    {([1, 2, 3] as const).map((ph) => (
+                      <span
+                        key={ph}
+                        className={`px-2 py-0.5 text-[10px] font-bold border border-black ${
+                          ph < phaseTransitionNotice.toPhase
+                            ? 'bg-neutral-200 text-neutral-600 line-through'
+                            : ph === phaseTransitionNotice.toPhase
+                            ? 'bg-black text-white scale-105 shadow-[1px_1px_0px_#000000]'
+                            : 'bg-white text-neutral-400'
+                        }`}
+                      >
+                        {ph === 1 ? '1. Precisión' : ph === 2 ? '2. Fluidez' : '3. Velocidad'}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-neutral-800 bg-neutral-50 p-2 border border-black leading-snug">
+                  {phaseTransitionNotice.toPhase === 2
+                    ? '🎯 Has consolidado la precisión de extremos. Ahora en Fase 2 (Fluidez): Dibuja a velocidad constante sin titubeos ni paradas intermedias.'
+                    : '⚡ Has dominado la uniformidad del trazo. Ahora en Fase 3 (Velocidad): Ejecuta el trazo con inercia rápida e impulso reflejo.'}
+                </p>
+
+                <button
+                  type="button"
+                  onClick={onDismissPhaseTransition}
+                  className="w-full btn-ink py-2 px-3 text-xs font-bold uppercase flex items-center justify-center gap-2 cursor-pointer shadow-[2px_2px_0px_#000000] hover:bg-neutral-900"
+                >
+                  <span>Continuar a Fase {phaseTransitionNotice.toPhase}</span>
+                  <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
+                </button>
+              </div>
             </div>
           )}
         </div>

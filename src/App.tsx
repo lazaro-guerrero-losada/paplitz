@@ -25,6 +25,7 @@ import { TinyToast, ToastData } from './components/TinyToast';
 import { StreakModal } from './components/StreakModal';
 import { DailyChallengePanel } from './components/DailyChallengePanel';
 import { DailySetCompletedModal } from './components/DailySetCompletedModal';
+import { LevelCompletionModal } from './components/LevelCompletionModal';
 import { calculatePlayerLevel } from './lib/levelSystem';
 import { SenseiCubo } from './components/avatar/SenseiCubo';
 import { AvatarMood } from './lib/avatarTypes';
@@ -163,8 +164,43 @@ export function App() {
     return all.find((n) => n.status === 'current') || all[0];
   });
 
-  // Fase cinemática activa (1: Precisión, 2: Fluidez, 3: Velocidad) - SOLO para calistenia
-  const [currentPhase, setCurrentPhase] = useState<1 | 2 | 3>(1);
+  // Fases cinemáticas activas por nodo (1: Precisión, 2: Fluidez, 3: Velocidad) - SOLO para calistenia
+  const [nodePhases, setNodePhases] = useState<Record<string, 1 | 2 | 3>>(() => {
+    const saved = localStorage.getItem('paplitz_node_phases');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  useEffect(() => {
+    localStorage.setItem('paplitz_node_phases', JSON.stringify(nodePhases));
+  }, [nodePhases]);
+
+  const currentPhase: 1 | 2 | 3 = activeNode ? (nodePhases[activeNode.id] || 1) : 1;
+  const setCurrentPhase = (phase: 1 | 2 | 3) => {
+    if (activeNode) {
+      setNodePhases((prev) => ({ ...prev, [activeNode.id]: phase }));
+    }
+  };
+
+  // Estados visuales y modales pedagógicos de maestría y fases de motricidad
+  const [justEarnedMastery, setJustEarnedMastery] = useState<boolean>(false);
+  const [phaseTransitionNotice, setPhaseTransitionNotice] = useState<{
+    fromPhase: 1 | 2 | 3;
+    toPhase: 1 | 2 | 3;
+    nodeCode: string;
+    nodeTitle?: string;
+  } | null>(null);
+
+  const [levelCompletionModal, setLevelCompletionModal] = useState<{
+    isOpen: boolean;
+    completedNode: LessonNode | null;
+    nextNode: LessonNode | null;
+    score: number;
+  }>({
+    isOpen: false,
+    completedNode: null,
+    nextNode: null,
+    score: 0,
+  });
 
   // Modo de práctica en la barra lateral: 'camino' (por defecto) o 'daily' (reto diario)
   const [practiceMode, setPracticeMode] = useState<'camino' | 'daily'>('camino');
@@ -469,12 +505,19 @@ export function App() {
     setShowSolution(false);
     setStrokes([]);
     setStrokeEvaluation(null);
+    setPhaseTransitionNotice(null);
+    setLevelCompletionModal({ isOpen: false, completedNode: null, nextNode: null, score: 0 });
     if (!node.isCalisthenics) {
       handleNewPracticeCube(node);
     } else {
       setCalisthenicsSeed(Math.floor(Math.random() * 90000 + 10000));
     }
     setActiveTab('practice');
+  };
+
+  const handleDismissPhaseTransition = () => {
+    setPhaseTransitionNotice(null);
+    setCalisthenicsSeed(Math.floor(Math.random() * 90000 + 10000));
   };
 
   const handleSelectModule = (modId: string) => {
@@ -518,57 +561,72 @@ export function App() {
 
       const currentStreak = masteryStreaks[activeNode.id] || 0;
       const newStreak = currentStreak + 1;
-      setMasteryStreaks((prev) => ({ ...prev, [activeNode.id]: newStreak }));
 
-      if (currentPhase < 3) {
-        setCurrentPhase((prev) => (prev + 1) as 1 | 2 | 3);
-      }
+      // Disparar animación de ganancia de maestría en el HUD del lienzo
+      setJustEarnedMastery(true);
+      setTimeout(() => setJustEarnedMastery(false), 900);
 
       if (newStreak < 3) {
+        // Aún no ha completado la fase actual
+        setMasteryStreaks((prev) => ({ ...prev, [activeNode.id]: newStreak }));
         showToast(
           '🎯',
-          `Racha: ${newStreak}/3 (≥90%)`,
+          `Racha Fase ${currentPhase}: ${newStreak}/3 (≥90%)`,
           activeVariants.length > 1
-            ? `¡Versión ${currentVariantIndex + 1}/${activeVariants.length} superada (${recordedScore}%)!`
-            : `¡Gran precisión con ${recordedScore}%! Necesitas ${3 - newStreak} más seguidos ≥90% para superar ${activeNode.code}.`
+            ? `¡Variante ${currentVariantIndex + 1}/${activeVariants.length} superada con ${recordedScore}%! Necesitas ${3 - newStreak} más seguidos para superar la Fase ${currentPhase}.`
+            : `¡Gran precisión con ${recordedScore}%! Necesitas ${3 - newStreak} más seguidos ≥90% para superar la Fase ${currentPhase}.`
         );
       } else {
-        // Superado 3/3!
+        // ¡HA CONSEGUIDO 3 SEGUIDOS DE MAESTRÍA EN LA FASE ACTUAL!
         setMasteryStreaks((prev) => ({ ...prev, [activeNode.id]: 0 }));
 
-        const currentIndexInAll = allNodes.findIndex((n) => n.id === activeNode.id);
-        const immediateNextNode =
-          currentIndexInAll >= 0 && currentIndexInAll < allNodes.length - 1
-            ? allNodes[currentIndexInAll + 1]
-            : null;
+        if (currentPhase < 3) {
+          // PASA DE FASE DE MOTRICIDAD (Fase 1 -> Fase 2, o Fase 2 -> Fase 3)
+          const nextPhase = (currentPhase + 1) as 1 | 2 | 3;
+          setCurrentPhase(nextPhase);
 
-        const nextUnits = units.map((unit) => ({
-          ...unit,
-          nodes: unit.nodes.map((n) => {
-            if (n.id === activeNode.id) {
-              return { ...n, status: 'completed' as const, score: Math.max(n.score || 0, recordedScore) };
-            }
-            if (immediateNextNode && n.id === immediateNextNode.id && n.status === 'locked') {
-              return { ...n, status: 'current' as const };
-            }
-            return n;
-          }),
-        }));
+          // Pop-up / mini-animación de paso de fase
+          setPhaseTransitionNotice({
+            fromPhase: currentPhase,
+            toPhase: nextPhase,
+            nodeCode: activeNode.code,
+            nodeTitle: activeNode.title,
+          });
+        } else {
+          // ¡HA ACABADO LA FASE DE VELOCIDAD (FASE 3)!
+          // ¡EL NIVEL ESTÁ TOTALMENTE SUPERADO!
+          const currentIndexInAll = allNodes.findIndex((n) => n.id === activeNode.id);
+          const immediateNextNode =
+            currentIndexInAll >= 0 && currentIndexInAll < allNodes.length - 1
+              ? allNodes[currentIndexInAll + 1]
+              : null;
 
-        setUnits(nextUnits);
-        setActiveNode((prev) =>
-          prev ? { ...prev, status: 'completed', score: Math.max(prev.score || 0, recordedScore) } : prev
-        );
+          const nextUnits = units.map((unit) => ({
+            ...unit,
+            nodes: unit.nodes.map((n) => {
+              if (n.id === activeNode.id) {
+                return { ...n, status: 'completed' as const, score: Math.max(n.score || 0, recordedScore) };
+              }
+              if (immediateNextNode && n.id === immediateNextNode.id && n.status === 'locked') {
+                return { ...n, status: 'current' as const };
+              }
+              return n;
+            }),
+          }));
 
-        showToast(
-          '✨',
-          `¡Nivel ${activeNode.code} Superado! (3/3)`,
-          immediateNextNode
-            ? `Has dominado ${activeNode.code}. Nuevo nivel desbloqueado: ${immediateNextNode.code}`
-            : `¡Maestría demostrada con 3 aciertos seguidos ≥90%!`,
-          immediateNextNode ? `Ir a ${immediateNextNode.code}` : undefined,
-          immediateNextNode ? () => handleSelectNode(immediateNextNode) : undefined
-        );
+          setUnits(nextUnits);
+          setActiveNode((prev) =>
+            prev ? { ...prev, status: 'completed', score: Math.max(prev.score || 0, recordedScore) } : prev
+          );
+
+          // Mostrar modal de nivel superado al acabar la fase de velocidad
+          setLevelCompletionModal({
+            isOpen: true,
+            completedNode: activeNode,
+            nextNode: immediateNextNode,
+            score: recordedScore,
+          });
+        }
       }
     } else {
       setAvatarMood('fail-spiral');
@@ -578,8 +636,8 @@ export function App() {
       setMasteryStreaks((prev) => ({ ...prev, [activeNode.id]: 0 }));
       showToast(
         '⚠️',
-        prevStreak > 0 ? `Racha reiniciada (${recordedScore}%)` : `Precisión: ${recordedScore}% (Requiere ≥90%)`,
-        `Reintenta la Versión ${currentVariantIndex + 1} para dominarla con nota ≥90%.`
+        prevStreak > 0 ? `Racha Fase ${currentPhase} reiniciada (${recordedScore}%)` : `Precisión: ${recordedScore}% (Requiere ≥90%)`,
+        `Para superar la Fase ${currentPhase} necesitas 3 aciertos seguidos con nota ≥90%. ¡Ánimo!`
       );
     }
   };
@@ -810,6 +868,7 @@ export function App() {
     setXp(0);
     setScoresHistory([]);
     setMasteryStreaks({});
+    setNodePhases({});
     const firstNode = MODULE_PARALLELEPIPEDS.units[0].nodes[0];
     setActiveNode(firstNode);
     handleNewPracticeCube(firstNode);
@@ -1405,6 +1464,9 @@ export function App() {
                     onEvaluationComplete={handleCalisthenicsEvaluationComplete}
                     onNext={handleSidebarNext}
                     masteryStreak={currentMasteryStreak}
+                    justEarnedMastery={justEarnedMastery}
+                    phaseTransitionNotice={phaseTransitionNotice}
+                    onDismissPhaseTransition={handleDismissPhaseTransition}
                     onOpenMasteryInfo={() => setShowMasteryStreakInfo(true)}
                     onOpenPhaseInfo={() => setShowKinematicPhasesInfo(true)}
                     onPhaseChange={(phase) => setCurrentPhase(phase)}
@@ -1548,6 +1610,28 @@ export function App() {
         isOpen={showKinematicPhasesInfo}
         onClose={() => setShowKinematicPhasesInfo(false)}
       />
+      {levelCompletionModal.isOpen && levelCompletionModal.completedNode && (
+        <LevelCompletionModal
+          isOpen={levelCompletionModal.isOpen}
+          completedNode={levelCompletionModal.completedNode}
+          nextNode={levelCompletionModal.nextNode}
+          score={levelCompletionModal.score}
+          onGoToNextNode={() => {
+            if (levelCompletionModal.nextNode) {
+              handleSelectNode(levelCompletionModal.nextNode);
+            }
+            setLevelCompletionModal({ isOpen: false, completedNode: null, nextNode: null, score: 0 });
+          }}
+          onStayAndPractice={() => {
+            setLevelCompletionModal({ isOpen: false, completedNode: null, nextNode: null, score: 0 });
+            setCalisthenicsSeed(Math.floor(Math.random() * 90000 + 10000));
+          }}
+          onGoToCamino={() => {
+            setActiveTab('path');
+            setLevelCompletionModal({ isOpen: false, completedNode: null, nextNode: null, score: 0 });
+          }}
+        />
+      )}
     </div>
   );
 }
