@@ -12,7 +12,7 @@ import {
   Target,
   AlertTriangle,
 } from 'lucide-react';
-import { LessonNode } from '../lib/curriculumData';
+import { LessonNode, MODULE_CALISTHENICS } from '../lib/curriculumData';
 import { AvatarMood } from '../lib/avatarTypes';
 import { generateStrokeChallenge, SeededRNG } from '../lib/strokeProceduralGenerator';
 
@@ -151,14 +151,16 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
   onAvatarMoodChange,
   onDrawingStateChange,
 }) => {
-  // Filtrar solo nodos de calistenia para el selector de nivel
+  // Todos los nodos de calistenia para el modo aleatorio completo (18 niveles con 237 variantes)
+  const allCalNodes = MODULE_CALISTHENICS.units.flatMap((u) => u.nodes);
   const calNodes = unlockedNodes.filter((n) => n.isCalisthenics);
-  const defaultCalNode = calNodes.find((n) => n.id === activeNode.id) || calNodes[0] || activeNode;
+  const selectableNodes = calNodes.length > 0 ? calNodes : allCalNodes;
+  const defaultCalNode = selectableNodes.find((n) => n.id === activeNode.id) || selectableNodes[0] || activeNode;
 
   // Selección de ejercicios: Modo Aleatorio (cada trazo diferente) vs Por Nivel
   const [isRandomMode, setIsRandomMode] = useState<boolean>(true);
   const [selectedNodeId, setSelectedNodeId] = useState<string>(defaultCalNode.id);
-  const selectedNode = calNodes.find((n) => n.id === selectedNodeId) || defaultCalNode;
+  const selectedNode = selectableNodes.find((n) => n.id === selectedNodeId) || defaultCalNode;
 
   // Modos de juego: 'survival' (evitar desbordamiento de 6 líneas) o 'blitz' (60s contrarreloj)
   const [gameMode, setGameMode] = useState<'survival' | 'blitz'>('survival');
@@ -296,11 +298,11 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
   const spawnNextLine = useCallback(
     (existingLines: ActiveRushLine[]): ActiveRushLine => {
       const nodeToUse = isRandomMode
-        ? (calNodes[Math.floor(Math.random() * calNodes.length)] || selectedNode)
+        ? (allCalNodes[Math.floor(Math.random() * allCalNodes.length)] || selectedNode)
         : selectedNode;
       return spawnLineForNode(nodeToUse, existingLines);
     },
-    [isRandomMode, calNodes, selectedNode, spawnLineForNode]
+    [isRandomMode, allCalNodes, selectedNode, spawnLineForNode]
   );
 
   // Iniciar partida
@@ -381,18 +383,18 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
     const count = activeLines.length;
 
     if (count === 0) {
-      // 0 líneas en pantalla: spawn casi instantáneo (280ms) para cero aburrimiento
-      delayMs = 280;
+      // 0 líneas en pantalla: spawn casi instantáneo (200ms) para cero aburrimiento
+      delayMs = 200;
     } else if (count === 1) {
       // 1 línea: aparición rápida y viva
       const speedUp = Math.min(450, clearedScores.length * 30);
-      delayMs = Math.max(750, 1200 - speedUp);
+      delayMs = Math.max(700, 1100 - speedUp);
     } else {
       // Líneas acumuladas (2, 3, 4, 5):
       // El ritmo varía adaptativamente según la acumulación y las líneas resueltas
-      const baseDelay = 1750 + (count - 2) * 150;
-      const speedUp = Math.min(750, clearedScores.length * 35);
-      delayMs = Math.max(900, baseDelay - speedUp);
+      const baseDelay = 1600 + (count - 2) * 200;
+      const speedUp = Math.min(800, clearedScores.length * 35);
+      delayMs = Math.max(850, baseDelay - speedUp);
     }
 
     const timer = window.setTimeout(() => {
@@ -677,7 +679,7 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
       setActiveLines((prev) => {
         const nextLines = prev.filter((l) => l.id !== targetLine.id);
         // Si al eliminar esta línea la pantalla queda VACÍA (0 líneas),
-        // programar un spawn inmediato en 250ms para que nunca haya aburrimiento
+        // programar un spawn inmediato en 200ms para que nunca haya aburrimiento
         if (nextLines.length === 0) {
           if (spawnTimerRef.current) clearTimeout(spawnTimerRef.current);
           spawnTimerRef.current = window.setTimeout(() => {
@@ -685,7 +687,7 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
               if (cur.length >= MAX_LINES_OVERFLOW) return cur;
               return [...cur, spawnNextLine(cur)];
             });
-          }, 250);
+          }, 200);
         }
         return nextLines;
       });
