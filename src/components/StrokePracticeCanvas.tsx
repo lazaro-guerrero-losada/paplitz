@@ -36,6 +36,10 @@ export interface StrokePracticeCanvasProps {
     toPhase: 1 | 2 | 3;
     nodeCode: string;
     nodeTitle?: string;
+    isVersionAdvance?: boolean;
+    fromVersion?: number;
+    toVersion?: number;
+    totalVersions?: number;
   } | null;
   onDismissPhaseTransition?: () => void;
   onOpenMasteryInfo?: () => void;
@@ -240,10 +244,19 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
       const w = 600;
       const h = 540;
+      const targetW = Math.round(w * dpr);
+      const targetH = Math.round(h * dpr);
+
+      if (canvas.width !== targetW || canvas.height !== targetH) {
+        canvas.width = targetW;
+        canvas.height = targetH;
+      }
 
       ctx.save();
+      ctx.scale(dpr, dpr);
 
       // 1. Fondo Papel Blanco Paplitz
       ctx.fillStyle = '#FFFFFF';
@@ -645,43 +658,76 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
         ctx.restore();
       }
 
-      // F. PUNTOS DIANA MINIMALISTAS
+      // F. PUNTOS DIANA Y BADGES DE DIRECCIÓN VECTORIALES DE ALTA DEFINICIÓN
       if (challenge.keyPoints && challenge.keyPoints.length > 0) {
         for (const kp of challenge.keyPoints) {
           ctx.save();
+
+          // 1. Anillo técnico concéntrico de precisión
+          ctx.strokeStyle = '#000000';
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.arc(kp.x, kp.y, 7, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // 2. Punto central sólido
           ctx.fillStyle = '#000000';
           ctx.beginPath();
           ctx.arc(kp.x, kp.y, 3.5, 0, Math.PI * 2);
           ctx.fill();
 
-          ctx.fillStyle = '#000000';
-          ctx.font = 'bold 10px monospace';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'bottom';
-
+          // 3. Cálculo de la posición del Badge para que no tape la diana ni el trazo
           const labelText = kp.label || String(kp.order);
-          let labelX = kp.x;
-          let labelY = kp.y - 6;
+          let badgeX = kp.x;
+          let badgeY = kp.y - 17;
 
-          if (
+          const isRadial =
             (challenge.category === 'radial_focal' ||
               challenge.directionKey === 'radial_outward' ||
               challenge.directionKey === 'radial_inward') &&
             challenge.keyPoints &&
-            challenge.keyPoints.length > 2
-          ) {
+            challenge.keyPoints.length > 2;
+
+          if (isRadial) {
             const centerKp = challenge.keyPoints[0];
             const dx = kp.x - centerKp.x;
             const dy = kp.y - centerKp.y;
             const dist = Math.hypot(dx, dy);
             if (dist > 15) {
-              labelX = kp.x + (dx / dist) * 12;
-              labelY = kp.y + (dy / dist) * 12;
-              ctx.textBaseline = 'middle';
+              badgeX = kp.x + (dx / dist) * 16;
+              badgeY = kp.y + (dy / dist) * 16;
+            } else {
+              // Punto central de la roseta
+              badgeX = kp.x - 14;
+              badgeY = kp.y - 14;
+            }
+          } else {
+            // Evitar salirse por el borde superior
+            if (badgeY < 14) {
+              badgeY = kp.y + 17;
             }
           }
 
-          ctx.fillText(labelText, labelX, labelY);
+          // 4. Badge circular nítido (fondo blanco opaco que limpia la cuadrícula + borde entintado negro)
+          const badgeR = 8.5;
+          ctx.fillStyle = '#FFFFFF';
+          ctx.beginPath();
+          ctx.arc(badgeX, badgeY, badgeR, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.strokeStyle = '#000000';
+          ctx.lineWidth = 1.8;
+          ctx.beginPath();
+          ctx.arc(badgeX, badgeY, badgeR, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // 5. Número vectorial nítido con tipografía moderna del sistema
+          ctx.fillStyle = '#000000';
+          ctx.font = 'bold 10px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(labelText, badgeX, badgeY);
+
           ctx.restore();
         }
       }
@@ -817,6 +863,14 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
       renderCanvas();
     }, [renderCanvas]);
 
+    useEffect(() => {
+      const handleResize = () => {
+        renderCanvas();
+      };
+      window.addEventListener('resize', handleResize);
+      return () => window.removeEventListener('resize', handleResize);
+    }, [renderCanvas]);
+
     // Normalización de coordenadas a resolución de referencia 600x540
     const getNormalizedCoords = (e: React.PointerEvent<HTMLCanvasElement>) => {
       const canvas = canvasRef.current;
@@ -877,9 +931,17 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
         const newStrokes = [...strokes, { points: [...currentStrokeRef.current] }];
         setStrokes(newStrokes);
 
-        // Auto-evaluación instantánea para ejercicios de trazo único o número de trazos requerido
-        const requiredStrokes = challenge.minRequiredStrokes || 1;
-        if (challenge.isSingleStrokeAutoEval || newStrokes.length >= requiredStrokes) {
+        // Auto-evaluación instantánea: en trazo único evalúa al instante, en retos multi-línea espera a completar todos los trazos requeridos
+        const requiredStrokes = Math.max(
+          1,
+          challenge.minRequiredStrokes || (challenge.targetLines ? challenge.targetLines.length : 1)
+        );
+        const isReadyToAutoEval =
+          requiredStrokes === 1
+            ? (challenge.isSingleStrokeAutoEval || newStrokes.length >= 1)
+            : newStrokes.length >= requiredStrokes;
+
+        if (isReadyToAutoEval) {
           currentStrokeRef.current = [];
           const result = evaluateStrokeSubmission(newStrokes, challenge);
           setEvaluation(result);
@@ -1016,51 +1078,84 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
             </div>
           )}
 
-          {/* MINI-POPUP / ANIMACIÓN DE PASO DE FASE DE MOTRICIDAD */}
+          {/* MINI-POPUP / ANIMACIÓN DE PASO DE FASE O AVANCE DE VERSIÓN */}
           {phaseTransitionNotice && (
             <div className="absolute inset-0 z-30 bg-black/40 backdrop-blur-[2px] flex items-center justify-center p-3 sm:p-4 select-none pointer-events-auto">
               <div className="bg-white border-3 border-black p-4 sm:p-5 shadow-[6px_6px_0px_#000000] max-w-sm w-full text-center font-mono space-y-3 animate-phase-pop">
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-black text-white text-[10px] font-bold uppercase tracking-wider">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>¡Fase {phaseTransitionNotice.fromPhase} Superada! (3/3)</span>
-                </div>
+                {phaseTransitionNotice.isVersionAdvance ? (
+                  <>
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-black text-white text-[10px] font-bold uppercase tracking-wider">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>¡Versión {phaseTransitionNotice.fromVersion}/{phaseTransitionNotice.totalVersions} Dominada!</span>
+                    </div>
 
-                <div className="space-y-1">
-                  <h3 className="text-lg sm:text-xl font-black font-display text-black">
-                    PASAS A FASE {phaseTransitionNotice.toPhase}: {phaseTransitionNotice.toPhase === 2 ? 'FLUIDEZ' : 'VELOCIDAD'}
-                  </h3>
-                  <div className="flex items-center justify-center gap-1.5 pt-1">
-                    {([1, 2, 3] as const).map((ph) => (
-                      <span
-                        key={ph}
-                        className={`px-2 py-0.5 text-[10px] font-bold border border-black ${
-                          ph < phaseTransitionNotice.toPhase
-                            ? 'bg-neutral-200 text-neutral-600 line-through'
-                            : ph === phaseTransitionNotice.toPhase
-                            ? 'bg-black text-white scale-105 shadow-[1px_1px_0px_#000000]'
-                            : 'bg-white text-neutral-400'
-                        }`}
-                      >
-                        {ph === 1 ? '1. Precisión' : ph === 2 ? '2. Fluidez' : '3. Velocidad'}
-                      </span>
-                    ))}
-                  </div>
-                </div>
+                    <div className="space-y-1">
+                      <h3 className="text-lg sm:text-xl font-black font-display text-black">
+                        PASAS A VERSIÓN {phaseTransitionNotice.toVersion}: FASE 1 (PRECISIÓN)
+                      </h3>
+                      <div className="text-xs text-neutral-600 font-bold">
+                        Progreso del nivel: {phaseTransitionNotice.toVersion} / {phaseTransitionNotice.totalVersions} versiones
+                      </div>
+                    </div>
 
-                <p className="text-[11px] text-neutral-800 bg-neutral-50 p-2 border border-black leading-snug">
-                  {phaseTransitionNotice.toPhase === 2
-                    ? '🎯 Has consolidado la precisión de extremos. Ahora en Fase 2 (Fluidez): Dibuja a velocidad constante sin titubeos ni paradas intermedias.'
-                    : '⚡ Has dominado la uniformidad del trazo. Ahora en Fase 3 (Velocidad): Ejecuta el trazo con inercia rápida e impulso reflejo.'}
-                </p>
+                    <p className="text-[11px] text-neutral-800 bg-neutral-50 p-2 border border-black leading-snug">
+                      🎯 Has superado las 3 fases (Precisión, Fluidez y Velocidad) de esta versión. Ahora comienza la versión {phaseTransitionNotice.toVersion} desde la Fase 1.
+                    </p>
 
-                <button
-                  type="button"
-                  onClick={onDismissPhaseTransition}
-                  className="w-full btn-ink py-2 px-3 text-xs font-bold uppercase flex items-center justify-center gap-2 cursor-pointer shadow-[2px_2px_0px_#000000] hover:bg-neutral-900"
-                >
-                  <span>Continuar a Fase {phaseTransitionNotice.toPhase}</span>
-                  <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
-                </button>
+                    <button
+                      type="button"
+                      onClick={onDismissPhaseTransition}
+                      className="w-full btn-ink py-2 px-3 text-xs font-bold uppercase flex items-center justify-center gap-2 cursor-pointer shadow-[2px_2px_0px_#000000] hover:bg-neutral-900"
+                    >
+                      <span>Comenzar Versión {phaseTransitionNotice.toVersion}</span>
+                      <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-black text-white text-[10px] font-bold uppercase tracking-wider">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>¡Fase {phaseTransitionNotice.fromPhase} Superada! (3/3)</span>
+                    </div>
+
+                    <div className="space-y-1">
+                      <h3 className="text-lg sm:text-xl font-black font-display text-black">
+                        PASAS A FASE {phaseTransitionNotice.toPhase}: {phaseTransitionNotice.toPhase === 2 ? 'FLUIDEZ' : 'VELOCIDAD'}
+                      </h3>
+                      <div className="flex items-center justify-center gap-1.5 pt-1">
+                        {([1, 2, 3] as const).map((ph) => (
+                          <span
+                            key={ph}
+                            className={`px-2 py-0.5 text-[10px] font-bold border border-black ${
+                              ph < phaseTransitionNotice.toPhase
+                                ? 'bg-neutral-200 text-neutral-600 line-through'
+                                : ph === phaseTransitionNotice.toPhase
+                                ? 'bg-black text-white scale-105 shadow-[1px_1px_0px_#000000]'
+                                : 'bg-white text-neutral-400'
+                            }`}
+                          >
+                            {ph === 1 ? '1. Precisión' : ph === 2 ? '2. Fluidez' : '3. Velocidad'}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <p className="text-[11px] text-neutral-800 bg-neutral-50 p-2 border border-black leading-snug">
+                      {phaseTransitionNotice.toPhase === 2
+                        ? '🎯 Has consolidado la precisión de extremos. Ahora en Fase 2 (Fluidez): Dibuja a velocidad constante sin titubeos ni paradas intermedias.'
+                        : '⚡ Has dominado la uniformidad del trazo. Ahora en Fase 3 (Velocidad): Ejecuta el trazo con inercia rápida e impulso reflejo.'}
+                    </p>
+
+                    <button
+                      type="button"
+                      onClick={onDismissPhaseTransition}
+                      className="w-full btn-ink py-2 px-3 text-xs font-bold uppercase flex items-center justify-center gap-2 cursor-pointer shadow-[2px_2px_0px_#000000] hover:bg-neutral-900"
+                    >
+                      <span>Continuar a Fase {phaseTransitionNotice.toPhase}</span>
+                      <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -1073,7 +1168,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
             <div className="flex items-center justify-between gap-2 p-2 border-2 border-black bg-white shadow-[2px_2px_0px_#000000]">
               <div className="flex items-center gap-1.5 sm:gap-2">
                 <span className="text-[11px] font-bold text-neutral-700 bg-neutral-100 px-2 py-1 border border-black shadow-[1px_1px_0px_#000000]">
-                  Trazos: {strokes.length}{challenge.minRequiredStrokes ? ` / ${challenge.minRequiredStrokes}` : ''}
+                  Trazos: {strokes.length} / {Math.max(1, challenge.minRequiredStrokes || (challenge.targetLines ? challenge.targetLines.length : 1))}
                 </span>
                 <button
                   type="button"

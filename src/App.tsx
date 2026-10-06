@@ -188,6 +188,10 @@ export function App() {
     toPhase: 1 | 2 | 3;
     nodeCode: string;
     nodeTitle?: string;
+    isVersionAdvance?: boolean;
+    fromVersion?: number;
+    toVersion?: number;
+    totalVersions?: number;
   } | null>(null);
 
   const [levelCompletionModal, setLevelCompletionModal] = useState<{
@@ -517,8 +521,20 @@ export function App() {
 
   const handleDismissPhaseTransition = () => {
     if (phaseTransitionNotice && activeNode) {
-      setCurrentPhase(phaseTransitionNotice.toPhase);
-      setMasteryStreaks((prev) => ({ ...prev, [activeNode.id]: 0 }));
+      if (phaseTransitionNotice.isVersionAdvance && phaseTransitionNotice.toVersion) {
+        // Avanzar a la siguiente versión / variante del nivel
+        const nextVariantIdx = phaseTransitionNotice.toVersion - 1;
+        setNodeVariantIndices((prev) => ({
+          ...prev,
+          [activeNode.id]: nextVariantIdx,
+        }));
+        setCurrentPhase(1);
+        setMasteryStreaks((prev) => ({ ...prev, [activeNode.id]: 0 }));
+      } else {
+        // Avanzar a la siguiente fase de motricidad dentro de la misma versión
+        setCurrentPhase(phaseTransitionNotice.toPhase);
+        setMasteryStreaks((prev) => ({ ...prev, [activeNode.id]: 0 }));
+      }
     }
     setPhaseTransitionNotice(null);
     setStrokeEvaluation(null);
@@ -538,13 +554,8 @@ export function App() {
   const handleSidebarNext = () => {
     setStrokeEvaluation(null);
     if (activeNode?.isCalisthenics) {
-      if (activeVariants.length > 1) {
-        const nextVariantIdx = (currentVariantIndex + 1) % activeVariants.length;
-        setNodeVariantIndices((prev) => ({
-          ...prev,
-          [activeNode.id]: nextVariantIdx,
-        }));
-      }
+      // En calistenia, avanzar genera una nueva semilla del mismo ejercicio y versión.
+      // NO avanza de versión. El avance de versión requiere superar las 3 fases (3 x 3 maestrías por versión).
       setCalisthenicsSeed(Math.floor(Math.random() * 90000 + 10000));
     } else {
       handleNextCubeOrProblem();
@@ -580,7 +591,7 @@ export function App() {
         setMasteryStreaks((prev) => ({ ...prev, [activeNode.id]: 3 }));
 
         if (currentPhase < 3) {
-          // PASA DE FASE DE MOTRICIDAD (Fase 1 -> Fase 2, o Fase 2 -> Fase 3)
+          // PASA DE FASE DE MOTRICIDAD (Fase 1 -> Fase 2, o Fase 2 -> Fase 3) DENTRO DE LA MISMA VERSIÓN
           const nextPhase = (currentPhase + 1) as 1 | 2 | 3;
           // Mostramos la ventana de paso de fase pero dejamos el trazo y nota visibles.
           // El cambio a nextPhase y reseteo de racha a 0 ocurre al pulsar "Continuar a Fase X".
@@ -589,41 +600,61 @@ export function App() {
             toPhase: nextPhase,
             nodeCode: activeNode.code,
             nodeTitle: activeNode.title,
+            isVersionAdvance: false,
           });
         } else {
           // ¡HA ACABADO LA FASE DE VELOCIDAD (FASE 3)!
-          // ¡EL NIVEL ESTÁ TOTALMENTE SUPERADO!
-          const currentIndexInAll = allNodes.findIndex((n) => n.id === activeNode.id);
-          const immediateNextNode =
-            currentIndexInAll >= 0 && currentIndexInAll < allNodes.length - 1
-              ? allNodes[currentIndexInAll + 1]
-              : null;
+          // Se han completado las 3 fases (Precisión, Fluidez, Velocidad) de esta versión.
+          const hasMoreVariants = activeVariants.length > 1 && currentVariantIndex < activeVariants.length - 1;
 
-          const nextUnits = units.map((unit) => ({
-            ...unit,
-            nodes: unit.nodes.map((n) => {
-              if (n.id === activeNode.id) {
-                return { ...n, status: 'completed' as const, score: Math.max(n.score || 0, recordedScore) };
-              }
-              if (immediateNextNode && n.id === immediateNextNode.id && n.status === 'locked') {
-                return { ...n, status: 'current' as const };
-              }
-              return n;
-            }),
-          }));
+          if (hasMoreVariants) {
+            // PASA A LA SIGUIENTE VERSIÓN (ej: V1 -> V2) EMPEZANDO EN FASE 1
+            const nextVariantNum = currentVariantIndex + 2; // 1-indexed
+            setPhaseTransitionNotice({
+              fromPhase: 3,
+              toPhase: 1,
+              nodeCode: activeNode.code,
+              nodeTitle: activeNode.title,
+              isVersionAdvance: true,
+              fromVersion: currentVariantIndex + 1,
+              toVersion: nextVariantNum,
+              totalVersions: activeVariants.length,
+            });
+          } else {
+            // ¡HA ACABADO LA ÚLTIMA VERSIÓN Y LA FASE 3!
+            // ¡EL NIVEL ESTÁ TOTALMENTE SUPERADO! (3 fases x 3 maestrías x N versiones)
+            const currentIndexInAll = allNodes.findIndex((n) => n.id === activeNode.id);
+            const immediateNextNode =
+              currentIndexInAll >= 0 && currentIndexInAll < allNodes.length - 1
+                ? allNodes[currentIndexInAll + 1]
+                : null;
 
-          setUnits(nextUnits);
-          setActiveNode((prev) =>
-            prev ? { ...prev, status: 'completed', score: Math.max(prev.score || 0, recordedScore) } : prev
-          );
+            const nextUnits = units.map((unit) => ({
+              ...unit,
+              nodes: unit.nodes.map((n) => {
+                if (n.id === activeNode.id) {
+                  return { ...n, status: 'completed' as const, score: Math.max(n.score || 0, recordedScore) };
+                }
+                if (immediateNextNode && n.id === immediateNextNode.id && n.status === 'locked') {
+                  return { ...n, status: 'current' as const };
+                }
+                return n;
+              }),
+            }));
 
-          // Mostrar modal de nivel superado al acabar la fase de velocidad
-          setLevelCompletionModal({
-            isOpen: true,
-            completedNode: activeNode,
-            nextNode: immediateNextNode,
-            score: recordedScore,
-          });
+            setUnits(nextUnits);
+            setActiveNode((prev) =>
+              prev ? { ...prev, status: 'completed', score: Math.max(prev.score || 0, recordedScore) } : prev
+            );
+
+            // Mostrar modal de nivel superado al acabar todas las versiones y fases
+            setLevelCompletionModal({
+              isOpen: true,
+              completedNode: activeNode,
+              nextNode: immediateNextNode,
+              score: recordedScore,
+            });
+          }
         }
       }
     } else {
