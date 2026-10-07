@@ -164,6 +164,7 @@ Explore the [`docs/`](./docs/README.md) directory for detailed engineering docum
 ## 👤 Author & Academic Research
 
 * **Author:** **Lázaro Guerrero Losada**
+* **LinkedIn:** [linkedin.com/in/lazaroguerrero](https://www.linkedin.com/in/lazaroguerrero)
 * **Affiliation:** Student of M.Sc. in Industrial Engineering (UMA) & B.Sc. in Industrial Design Engineering and Product Development (*Universidad de Málaga — UMA*).
 * **Research Line:** Digital Pedagogy & Transdisciplinary Design (*Congreso Internacional de Innovación Docente y Educación en Diseño*).
 * **Contact:** `lazaroguerrerolosada@uma.es`
