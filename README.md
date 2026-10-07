@@ -4,7 +4,9 @@
 > 
 > *“Drawing is not an innate gift—it is a learnable visual language. Paplitz transforms sketching anxiety into spatial muscle memory through real-time geometric feedback and deliberate practice.”*
 
-![Paplitz Logo](public/paplitz-logo.svg)
+<p align="center">
+  <img src="public/paplitz-logo.svg" alt="Paplitz Logo" width="96" />
+</p>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Live Demo](https://img.shields.io/badge/Live_Demo-paplitz.vercel.app-black?logo=vercel&logoColor=white)](https://paplitz.vercel.app/)
