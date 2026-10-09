@@ -6,6 +6,43 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.2.1] — 2026-10-09
+
+### 🎮 Minigames Overhaul, Zen Practice Canvas & Biomechanical Progression
+
+#### ⚡ Minigames Redesign & Interactive Play
+- **👻 Línea Fantasma (Ghost Line Minigame) (`GhostLineMinigame.tsx`)**:
+  - **Sidebar Layout Architecture**: Shifted controls, HUD, and feedback into a clean left-hand sidebar for full tablet/desktop canvas clarity.
+  - **Continuous Ghost Mutation**: Dynamic target regeneration keeping neuromuscular motor synchronization active without rigid restarts.
+  - **"Finalizar" (Finish) Action**: Dedicated exit button allowing students to wrap up their training session at any moment, saving earned XP and stats.
+- **⚡ Avalancha de Trazos (Stroke Rush Minigame) (`StrokeRushMinigame.tsx`)**:
+  - **Acts & Stages Progression System**: Structured intervals into organized acts with restorative pauses and break reminders between motor bursts.
+  - **Accumulated Line Dynamics**: Real on-screen polyline accumulation with strict threshold-based motor accuracy evaluation.
+  - **Snappy 200ms Empty-Screen Spawn**: High-responsiveness respawn rate ensuring continuous drawing flow.
+  - **Full Calisthenics Variety in Random Mode**: Integrated all procedurally generated calisthenic patterns into the rush pool.
+  - **"Finalizar" Button**: Clean session termination control with instant score tallying.
+
+#### 🖌️ Practice Canvas & Motor Training Workspace (`StrokePracticeCanvas.tsx`, `DrawingCanvas.tsx`)
+- **📐 750x500 Landscape Aspect Ratio**: Perfectly locked aspect ratio (750x500) aligned with the tool palette to prevent letterboxing and distortion across devices.
+- **🚫 Removed 75% Hard Threshold Blocking**: Replaced punitive barriers with progressive motor feedback, letting students continue practicing fluidly.
+- **⏱️ Auto-Advance Calibration**:
+  - Tuned auto-advance timer to snappy 1.5s–2.0s with active countdown indicator.
+  - Interactive auto-advance toggle switch.
+  - Intelligent pause behavior: timer automatically freezes when opening any modal, report, or stats popup.
+- **🎯 Clean Solution Guide Overlay**: Renders the theoretical target path cleanly over the canvas without clearing or erasing user strokes.
+- **🔍 Multi-Line Stroke Detection**: Added smart wait heuristics for multi-stroke calisthenics (e.g. radial rosettes, parallel tracks), preventing premature scoring before completion.
+- **🎨 Minimalist Toolbar & Visual Polish**:
+  - Compact icon-only toolbar buttons for Stats and Debug Reports (`AlertTriangle` icon).
+  - 100% monochromatic ink phase transition popups, removing colorful emojis for an authentic graphite/ink design studio aesthetic.
+  - Prominent on-canvas score badge, kinematic phase indicators, and live mastery progress indicators.
+
+#### 📚 Documentation & Identity (`README.md`)
+- Streamlined documentation with concise visual literacy overview.
+- Sized brand logo to a crisp, centered 96px display.
+- Added author LinkedIn profile link in the footer.
+
+---
+
 ## [0.2.0] — 2026-10-05
 
 ### 🚀 Mega-Update: Motor Calisthenics Engine, Two-Module Learning Curriculum & Immersive Practice Canvas
