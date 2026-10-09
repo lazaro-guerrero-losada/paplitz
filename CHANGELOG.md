@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.2.2] — 2026-10-09
+
+### 📱 Mobile Viewport UX: Snug Vertical Positioning & Landscape Redesign
+
+#### ⬆️ Vertical Mobile Snug Canvas Positioning (`App.tsx`, `StrokePracticeCanvas.tsx`, `DrawingCanvas.tsx`)
+- **🚫 Eliminated Awkward Vertical Dead Space**: Replaced `justify-center` vertical centering in portrait mobile with `justify-start pt-1 sm:pt-4`, placing the drawing canvas immediately below the top controls and level indicator (`[Panel] | 1.1`).
+- **📐 Snug Padding & Anchor Harmony**: Removed excessive spacing and dead margins so that users see their drawing canvas right where their eyes and hands are, with natural 4px–6px gaps rather than a massive 200px gap.
+
+#### 🔄 Horizontal Mobile Landscape Redesign (`App.tsx`, `StrokePracticeCanvas.tsx`, `DrawingCanvas.tsx`, `index.css`)
+- **🔀 Side-by-Side Horizontal Architecture**: When rotated to landscape on mobile phones (`orientation: landscape` with `height <= 520px`), automatically switches the workspace layout to side-by-side (`flex-row`):
+  - **Left**: Canvas maximized to the available screen height (`height: min(calc(100vh - 46px), 360px)`), with aspect ratio locked (750:500 for strokes, 600:540 for 3D cubes). Width scales cleanly to ~420px (more than double the previous squeezed 180px view!).
+  - **Right**: Ergonomic side toolbar matching canvas height with clean ink card styling (`w-48 sm:w-52`). Contains `[Panel]` toggle button, level badge, stroke count, quick tool row (`[Undo]`, `[Trash]`, `[Eye Trazo]`, `[Eye Guía]`), auto-advance toggle, and primary action (`[ CORREGIR ]` or `[ SIGUIENTE ]`).
+- **✨ Compact Header in Mobile Landscape**: Header automatically condenses to 40px (`h-10`) in mobile landscape, saving valuable vertical height and dedicating maximum screen real estate to the drawing canvas.
+- **🚫 No Scroll & No Cropping**: Completely prevents vertical scrolling and eliminates button cutoff in mobile landscape.
+- **🧭 Integrated Sidebar Trigger**: Removed the isolated floating desktop button on the far left in mobile landscape and integrated the `[Panel]` toggle directly inside the side toolbar header.
+
+---
+
 ## [0.2.1] — 2026-10-09
 
 ### 🎮 Biomechanical Progression, Mobile Vertical UX & Tablet Minigame Overhaul

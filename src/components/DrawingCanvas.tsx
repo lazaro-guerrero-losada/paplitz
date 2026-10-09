@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { CubeChallenge, Point2D } from '../lib/geometry';
 import { UserStroke, ValidationFeedback, countDetectedAristas } from '../lib/validation';
-import { Undo2, Trash2, Check, ArrowRight, AlertTriangle, CheckCircle, Clock, Zap, Copy, Download, X, Pen, Hand, ArrowDown, ArrowUp, Eye, EyeOff, FileText } from 'lucide-react';
+import { Undo2, Trash2, Check, ArrowRight, AlertTriangle, CheckCircle, Clock, Zap, Copy, Download, X, Pen, Hand, ArrowDown, ArrowUp, Eye, EyeOff, FileText, PanelLeft } from 'lucide-react';
 import { buildDebugReport, copyReportToClipboard, downloadReportJson } from '../lib/debugReport';
 
 /**
@@ -147,6 +147,9 @@ export interface DrawingCanvasProps {
     difficulty?: string;
     isShadowLevel?: boolean;
   } | null;
+  isLandscapeMobile?: boolean;
+  onToggleSidebar?: () => void;
+  nodeCode?: string;
 }
 
 const TOTAL_COUNTDOWN_SECONDS = 30;
@@ -163,7 +166,31 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((p
     activeLesson,
     showUserDrawing: externalShowUserDrawing,
     showParametricSolution: externalShowParametricSolution,
+    isLandscapeMobile: propIsLandscapeMobile,
+    onToggleSidebar,
+    nodeCode,
   } = props;
+
+  const [internalIsLandscape, setInternalIsLandscape] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth > window.innerHeight && (window.innerHeight <= 520 || (window.innerWidth <= 960 && window.innerHeight <= 560));
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      setInternalIsLandscape(w > h && (h <= 520 || (w <= 960 && h <= 560)));
+    };
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
+  }, []);
+
+  const effectiveIsLandscape = propIsLandscapeMobile !== undefined ? propIsLandscapeMobile : internalIsLandscape;
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -948,17 +975,207 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((p
   }));
 
   return (
-    <div
-      className="flex flex-col items-center select-none w-full mx-auto"
-      style={{
-        width: 'min(100%, 680px, max(280px, calc((100vh - 200px) * 600 / 540)))',
-      }}
-    >
-      {/* Contenedor responsivo del lienzo: aspecto 600/540 bloqueado 1:1 sin deformación ni márgenes invisibles */}
-      <div
-        data-canvas-zone="true"
-        className="relative border-4 border-black bg-white shadow-[4px_4px_0px_#000000] w-full aspect-[600/540] overflow-hidden"
-      >
+    <div className="w-full flex flex-col items-center justify-center select-none">
+      {effectiveIsLandscape ? (
+        /* ============================================================ */
+        /* MODO MÓVIL HORIZONTAL (LANDSCAPE COMPACTO): CUBO 3D          */
+        /* ============================================================ */
+        <div className="w-full h-full flex flex-row items-center justify-center gap-2 sm:gap-3 max-w-full select-none overflow-hidden font-mono">
+          {/* LIENZO 600x540 ESCALADO A MÁXIMA ALTURA */}
+          <div
+            data-canvas-zone="true"
+            className="relative border-3 border-black bg-white shadow-[3px_3px_0px_#000000] aspect-[600/540] overflow-hidden shrink-0"
+            style={{
+              height: 'min(calc(100vh - 46px), calc(100dvh - 46px), 360px)',
+              width: 'auto',
+              maxWidth: 'calc(100vw - 210px)',
+            }}
+          >
+            {/* Barra superior de progreso del temporizador */}
+            <div className="absolute top-0 left-0 right-0 h-1 bg-neutral-200 pointer-events-none z-10">
+              <div
+                className={`h-full transition-all duration-100 ${
+                  timeLeft <= 5 && isTimerRunning ? 'bg-black animate-pulse' : 'bg-neutral-800'
+                }`}
+                style={{ width: `${(timeLeft / TOTAL_COUNTDOWN_SECONDS) * 100}%` }}
+              />
+            </div>
+
+            <canvas
+              ref={canvasRef}
+              width={600}
+              height={540}
+              className="block w-full h-full touch-none cursor-crosshair select-none"
+              style={{ touchAction: 'none' }}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={handlePointerUp}
+            />
+
+            <div className="absolute top-1.5 left-1.5 text-[9px] font-mono uppercase bg-white border border-black px-1.5 py-0.5 pointer-events-none shadow-[1px_1px_0px_#000000] z-10">
+              #{challenge.seed}
+            </div>
+
+            {/* Temporizador */}
+            <div
+              className={`absolute top-1.5 right-1.5 border border-black px-1.5 py-0.5 font-mono text-[10px] pointer-events-none shadow-[1px_1px_0px_#000000] z-10 flex items-center gap-1 ${
+                timeLeft <= 5 && isTimerRunning ? 'bg-black text-white animate-pulse' : 'bg-white text-black'
+              }`}
+            >
+              <Clock className="w-3 h-3 stroke-[2.5]" />
+              <span className="font-bold tabular-nums">{timeLeft.toFixed(1)}s</span>
+              {feedback && feedback.passed && (feedback.speedBonus ?? 0) > 0 && (
+                <span className="text-[9px] font-bold bg-neutral-200 text-black border border-black px-0.5">
+                  +{feedback.speedBonus}%
+                </span>
+              )}
+            </div>
+
+            {/* Banner sombras si aplica */}
+            {challenge.isShadowLevel && (
+              <div className="absolute bottom-1.5 left-1.5 right-1.5 bg-black text-white text-[9px] font-mono px-2 py-0.5 border border-white pointer-events-none z-10 truncate">
+                ☀️ {challenge.hasGroundGrid ? "Sombra con suelo guía" : "Sombra libre"}
+              </div>
+            )}
+          </div>
+
+          {/* BARRA LATERAL ERGONÓMICA EN MÓVIL HORIZONTAL (DERECHA) */}
+          <div
+            className="w-44 sm:w-48 shrink-0 flex flex-col justify-between border-2 border-black bg-white shadow-[3px_3px_0px_#000000] p-1.5 select-none font-mono"
+            style={{
+              height: 'min(calc(100vh - 46px), calc(100dvh - 46px), 360px)',
+            }}
+          >
+            {/* SECCIÓN SUPERIOR */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between gap-1 pb-1 border-b border-black">
+                {onToggleSidebar && (
+                  <button
+                    type="button"
+                    onClick={onToggleSidebar}
+                    className="bg-white hover:bg-neutral-100 text-black px-1.5 py-0.5 border border-black shadow-[1px_1px_0px_#000000] text-[10px] font-bold flex items-center gap-1 cursor-pointer active:scale-95"
+                    title="Abrir panel"
+                  >
+                    <PanelLeft className="w-3 h-3 stroke-[2.5]" />
+                    <span>Panel</span>
+                  </button>
+                )}
+                <span className="text-[9px] font-bold bg-neutral-100 px-1 py-0.5 border border-black truncate">
+                  {nodeCode || activeLesson?.code || '1.1'}
+                </span>
+              </div>
+
+              {/* Contador de aristas */}
+              <div className="flex items-center justify-between text-[10px] font-bold text-neutral-700 bg-neutral-50 px-1.5 py-0.5 border border-neutral-300">
+                <span>Aristas:</span>
+                <span className="tabular-nums">
+                  {countDetectedAristas(strokes)} / {challenge.targetEdges.length}
+                </span>
+              </div>
+
+              {/* Herramientas: Deshacer, Borrar, Reporte */}
+              <div className="grid grid-cols-3 gap-1">
+                <button
+                  onClick={undoLastStroke}
+                  disabled={strokes.length === 0 || showSolution}
+                  className="btn-ink-outline p-1 text-xs font-mono disabled:opacity-30 cursor-pointer flex items-center justify-center shadow-[1px_1px_0px_#000000]"
+                  title="Deshacer (Ctrl+Z)"
+                >
+                  <Undo2 className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={clearStrokes}
+                  disabled={strokes.length === 0 || showSolution}
+                  className="btn-ink-outline p-1 text-xs font-mono disabled:opacity-30 cursor-pointer hover:bg-red-50 hover:text-red-700 flex items-center justify-center shadow-[1px_1px_0px_#000000]"
+                  title="Borrar todo"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={handleOpenReportModal}
+                  className="btn-ink-outline p-1 text-xs font-mono font-bold flex items-center justify-center cursor-pointer shadow-[1px_1px_0px_#000000]"
+                  title="Reporte de anomalía"
+                >
+                  <AlertTriangle className="w-3.5 h-3.5 text-black stroke-[2.5]" />
+                </button>
+              </div>
+
+              {/* Capas dibujo y solución cuando está resuelto */}
+              {feedback && (
+                <div className="grid grid-cols-2 gap-1 pt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowUserDrawing((prev) => !prev)}
+                    className={`p-1 text-[10px] font-mono font-bold border border-black flex items-center justify-center gap-0.5 ${
+                      showUserDrawing ? 'bg-black text-white' : 'bg-neutral-100 text-neutral-400 line-through'
+                    }`}
+                    title={showUserDrawing ? "Ocultar trazo" : "Mostrar trazo"}
+                  >
+                    {showUserDrawing ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                    <span>Trazo</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowParametricSolution((prev) => !prev)}
+                    className={`p-1 text-[10px] font-mono font-bold border border-black flex items-center justify-center gap-0.5 ${
+                      showParametricSolution ? 'bg-black text-white' : 'bg-neutral-100 text-neutral-400 line-through'
+                    }`}
+                    title={showParametricSolution ? "Ocultar solución" : "Mostrar solución"}
+                  >
+                    {showParametricSolution ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                    <span>Solución</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* SECCIÓN INFERIOR */}
+            <div className="pt-1 border-t border-neutral-300">
+              {!feedback ? (
+                <button
+                  onClick={handleValidateClick}
+                  disabled={countDetectedAristas(strokes) === 0}
+                  className="w-full btn-ink py-2 text-xs font-mono uppercase font-bold disabled:opacity-25 disabled:pointer-events-none cursor-pointer shadow-[2px_2px_0px_#000000] flex items-center justify-center gap-1"
+                  title="Comprobar perspectiva (Enter)"
+                >
+                  <span>Comprobar</span>
+                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                </button>
+              ) : (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[11px] font-bold bg-neutral-100 p-1 border border-black">
+                    <span className="text-[10px] text-neutral-600">Nota:</span>
+                    <span className="font-black text-sm">{feedback.totalScore ?? feedback.score}%</span>
+                  </div>
+                  <button
+                    onClick={onNextCube}
+                    className="w-full btn-ink py-2 text-xs font-mono uppercase font-bold flex items-center justify-center gap-1 cursor-pointer shadow-[2px_2px_0px_#000000]"
+                    title="Siguiente ejercicio"
+                  >
+                    <span>Siguiente</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* ============================================================ */
+        /* MODO ESTÁNDAR (PORTRAIT MÓVIL, TABLET, ESCRITORIO)           */
+        /* ============================================================ */
+        <div
+          className="flex flex-col items-center select-none w-full mx-auto"
+          style={{
+            width: 'min(100%, 680px, max(280px, calc((100vh - 180px) * 600 / 540)))',
+          }}
+        >
+          {/* Contenedor responsivo del lienzo: aspecto 600/540 bloqueado 1:1 sin deformación ni márgenes invisibles */}
+          <div
+            data-canvas-zone="true"
+            className="relative border-4 border-black bg-white shadow-[4px_4px_0px_#000000] w-full aspect-[600/540] overflow-hidden"
+          >
         {/* Barra superior de progreso del temporizador */}
         <div className="absolute top-0 left-0 right-0 h-1 bg-neutral-200 pointer-events-none z-10">
           <div
@@ -1227,6 +1444,8 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((p
           </div>
         )}
       </div>
+    </div>
+  )}
 
       {/* Feedback técnico si se ha comprobado */}
       {feedback && (
@@ -1394,33 +1613,35 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((p
           </div>
         </div>
       )}
-      {/* Botón flotante móvil de desplazamiento rápido con 1 dedo */}
-      <div className="fixed bottom-4 right-4 z-40 sm:hidden">
-        <button
-          type="button"
-          onClick={() => {
-            if (isScrolledDown) {
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            } else {
-              window.scrollBy({ top: 380, behavior: 'smooth' });
-            }
-          }}
-          className="btn-ink px-2.5 py-1.5 text-xs font-mono font-bold flex items-center gap-1.5 shadow-[2px_2px_0px_#000000] cursor-pointer active:scale-95"
-          title={isScrolledDown ? "Volver arriba al lienzo" : "Bajar a los controles"}
-        >
-          {isScrolledDown ? (
-            <>
-              <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span className="text-[11px]">Lienzo</span>
-            </>
-          ) : (
-            <>
-              <ArrowDown className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span className="text-[11px]">Controles</span>
-            </>
-          )}
-        </button>
-      </div>
+      {/* Botón flotante móvil de desplazamiento rápido con 1 dedo (solo en vertical) */}
+      {!effectiveIsLandscape && (
+        <div className="fixed bottom-4 right-4 z-40 sm:hidden">
+          <button
+            type="button"
+            onClick={() => {
+              if (isScrolledDown) {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              } else {
+                window.scrollBy({ top: 380, behavior: 'smooth' });
+              }
+            }}
+            className="btn-ink px-2.5 py-1.5 text-xs font-mono font-bold flex items-center gap-1.5 shadow-[2px_2px_0px_#000000] cursor-pointer active:scale-95"
+            title={isScrolledDown ? "Volver arriba al lienzo" : "Bajar a los controles"}
+          >
+            {isScrolledDown ? (
+              <>
+                <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span className="text-[11px]">Lienzo</span>
+              </>
+            ) : (
+              <>
+                <ArrowDown className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span className="text-[11px]">Controles</span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
     </div>
   );
 });

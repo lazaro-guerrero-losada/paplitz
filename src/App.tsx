@@ -123,6 +123,10 @@ export function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [showRotatePrompt, setShowRotatePrompt] = useState<boolean>(true);
   const [isPortraitMobile, setIsPortraitMobile] = useState<boolean>(false);
+  const [isLandscapeMobile, setIsLandscapeMobile] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth > window.innerHeight && (window.innerHeight <= 520 || (window.innerWidth <= 960 && window.innerHeight <= 560));
+  });
   const [, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
 
   // Estado del Avatar Acompañante Cúbico ("Cubito")
@@ -347,6 +351,7 @@ export function App() {
       const h = window.innerHeight;
       setWindowWidth(w);
       setIsPortraitMobile(w <= 768 && h > w);
+      setIsLandscapeMobile(w > h && (h <= 520 || (w <= 960 && h <= 560)));
     };
     handleDimensions();
     window.addEventListener('resize', handleDimensions);
@@ -967,26 +972,30 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-white text-black flex flex-col antialiased">
-      {/* 1. BARRA SUPERIOR CON PESTAÑAS PRINCIPALES */}
+      {/* 1. BARRA SUPERIOR CON PESTAÑAS PRINCIPALES (COMPACTA EN MÓVIL HORIZONTAL PARA MÁXIMO ESPACIO DE LIENZO) */}
       <header className="sticky top-0 z-40 bg-white border-b-2 border-black">
-        <div className="max-w-6xl xl:max-w-7xl mx-auto px-3 sm:px-4 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4">
+        <div className={`max-w-6xl xl:max-w-7xl mx-auto flex items-center justify-between gap-2 sm:gap-4 ${
+          isLandscapeMobile ? 'px-2.5 h-10' : 'px-3 sm:px-4 h-14 sm:h-16'
+        }`}>
           {/* Logo Paplitz */}
           <div
             onClick={() => { setActiveTab('practice'); setMobileMenuOpen(false); }}
-            className="flex items-center gap-2 sm:gap-3 cursor-pointer group select-none shrink-0"
+            className="flex items-center gap-1.5 sm:gap-3 cursor-pointer group select-none shrink-0"
           >
             <img
               src="/paplitz-logo.svg"
               alt="Paplitz Logo"
-              className="w-8 h-8 sm:w-10 sm:h-10 group-hover:scale-105 transition-transform"
+              className={`${isLandscapeMobile ? 'w-6 h-6' : 'w-8 h-8 sm:w-10 sm:h-10'} group-hover:scale-105 transition-transform`}
             />
             <div>
-              <span className="text-lg sm:text-2xl font-bold font-display tracking-tight block leading-none">
+              <span className={`${isLandscapeMobile ? 'text-sm' : 'text-lg sm:text-2xl'} font-bold font-display tracking-tight block leading-none`}>
                 Paplitz
               </span>
-              <span className="text-[7px] sm:text-[9px] font-mono tracking-widest uppercase text-neutral-500 block">
-                Drawing Practice
-              </span>
+              {!isLandscapeMobile && (
+                <span className="text-[7px] sm:text-[9px] font-mono tracking-widest uppercase text-neutral-500 block">
+                  Drawing Practice
+                </span>
+              )}
             </div>
           </div>
 
@@ -1305,39 +1314,47 @@ export function App() {
 
         {/* PESTAÑA 1: HOME / PRÁCTICA RÁPIDA (REDiseño LIMPIO, INTUITIVO Y SIN DISTRACCIONES) */}
         {activeTab === 'practice' && (
-          <div className="flex-1 w-full flex flex-col items-center justify-start sm:justify-center overflow-hidden relative min-h-[calc(100vh-64px)] bg-neutral-100 p-2 sm:p-4">
+          <div className={`flex-1 w-full flex flex-col items-center overflow-hidden relative bg-neutral-100 ${
+            isLandscapeMobile
+              ? 'p-1.5 justify-center min-h-[calc(100vh-42px)] max-h-[calc(100vh-42px)]'
+              : 'p-1.5 sm:p-4 pt-1 sm:pt-4 justify-start sm:justify-center min-h-[calc(100vh-64px)]'
+          }`}>
             {/* BARRA SUPERIOR EXCLUSIVA MÓVIL VERTICAL (< sm): ANCLAJE ELEGANTE DEL PANEL Y CONTEXTO */}
-            <div className="w-full max-w-[750px] flex items-center justify-between gap-2 px-0.5 pb-1 sm:hidden z-20 select-none">
+            {!isLandscapeMobile && (
+              <div className="w-full max-w-[750px] flex items-center justify-between gap-2 px-0.5 pb-1 sm:hidden z-20 select-none">
+                <button
+                  type="button"
+                  onClick={() => setIsSidebarCollapsed((prev) => !prev)}
+                  className="bg-white hover:bg-neutral-100 text-black px-2.5 py-1 border-2 border-black shadow-[2px_2px_0px_#000000] text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer active:scale-95 transition-transform"
+                  title={isSidebarCollapsed ? "Abrir panel de práctica" : "Ocultar panel"}
+                >
+                  <PanelLeft className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Panel</span>
+                </button>
+
+                <div className="flex items-center gap-1 min-w-0 bg-white border border-black px-2 py-0.5 shadow-[1px_1px_0px_#000000]">
+                  <span className="text-[10px] font-mono font-bold text-neutral-500 uppercase">
+                    {practiceMode === 'camino' ? (activeNode ? activeNode.code : '1.1') : 'RETO'}
+                  </span>
+                  <span className="text-[11px] font-mono font-bold text-black truncate max-w-[130px]">
+                    {practiceMode === 'camino' ? (activeNode?.title || '') : 'Diario'}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* BOTÓN TOGGLE FLOTANTE EN TABLET Y ESCRITORIO (>= sm, OCULTO EN MÓVIL HORIZONTAL) */}
+            {!isLandscapeMobile && (
               <button
                 type="button"
                 onClick={() => setIsSidebarCollapsed((prev) => !prev)}
-                className="bg-white hover:bg-neutral-100 text-black px-2.5 py-1 border-2 border-black shadow-[2px_2px_0px_#000000] text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer active:scale-95 transition-transform"
+                className="hidden sm:flex absolute top-3 left-3 z-30 bg-white hover:bg-neutral-100 text-black px-2.5 py-1.5 border-2 border-black shadow-[2px_2px_0px_#000000] text-xs font-mono font-bold items-center gap-1.5 cursor-pointer transition-transform hover:scale-105 active:scale-95"
                 title={isSidebarCollapsed ? "Abrir panel de práctica" : "Ocultar panel"}
               >
-                <PanelLeft className="w-3.5 h-3.5 stroke-[2.5]" />
+                <PanelLeft className="w-4 h-4 stroke-[2.5]" />
                 <span>Panel</span>
               </button>
-
-              <div className="flex items-center gap-1 min-w-0 bg-white border border-black px-2 py-0.5 shadow-[1px_1px_0px_#000000]">
-                <span className="text-[10px] font-mono font-bold text-neutral-500 uppercase">
-                  {practiceMode === 'camino' ? (activeNode ? activeNode.code : '1.1') : 'RETO'}
-                </span>
-                <span className="text-[11px] font-mono font-bold text-black truncate max-w-[130px]">
-                  {practiceMode === 'camino' ? (activeNode?.title || '') : 'Diario'}
-                </span>
-              </div>
-            </div>
-
-            {/* BOTÓN TOGGLE FLOTANTE EN TABLET Y ESCRITORIO (>= sm) */}
-            <button
-              type="button"
-              onClick={() => setIsSidebarCollapsed((prev) => !prev)}
-              className="hidden sm:flex absolute top-3 left-3 z-30 bg-white hover:bg-neutral-100 text-black px-2.5 py-1.5 border-2 border-black shadow-[2px_2px_0px_#000000] text-xs font-mono font-bold items-center gap-1.5 cursor-pointer transition-transform hover:scale-105 active:scale-95"
-              title={isSidebarCollapsed ? "Abrir panel de práctica" : "Ocultar panel"}
-            >
-              <PanelLeft className="w-4 h-4 stroke-[2.5]" />
-              <span>Panel</span>
-            </button>
+            )}
 
             {/* BACKDROP FLOTANTE CUANDO EL PANEL ESTÁ ABIERTO */}
             {!isSidebarCollapsed && (
@@ -1500,9 +1517,13 @@ export function App() {
               </div>
             </aside>
 
-            {/* ÁREA CENTRAL: LIENZO 100% CENTRADO Y PERMANENTEMENTE INMÓVIL */}
-            <div className="flex-1 w-full flex flex-col items-center justify-center overflow-hidden min-h-0">
-              <div className="w-full flex flex-col items-center justify-center">
+            {/* ÁREA CENTRAL: LIENZO PEGADO ARRIBA EN MÓVIL VERTICAL (SIN HUECAZO) Y CENTRADO EN HORIZONTAL/DESKTOP */}
+            <div className={`flex-1 w-full flex flex-col items-center overflow-hidden min-h-0 ${
+              isLandscapeMobile ? 'justify-center h-full' : 'justify-start sm:justify-center pt-1 sm:pt-0'
+            }`}>
+              <div className={`w-full flex flex-col items-center ${
+                isLandscapeMobile ? 'justify-center h-full' : 'justify-start sm:justify-center'
+              }`}>
                 {activeNode?.isCalisthenics ? (
                   <StrokePracticeCanvas
                     ref={strokeCanvasRef}
@@ -1524,6 +1545,10 @@ export function App() {
                     onOpenMasteryInfo={() => setShowMasteryStreakInfo(true)}
                     onOpenPhaseInfo={() => setShowKinematicPhasesInfo(true)}
                     onPhaseChange={(phase) => setCurrentPhase(phase)}
+                    isLandscapeMobile={isLandscapeMobile}
+                    onToggleSidebar={() => setIsSidebarCollapsed((prev) => !prev)}
+                    nodeCode={practiceMode === 'camino' ? (activeNode ? activeNode.code : '1.1') : 'RETO'}
+                    nodeTitle={practiceMode === 'camino' ? (activeNode?.title || '') : 'Diario'}
                   />
                 ) : (
                   <DrawingCanvas
@@ -1538,6 +1563,9 @@ export function App() {
                     onNextCube={handleNextCubeOrProblem}
                     onDrawingStateChange={setIsUserDrawing}
                     activeLesson={activeNode}
+                    isLandscapeMobile={isLandscapeMobile}
+                    onToggleSidebar={() => setIsSidebarCollapsed((prev) => !prev)}
+                    nodeCode={practiceMode === 'camino' ? (activeNode ? activeNode.code : '1.1') : 'RETO'}
                   />
                 )}
               </div>

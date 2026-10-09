@@ -15,6 +15,7 @@ import {
   Copy,
   X,
   AlertTriangle,
+  PanelLeft,
 } from 'lucide-react';
 import {
   LabExerciseDef,
@@ -62,6 +63,10 @@ export interface StrokePracticeCanvasProps {
   onOpenMasteryInfo?: () => void;
   onOpenPhaseInfo?: () => void;
   onPhaseChange?: (phase: 1 | 2 | 3) => void;
+  isLandscapeMobile?: boolean;
+  onToggleSidebar?: () => void;
+  nodeCode?: string;
+  nodeTitle?: string;
 }
 
 export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePracticeCanvasProps>(
@@ -85,12 +90,37 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
       onOpenMasteryInfo,
       onOpenPhaseInfo,
       onPhaseChange,
+      isLandscapeMobile: propIsLandscapeMobile,
+      onToggleSidebar,
+      nodeCode,
+      nodeTitle,
     },
     ref
   ) => {
     const [challengeSeed, setChallengeSeed] = useState<number>(() =>
       externalSeed !== undefined ? externalSeed : Math.floor(Math.random() * 90000 + 10000)
     );
+
+    const [internalIsLandscape, setInternalIsLandscape] = useState<boolean>(() => {
+      if (typeof window === 'undefined') return false;
+      return window.innerWidth > window.innerHeight && (window.innerHeight <= 520 || (window.innerWidth <= 960 && window.innerHeight <= 560));
+    });
+
+    useEffect(() => {
+      const handleResize = () => {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        setInternalIsLandscape(w > h && (h <= 520 || (w <= 960 && h <= 560)));
+      };
+      window.addEventListener('resize', handleResize);
+      window.addEventListener('orientationchange', handleResize);
+      return () => {
+        window.removeEventListener('resize', handleResize);
+        window.removeEventListener('orientationchange', handleResize);
+      };
+    }, []);
+
+    const effectiveIsLandscape = propIsLandscapeMobile !== undefined ? propIsLandscapeMobile : internalIsLandscape;
 
     const [challenge, setChallenge] = useState<ProceduralStrokeChallenge>(() => {
       const ch = generateStrokeChallenge(exerciseDef, challengeSeed, 750, 500);
@@ -1064,16 +1094,328 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
     );
 
     return (
-      <div
-        className="w-full flex flex-col items-center mx-auto"
-        style={{
-          maxWidth: 'min(100%, 750px, calc((100vh - 230px) * (750 / 500)))',
-        }}
-      >
-        {/* Contenedor del lienzo con aspect-ratio 750/500 estrictamente bloqueado para evitar distorsiones o achatamiento */}
-        <div
-          className="relative w-full aspect-[750/500] border-2 border-black bg-white shadow-[4px_4px_0px_#000000] select-none touch-none overflow-hidden"
-        >
+      <div className="w-full flex flex-col items-center justify-center">
+        {effectiveIsLandscape ? (
+          /* ============================================================ */
+          /* MODO MÓVIL HORIZONTAL (LANDSCAPE COMPACTO): LIENZO + TOOLBAR */
+          /* ============================================================ */
+          <div className="w-full h-full flex flex-row items-center justify-center gap-2 sm:gap-3 max-w-full select-none overflow-hidden font-mono">
+            {/* LIENZO 750x500 ESCALADO A MÁXIMA ALTURA SIN DISTORSIÓN */}
+            <div
+              className="relative aspect-[750/500] border-2 border-black bg-white shadow-[3px_3px_0px_#000000] select-none touch-none overflow-hidden shrink-0"
+              style={{
+                height: 'min(calc(100vh - 46px), calc(100dvh - 46px), 360px)',
+                width: 'auto',
+                maxWidth: 'calc(100vw - 220px)',
+              }}
+            >
+              <canvas
+                ref={canvasRef}
+                width={750}
+                height={500}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={handlePointerUp}
+                className="block w-full h-full cursor-crosshair touch-none select-none"
+              />
+
+              {/* HUD SUPERIOR IZQUIERDO: MAESTRÍA Y FASE CINEMÁTICA */}
+              <div className="absolute top-1.5 left-1.5 z-20 flex flex-col gap-1 p-1 bg-white/95 border border-black shadow-[1px_1px_0px_#000000] font-mono pointer-events-auto select-none text-[10px]">
+                {/* Maestría: M [✓][✓][ ] 0/3 [i] */}
+                <div className={`flex items-center gap-1 text-[10px] transition-transform ${justEarnedMastery ? 'scale-105' : ''}`}>
+                  <span className="font-bold text-neutral-600">M:</span>
+                  <div className="flex items-center gap-0.5">
+                    {[0, 1, 2].map((i) => {
+                      const isFilled = i < (masteryStreak ?? 0);
+                      const isJustFilled = justEarnedMastery && i === (masteryStreak ?? 0) - 1;
+                      return (
+                        <span
+                          key={i}
+                          className={`w-3 h-3 border border-black flex items-center justify-center transition-all ${
+                            isJustFilled
+                              ? 'bg-black text-white animate-mastery-pop scale-110 z-10'
+                              : isFilled
+                              ? 'bg-black text-white'
+                              : 'bg-neutral-100 text-transparent'
+                          }`}
+                        >
+                          {isFilled && <Check className="w-2 h-2 stroke-[3] text-white" />}
+                        </span>
+                      );
+                    })}
+                  </div>
+                  <span className={`font-bold tabular-nums ${justEarnedMastery ? 'text-black font-black' : ''}`}>
+                    {masteryStreak ?? 0}/3
+                  </span>
+                  {onOpenMasteryInfo && (
+                    <button
+                      type="button"
+                      onClick={onOpenMasteryInfo}
+                      className="w-3 h-3 border border-black flex items-center justify-center text-[8px] font-bold text-neutral-600 hover:text-black hover:bg-neutral-200 cursor-pointer"
+                      title={`Información de Maestría (Racha de 3 aciertos ≥${targetMasteryScore}%)`}
+                    >
+                      i
+                    </button>
+                  )}
+                </div>
+
+                {/* Fase de Motricidad: F [1][2][3] [i] */}
+                <div className="flex items-center gap-1 pt-0.5 border-t border-neutral-300 text-[10px]">
+                  <span className="font-bold text-neutral-600">F:</span>
+                  <div className="flex items-center gap-0.5">
+                    {([1, 2, 3] as const).map((ph) => (
+                      <button
+                        key={ph}
+                        type="button"
+                        onClick={() => onPhaseChange && onPhaseChange(ph)}
+                        className={`w-3.5 h-3.5 border border-black flex items-center justify-center text-[8px] font-bold cursor-pointer transition-colors ${
+                          currentPhase === ph
+                            ? 'bg-black text-white shadow-[1px_1px_0px_#000000]'
+                            : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+                        }`}
+                        title={`Fase ${ph}: ${ph === 1 ? 'Precisión (extremos, ≥80%)' : ph === 2 ? 'Fluidez (velocidad constante, ≥85%)' : 'Velocidad (inercia ágil, ≥90%)'}`}
+                      >
+                        {ph}
+                      </button>
+                    ))}
+                  </div>
+                  {onOpenPhaseInfo && (
+                    <button
+                      type="button"
+                      onClick={onOpenPhaseInfo}
+                      className="w-3 h-3 border border-black flex items-center justify-center text-[8px] font-bold text-neutral-600 hover:text-black hover:bg-neutral-200 cursor-pointer"
+                      title="Información de Fases de Motricidad"
+                    >
+                      i
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* HUD SUPERIOR DERECHO: NOTA SI ESTÁ EVALUADO */}
+              {evaluation && (
+                <div className="absolute top-1.5 right-1.5 z-20 flex flex-col items-center bg-white border border-black p-1 shadow-[2px_2px_0px_#000000] font-mono pointer-events-auto">
+                  <span className="text-[8px] font-bold uppercase text-neutral-500">Nota</span>
+                  <span className="text-xl font-black leading-none my-0.5">{Math.round(evaluation.overallScore)}%</span>
+                  <span
+                    className={`text-[8px] font-bold uppercase px-1 py-0.2 border border-black ${
+                      isMasterySuccess
+                        ? 'bg-black text-white'
+                        : evaluation.passed
+                        ? 'bg-neutral-200 text-black'
+                        : 'bg-white text-neutral-700'
+                    }`}
+                  >
+                    {isMasterySuccess ? 'Excelente' : evaluation.passed ? 'Aprobado' : 'Reintentar'}
+                  </span>
+                </div>
+              )}
+
+              {/* MINI-POPUP DE PASO DE FASE */}
+              {phaseTransitionNotice && (
+                <div className="absolute inset-0 z-30 flex items-center justify-center p-2 select-none pointer-events-none animate-in fade-in zoom-in-95 duration-150">
+                  <div className="bg-black text-white border-2 border-white p-2.5 shadow-[4px_4px_0px_#000000] max-w-xs w-full text-center font-mono space-y-1 animate-phase-pop pointer-events-auto">
+                    <div className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-white text-black text-[9px] font-black uppercase tracking-wider shadow-[1px_1px_0px_#000000]">
+                      <Sparkles className="w-3 h-3 stroke-[2.5]" />
+                      <span>¡Siguiente Fase!</span>
+                    </div>
+                    <h3 className="text-sm font-black font-display text-white tracking-tight uppercase">
+                      {phaseTransitionNotice.isVersionAdvance
+                        ? `VERSIÓN ${phaseTransitionNotice.toVersion}: FASE 1`
+                        : `FASE ${phaseTransitionNotice.toPhase}: ${phaseTransitionNotice.toPhase === 2 ? 'FLUIDEZ' : 'VELOCIDAD'}`}
+                    </h3>
+                    <div className="text-[9px] text-neutral-300 font-bold">
+                      {phaseTransitionNotice.isVersionAdvance
+                        ? `¡Versión ${phaseTransitionNotice.fromVersion}/${phaseTransitionNotice.totalVersions} dominada!`
+                        : `¡3/3 aciertos completados!`}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* BARRA LATERAL ERGONÓMICA EN MÓVIL HORIZONTAL (A LA DERECHA DEL LIENZO) */}
+            <div
+              className="w-48 sm:w-52 shrink-0 flex flex-col justify-between border-2 border-black bg-white shadow-[3px_3px_0px_#000000] p-1.5 select-none font-mono"
+              style={{
+                height: 'min(calc(100vh - 46px), calc(100dvh - 46px), 360px)',
+              }}
+            >
+              {/* SECCIÓN SUPERIOR: PANEL Y METADATOS */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between gap-1 pb-1 border-b border-black">
+                  {onToggleSidebar && (
+                    <button
+                      type="button"
+                      onClick={onToggleSidebar}
+                      className="bg-white hover:bg-neutral-100 text-black px-1.5 py-0.5 border border-black shadow-[1px_1px_0px_#000000] text-[10px] font-bold flex items-center gap-1 cursor-pointer active:scale-95 transition-transform"
+                      title="Abrir panel"
+                    >
+                      <PanelLeft className="w-3 h-3 stroke-[2.5]" />
+                      <span>Panel</span>
+                    </button>
+                  )}
+                  <div className="flex items-center gap-1 min-w-0 bg-neutral-100 border border-black px-1.5 py-0.5">
+                    <span className="text-[9px] font-bold text-neutral-500 uppercase">{nodeCode || '1.1'}</span>
+                    {nodeTitle && <span className="text-[9px] font-bold text-black truncate max-w-[85px]">{nodeTitle}</span>}
+                  </div>
+                </div>
+
+                {/* Contador de trazos */}
+                <div className="flex items-center justify-between text-[10px] font-bold text-neutral-700 bg-neutral-50 px-1.5 py-0.5 border border-neutral-300">
+                  <span>Trazos:</span>
+                  <span className="tabular-nums">
+                    {strokes.length} / {Math.max(1, challenge.minRequiredStrokes || (challenge.targetLines ? challenge.targetLines.length : 1))}
+                  </span>
+                </div>
+
+                {/* Herramientas de trazo: Undo, Clear, Trazo, Solución */}
+                <div className="grid grid-cols-4 gap-1">
+                  <button
+                    type="button"
+                    onClick={handleUndo}
+                    disabled={strokes.length === 0}
+                    className="btn-ink-outline p-1 text-xs font-bold disabled:opacity-30 cursor-pointer flex items-center justify-center shadow-[1px_1px_0px_#000000]"
+                    title="Deshacer (Ctrl+Z)"
+                  >
+                    <Undo2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleClear}
+                    disabled={strokes.length === 0}
+                    className="btn-ink-outline p-1 text-xs font-bold disabled:opacity-30 cursor-pointer hover:bg-red-50 hover:text-red-700 flex items-center justify-center shadow-[1px_1px_0px_#000000]"
+                    title="Borrar todo"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                  </button>
+                  {onToggleUserStrokes && (
+                    <button
+                      type="button"
+                      onClick={onToggleUserStrokes}
+                      className={`p-1 text-xs font-bold border border-black cursor-pointer flex items-center justify-center shadow-[1px_1px_0px_#000000] ${
+                        showUserStrokes ? 'bg-black text-white' : 'bg-neutral-100 text-neutral-400 line-through'
+                      }`}
+                      title={showUserStrokes ? "Ocultar trazo" : "Mostrar trazo"}
+                    >
+                      {showUserStrokes ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                    </button>
+                  )}
+                  {onToggleSolution && (
+                    <button
+                      type="button"
+                      onClick={onToggleSolution}
+                      className={`p-1 text-xs font-bold border border-black cursor-pointer flex items-center justify-center shadow-[1px_1px_0px_#000000] ${
+                        showSolution ? 'bg-black text-white' : 'bg-neutral-100 text-neutral-700'
+                      }`}
+                      title={showSolution ? "Ocultar guía" : "Mostrar guía"}
+                    >
+                      {showSolution ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                    </button>
+                  )}
+                </div>
+
+                {/* Alternar auto-avance y reporte */}
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={handleToggleAutoAdvance}
+                    className={`flex-1 py-1 px-1.5 text-[10px] font-bold border border-black flex items-center justify-center gap-1 cursor-pointer transition-colors shadow-[1px_1px_0px_#000000] ${
+                      autoAdvance ? 'bg-black text-white' : 'bg-neutral-100 text-neutral-700'
+                    }`}
+                    title="Auto-avance (1s)"
+                  >
+                    <Zap className={`w-3 h-3 ${autoAdvance ? 'fill-white' : ''}`} />
+                    <span>Auto: {autoAdvance ? 'ON (1s)' : 'OFF'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowReportModal(true)}
+                    className="p-1 text-xs font-bold border border-black cursor-pointer shadow-[1px_1px_0px_#000000] bg-white hover:bg-neutral-100 flex items-center justify-center"
+                    title="Reportar anomalía"
+                  >
+                    <AlertTriangle className="w-3.5 h-3.5 stroke-[2.5]" />
+                  </button>
+                </div>
+              </div>
+
+              {/* SECCIÓN INFERIOR: ACCIÓN PRINCIPAL */}
+              <div className="pt-1 border-t border-neutral-300">
+                {!evaluation ? (
+                  <button
+                    type="button"
+                    onClick={handleEvaluate}
+                    disabled={strokes.length === 0}
+                    className="w-full btn-ink py-2 text-xs font-bold uppercase disabled:opacity-30 disabled:pointer-events-none cursor-pointer shadow-[2px_2px_0px_#000000] flex items-center justify-center gap-1.5"
+                    title="Corregir trazo (Enter)"
+                  >
+                    <span>Corregir</span>
+                    <Check className="w-3.5 h-3.5 stroke-[3]" />
+                  </button>
+                ) : (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={handleRetry}
+                        className="flex-1 btn-ink-outline py-1 text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000000]"
+                        title="Reintentar este ejercicio"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        <span>Reintentar</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowStatsModal(true)}
+                        className="p-1 text-xs font-bold border border-black cursor-pointer shadow-[1px_1px_0px_#000000] bg-white hover:bg-neutral-100 flex items-center justify-center"
+                        title="Ver estadísticas"
+                      >
+                        <Activity className="w-3.5 h-3.5 stroke-[2.5]" />
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleNext}
+                      className="w-full btn-ink py-2 text-xs uppercase font-bold flex items-center justify-center gap-1 cursor-pointer shadow-[2px_2px_0px_#000000] relative overflow-hidden"
+                      title="Siguiente ejercicio"
+                    >
+                      {autoAdvance && autoAdvanceCountdown !== null && autoAdvanceCountdown > 0 && (
+                        <div
+                          className="absolute bottom-0 left-0 top-0 bg-white/25 pointer-events-none transition-all duration-100 ease-linear"
+                          style={{
+                            width: `${((1.0 - autoAdvanceCountdown) / 1.0) * 100}%`,
+                          }}
+                        />
+                      )}
+                      <span>
+                        Siguiente
+                        {autoAdvance && autoAdvanceCountdown !== null && autoAdvanceCountdown > 0
+                          ? ` (${autoAdvanceCountdown.toFixed(1)}s)`
+                          : ''}
+                      </span>
+                      <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* ============================================================ */
+          /* MODO ESTÁNDAR (PORTRAIT MÓVIL, TABLET, ESCRITORIO)           */
+          /* ============================================================ */
+          <div
+            className="w-full flex flex-col items-center mx-auto"
+            style={{
+              maxWidth: 'min(100%, 750px, calc((100vh - 180px) * (750 / 500)))',
+            }}
+          >
+            {/* Contenedor del lienzo con aspect-ratio 750/500 estrictamente bloqueado para evitar distorsiones o achatamiento */}
+            <div
+              className="relative w-full aspect-[750/500] border-2 border-black bg-white shadow-[4px_4px_0px_#000000] select-none touch-none overflow-hidden"
+            >
           <canvas
             ref={canvasRef}
             width={750}
@@ -1415,6 +1757,8 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
             </div>
           )}
         </div>
+      </div>
+    )}
 
         {/* MODAL DE ESTADÍSTICAS DETALLADAS DEL TRAZO */}
         {showStatsModal && evaluation && (
