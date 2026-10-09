@@ -427,7 +427,7 @@ export function evaluateSingleStrokeSubmission(
     phasePassed = overallScore >= 75 && kinematics.phasePassed;
   } else {
     // Fase 3: Velocidad Balística (60% Geometría + 40% Velocidad Balística ponderada)
-    const targetFastSpeed = Math.max(480, Math.round(kinematics.userBaselineSpeedPxPerSec * 1.18));
+    const targetFastSpeed = Math.max(360, Math.round(kinematics.userBaselineSpeedPxPerSec * 0.95));
     const speedRatio = kinematics.avgSpeedPxPerSec / targetFastSpeed;
     const speedScore = Math.min(100, Math.round(Math.max(0, speedRatio * 100)));
 
@@ -818,7 +818,7 @@ export function evaluateMultiLineSubmission(
   } else if (activePhase === 2) {
     overallScore = Math.round(geometricScore * 0.70 + avgFluency * 0.30);
   } else {
-    const targetFastSpeed = Math.max(480, Math.round(userBaseline * 1.18));
+    const targetFastSpeed = Math.max(360, Math.round(userBaseline * 0.95));
     const speedRatio = avgSpeed / targetFastSpeed;
     const speedScore = Math.min(100, Math.round(Math.max(0, speedRatio * 100)));
     overallScore = Math.round(geometricScore * 0.60 + speedScore * 0.40);

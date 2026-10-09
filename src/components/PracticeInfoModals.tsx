@@ -42,9 +42,8 @@ export const MasteryStreakInfoModal: React.FC<InfoModalProps> = ({ isOpen, onClo
         {/* Contenido didáctico */}
         <div className="space-y-3 text-xs font-sans text-neutral-700 leading-relaxed border-t-2 border-black pt-3">
           <p>
-            Para superar un nivel y desbloquear el siguiente reto en el <strong>Camino</strong>, debes
-            demostrar maestría logrando <strong>3 aciertos seguidos</strong> con una calificación de
-            precisión igual o superior al <strong>90% (≥90%)</strong>.
+            Para avanzar de fase de motricidad y superar un nivel en el <strong>Camino</strong>, debes
+            demostrar maestría logrando <strong>3 aciertos seguidos</strong> superando el umbral exigido.
           </p>
 
           <div className="p-3 border-2 border-black bg-neutral-50 space-y-2">
@@ -60,12 +59,14 @@ export const MasteryStreakInfoModal: React.FC<InfoModalProps> = ({ isOpen, onClo
                   ✓
                 </span>
               </div>
-              <span>Regla del 3/3:</span>
+              <span>Regla del 3/3 Progresivo:</span>
             </div>
             <ul className="list-disc list-inside space-y-1 text-[11px] text-neutral-600">
-              <li>Cada intento con nota ≥90% suma 1 cubo a tu racha de maestría.</li>
-              <li>Si la nota baja del 90% o el trazo suspende, la racha se reinicia a 0.</li>
-              <li>Alcanzar 3/3 asegura una memoria muscular y confianza técnica sólidas.</li>
+              <li><strong>Fase 1 (Precisión):</strong> 3 aciertos seguidos con nota <strong>≥80%</strong> para pasar a Fase 2.</li>
+              <li><strong>Fase 2 (Fluidez):</strong> 3 aciertos seguidos con nota <strong>≥85%</strong> a velocidad continua para pasar a Fase 3.</li>
+              <li><strong>Fase 3 (Velocidad):</strong> 3 aciertos seguidos con nota <strong>≥90%</strong> en disparo balístico para dominar la versión o nivel.</li>
+              <li><strong>Módulo de Cajas 3D:</strong> 3 cubos seguidos con nota <strong>≥90%</strong>.</li>
+              <li>Si la nota baja del umbral de la fase activa, la racha se reinicia a 0.</li>
             </ul>
           </div>
         </div>

@@ -219,8 +219,8 @@ export function analyzeStrokeKinematics(
     }
   } else if (currentPhase === 2) {
     // FASE 2: RITMO Y FLUIDEZ
-    // Exige velocidad continua de dibujo sin titubeos ni micro-paradas (fluidez >= 60% y velocidad sostenida >= 280 px/s o 70% baseline)
-    const minSpeed = Math.max(280, Math.round(userBaseline * 0.70));
+    // Exige velocidad continua de dibujo sin titubeos ni micro-paradas (fluidez >= 60% y velocidad sostenida >= 220 px/s o 60% baseline)
+    const minSpeed = Math.max(220, Math.round(userBaseline * 0.60));
     phaseRequirementText = `Fase 2: Trazo continuo y fluido (≥${minSpeed} px/s sin vacilaciones)`;
     phasePassed = fluencyScore >= 60 && avgSpeedPxPerSec >= minSpeed && microStopCount <= 2;
 
@@ -233,17 +233,18 @@ export function analyzeStrokeKinematics(
     }
   } else {
     // FASE 3: VELOCIDAD Y DISPARO BALÍSTICO
-    // Exige golpe decidido y rápido: >= 480 px/s y >= 1.18x su media, en un impulso rápido (<=500ms)
-    const targetFastSpeed = Math.max(480, Math.round(userBaseline * 1.18));
-    phaseRequirementText = `Fase 3: Trazo balístico rápido (≥${targetFastSpeed} px/s en ≤500ms)`;
-    phasePassed = avgSpeedPxPerSec >= targetFastSpeed && durationMs <= 500;
+    // Exige golpe decidido y rápido con buen impulso reflejo (>= 360 px/s o 95% baseline)
+    const targetFastSpeed = Math.max(360, Math.round(userBaseline * 0.95));
+    const maxDurationMs = Math.max(700, Math.round(totalLength * 1.8));
+    phaseRequirementText = `Fase 3: Trazo balístico rápido (≥${targetFastSpeed} px/s en ≤${maxDurationMs}ms)`;
+    phasePassed = avgSpeedPxPerSec >= targetFastSpeed && durationMs <= maxDurationMs;
 
     if (phasePassed) {
       speedDiagnosisLabel = '¡Disparo balístico certero a gran velocidad!';
     } else if (avgSpeedPxPerSec < targetFastSpeed) {
       speedDiagnosisLabel = `Velocidad insuficiente: vas a ${avgSpeedPxPerSec} px/s (requieres ≥${targetFastSpeed} px/s)`;
     } else {
-      speedDiagnosisLabel = `Demasiado tiempo en el lienzo: ${durationMs}ms (requieres impulso rápido ≤500ms)`;
+      speedDiagnosisLabel = `Demasiado tiempo en el lienzo: ${durationMs}ms (requieres impulso rápido ≤${maxDurationMs}ms)`;
     }
   }
 

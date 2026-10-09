@@ -8,19 +8,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [0.2.1] — 2026-10-09
 
-### 🎮 Minigames Overhaul, Zen Practice Canvas & Biomechanical Progression
+### 🎮 Biomechanical Progression, Mobile Vertical UX & Tablet Minigame Overhaul
 
-#### ⚡ Minigames Redesign & Interactive Play
-- **👻 Línea Fantasma (Ghost Line Minigame) (`GhostLineMinigame.tsx`)**:
-  - **Sidebar Layout Architecture**: Shifted controls, HUD, and feedback into a clean left-hand sidebar for full tablet/desktop canvas clarity.
-  - **Continuous Ghost Mutation**: Dynamic target regeneration keeping neuromuscular motor synchronization active without rigid restarts.
-  - **"Finalizar" (Finish) Action**: Dedicated exit button allowing students to wrap up their training session at any moment, saving earned XP and stats.
-- **⚡ Avalancha de Trazos (Stroke Rush Minigame) (`StrokeRushMinigame.tsx`)**:
-  - **Acts & Stages Progression System**: Structured intervals into organized acts with restorative pauses and break reminders between motor bursts.
-  - **Accumulated Line Dynamics**: Real on-screen polyline accumulation with strict threshold-based motor accuracy evaluation.
-  - **Snappy 200ms Empty-Screen Spawn**: High-responsiveness respawn rate ensuring continuous drawing flow.
-  - **Full Calisthenics Variety in Random Mode**: Integrated all procedurally generated calisthenic patterns into the rush pool.
-  - **"Finalizar" Button**: Clean session termination control with instant score tallying.
+#### ⚡ Biomechanical Phase Calibration (80% → 85% → 90%)
+- **📈 Progressive Phase Mastery Requirements (`App.tsx`, `strokeKinematics.ts`, `strokeEvaluator.ts`)**:
+  - **Fase 1 (Precisión)**: Requires 3 consecutive masteries with score **≥80%** to advance to Phase 2.
+  - **Fase 2 (Fluidez)**: Requires 3 consecutive masteries with score **≥85%** at continuous speed without hesitations to advance to Phase 3.
+  - **Fase 3 (Velocidad)**: Requires 3 consecutive masteries with score **≥90%** in fast ballistic impulse to master the variant or complete the level.
+  - **Balanced Speed Kinematics**: Adjusted speed baseline expectations (Phase 2 ≥ 220 px/s, Phase 3 ≥ 360 px/s or 95% baseline with stroke-scaled duration limits), ensuring strokes are noticeably fast and decisive without impossible speed spikes on touch screens.
+- **✨ 1-Second Auto-Dismissing Phase Popup (`StrokePracticeCanvas.tsx`)**:
+  - Replaced manual blocking dialogs with a high-visibility, centered ink banner ("¡Siguiente Fase!").
+  - Displays for exactly 1.0s with an ink progress bar and automatically dismisses itself, seamlessly transitioning phases and loading the new exercise without requiring taps.
+
+#### 📱 Mobile Vertical UX/UI Overhaul (`App.tsx`, `StrokePracticeCanvas.tsx`)
+- **🧭 Dedicated Mobile Practice Top Bar**: Positioned cleanly above the drawing canvas on portrait devices (`< sm`), securely anchoring the `[Panel]` toggle button and displaying the active level badge without floating collisions.
+- **📐 Ergonomic 2-Row Mobile Action Bar**:
+  - Tool buttons (trazos count, undo, clear, auto-advance, layer toggles, report) neatly arranged in an upper utility row.
+  - Primary actions ("CORREGIR" and "SIGUIENTE") expand to full-width, thumb-friendly touch targets on mobile vertical screens while maintaining sleek inline alignment on desktop.
+- **⚡ Snappy 1.0s Auto-Advance**: Reduced the auto-advance waiting time to 1.0s (from 1.5s) with real-time countdown progress and label indicators.
+
+#### 🕹️ Tablet Layout & Overlay Sidebar in Minigames (`StrokeRushMinigame.tsx`, `GhostLineMinigame.tsx`)
+- **🔒 Non-Scrolling Viewport Architecture**: Enforced locked viewport bounds (`h-[calc(100vh-64px)] overflow-hidden`), completely preventing whole-page and canvas scrolling on iPads and Android tablets.
+- **🎯 Centered Canvas Layout**: Canvas mathematically centered in the entire viewport with proportional constraints (`calc((100vh - 165px) * (600 / 540))`).
+- **📂 Slide-Over Drawer Sidebars**: Sidebars converted into non-intrusive overlay drawers (matching the Practice panel) with backdrop blur, quick `[X]` close controls, and independent internal scrolling (`overflow-y-auto`).
+- **💨 Auto-Hide on Gameplay**: The sidebar automatically collapses/hides when starting gameplay or touching the canvas, granting 100% focused tablet screen estate to drawing. Quick-action "Finalizar" buttons remain instantly accessible on the HUD.
+
+---
 
 #### 🖌️ Practice Canvas & Motor Training Workspace (`StrokePracticeCanvas.tsx`, `DrawingCanvas.tsx`)
 - **📐 750x500 Landscape Aspect Ratio**: Perfectly locked aspect ratio (750x500) aligned with the tool palette to prevent letterboxing and distortion across devices.

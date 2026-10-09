@@ -15,7 +15,6 @@ import {
   Copy,
   X,
   AlertTriangle,
-  Target,
 } from 'lucide-react';
 import {
   LabExerciseDef,
@@ -210,7 +209,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
       });
     }, []);
 
-    // Temporizador de 1.5 segundos de auto-avance tras corregir
+    // Temporizador de 1.0 segundo de auto-avance tras corregir
     // Se pausa momentáneamente si se abren los modales de Stats o Reporte, o si hay aviso de cambio de fase
     useEffect(() => {
       if (!evaluation || !autoAdvance || phaseTransitionNotice || showStatsModal || showReportModal) {
@@ -218,10 +217,10 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
         return;
       }
 
-      const TOTAL_MS = 1500;
+      const TOTAL_MS = 1000;
       const STEP_MS = 100;
       let remainingMs = TOTAL_MS;
-      setAutoAdvanceCountdown(1.5);
+      setAutoAdvanceCountdown(1.0);
 
       const intervalId = setInterval(() => {
         remainingMs -= STEP_MS;
@@ -238,6 +237,15 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
         clearInterval(intervalId);
       };
     }, [evaluation, autoAdvance, phaseTransitionNotice, showStatsModal, showReportModal, handleNext]);
+
+    // Auto-dismiss del aviso de paso de fase tras 1.0 segundo (se quita solo y avanza automáticamente)
+    useEffect(() => {
+      if (!phaseTransitionNotice || !onDismissPhaseTransition) return;
+      const timer = setTimeout(() => {
+        onDismissPhaseTransition();
+      }, 1000);
+      return () => clearTimeout(timer);
+    }, [phaseTransitionNotice, onDismissPhaseTransition]);
 
     // Generación dinámica del reporte en Markdown y JSON para diagnóstico
     const currentReportMarkdown = useMemo(() => {
@@ -1050,6 +1058,11 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
       renderCanvas();
     };
 
+    const targetMasteryScore = currentPhase === 1 ? 80 : currentPhase === 2 ? 85 : 90;
+    const isMasterySuccess = Boolean(
+      evaluation && evaluation.passed && evaluation.phasePassed !== false && evaluation.overallScore >= targetMasteryScore
+    );
+
     return (
       <div
         className="w-full flex flex-col items-center mx-auto"
@@ -1110,7 +1123,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                   type="button"
                   onClick={onOpenMasteryInfo}
                   className="w-3.5 h-3.5 border border-black flex items-center justify-center text-[9px] font-bold text-neutral-600 hover:text-black hover:bg-neutral-200 cursor-pointer"
-                  title="Información de Maestría (Racha de 3 aciertos ≥90%)"
+                  title={`Información de Maestría (Racha de 3 aciertos ≥${targetMasteryScore}%)`}
                 >
                   i
                 </button>
@@ -1131,7 +1144,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                         ? 'bg-black text-white shadow-[1px_1px_0px_#000000]'
                         : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
                     }`}
-                    title={`Fase ${ph}: ${ph === 1 ? 'Precisión (extremos)' : ph === 2 ? 'Fluidez (velocidad constante)' : 'Velocidad (inercia)'}`}
+                    title={`Fase ${ph}: ${ph === 1 ? 'Precisión (extremos, ≥80%)' : ph === 2 ? 'Fluidez (velocidad constante, ≥85%)' : 'Velocidad (inercia ágil, ≥90%)'}`}
                   >
                     {ph}
                   </button>
@@ -1161,14 +1174,14 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
               </span>
               <span
                 className={`text-[9px] font-bold uppercase px-1.5 py-0.5 mt-0.5 border border-black ${
-                  evaluation.passed && evaluation.overallScore >= 90
+                  isMasterySuccess
                     ? 'bg-black text-white'
                     : evaluation.passed
                     ? 'bg-neutral-200 text-black'
                     : 'bg-white text-neutral-700'
                 }`}
               >
-                {evaluation.passed && evaluation.overallScore >= 90
+                {isMasterySuccess
                   ? 'Excelente'
                   : evaluation.passed
                   ? 'Aprobado'
@@ -1177,111 +1190,44 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
             </div>
           )}
 
-          {/* MINI-POPUP / ANIMACIÓN DE PASO DE FASE O AVANCE DE VERSIÓN */}
+          {/* MINI-POPUP DE PASO DE FASE O AVANCE DE VERSIÓN: DURA 1 SEGUNDO Y SE QUITA SOLO */}
           {phaseTransitionNotice && (
-            <div className="absolute inset-0 z-30 bg-black/40 backdrop-blur-[2px] flex items-center justify-center p-3 sm:p-4 select-none pointer-events-auto">
-              <div className="bg-white border-3 border-black p-4 sm:p-5 shadow-[6px_6px_0px_#000000] max-w-sm w-full text-center font-mono space-y-3 animate-phase-pop">
-                {phaseTransitionNotice.isVersionAdvance ? (
-                  <>
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-black text-white text-[10px] font-bold uppercase tracking-wider">
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>¡Versión {phaseTransitionNotice.fromVersion}/{phaseTransitionNotice.totalVersions} Dominada!</span>
-                    </div>
+            <div className="absolute inset-0 z-30 flex items-center justify-center p-3 select-none pointer-events-none animate-in fade-in zoom-in-95 duration-150">
+              <div className="bg-black text-white border-2 sm:border-3 border-white p-3.5 sm:p-4 shadow-[6px_6px_0px_#000000] max-w-xs sm:max-w-sm w-full text-center font-mono space-y-2 animate-phase-pop pointer-events-auto">
+                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-white text-black text-[10px] font-black uppercase tracking-wider shadow-[1px_1px_0px_#000000]">
+                  <Sparkles className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>¡Siguiente Fase!</span>
+                </div>
 
-                    <div className="space-y-1">
-                      <h3 className="text-lg sm:text-xl font-black font-display text-black">
-                        PASAS A VERSIÓN {phaseTransitionNotice.toVersion}: FASE 1 (PRECISIÓN)
-                      </h3>
-                      <div className="text-xs text-neutral-600 font-bold">
-                        Progreso del nivel: {phaseTransitionNotice.toVersion} / {phaseTransitionNotice.totalVersions} versiones
-                      </div>
-                    </div>
+                <div className="space-y-0.5">
+                  <h3 className="text-base sm:text-lg font-black font-display text-white tracking-tight uppercase">
+                    {phaseTransitionNotice.isVersionAdvance
+                      ? `VERSIÓN ${phaseTransitionNotice.toVersion}: FASE 1`
+                      : `FASE ${phaseTransitionNotice.toPhase}: ${phaseTransitionNotice.toPhase === 2 ? 'FLUIDEZ' : 'VELOCIDAD'}`}
+                  </h3>
+                  <div className="text-[10px] sm:text-[11px] text-neutral-300 font-bold">
+                    {phaseTransitionNotice.isVersionAdvance
+                      ? `¡Versión ${phaseTransitionNotice.fromVersion}/${phaseTransitionNotice.totalVersions} dominada! Iniciando versión ${phaseTransitionNotice.toVersion}...`
+                      : `¡3/3 aciertos completados! Avanzando automáticamente...`}
+                  </div>
+                </div>
 
-                    <p className="text-[11px] text-neutral-800 bg-neutral-50 p-2 border border-black leading-snug flex items-start gap-1.5 text-left">
-                      <Sparkles className="w-4 h-4 text-black shrink-0 mt-0.5 stroke-[2.5]" />
-                      <span>
-                        Has superado las 3 fases (Precisión, Fluidez y Velocidad) de esta versión. Ahora comienza la versión {phaseTransitionNotice.toVersion} desde la Fase 1.
-                      </span>
-                    </p>
-
-                    <button
-                      type="button"
-                      onClick={onDismissPhaseTransition}
-                      className="w-full btn-ink py-2 px-3 text-xs font-bold uppercase flex items-center justify-center gap-2 cursor-pointer shadow-[2px_2px_0px_#000000] hover:bg-neutral-900"
-                    >
-                      <span>Comenzar Versión {phaseTransitionNotice.toVersion}</span>
-                      <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-black text-white text-[10px] font-bold uppercase tracking-wider">
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>¡Fase {phaseTransitionNotice.fromPhase} Superada! (3/3)</span>
-                    </div>
-
-                    <div className="space-y-1">
-                      <h3 className="text-lg sm:text-xl font-black font-display text-black">
-                        PASAS A FASE {phaseTransitionNotice.toPhase}: {phaseTransitionNotice.toPhase === 2 ? 'FLUIDEZ' : 'VELOCIDAD'}
-                      </h3>
-                      <div className="flex items-center justify-center gap-1.5 pt-1">
-                        {([1, 2, 3] as const).map((ph) => (
-                          <span
-                            key={ph}
-                            className={`px-2 py-0.5 text-[10px] font-bold border border-black ${
-                              ph < phaseTransitionNotice.toPhase
-                                ? 'bg-neutral-200 text-neutral-600 line-through'
-                                : ph === phaseTransitionNotice.toPhase
-                                ? 'bg-black text-white scale-105 shadow-[1px_1px_0px_#000000]'
-                                : 'bg-white text-neutral-400'
-                            }`}
-                          >
-                            {ph === 1 ? '1. Precisión' : ph === 2 ? '2. Fluidez' : '3. Velocidad'}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    <p className="text-[11px] text-neutral-800 bg-neutral-50 p-2 border border-black leading-snug flex items-start gap-1.5 text-left">
-                      {phaseTransitionNotice.toPhase === 2 ? (
-                        <>
-                          <Target className="w-4 h-4 text-black shrink-0 mt-0.5 stroke-[2.5]" />
-                          <span>
-                            <strong>Fase 2 (Fluidez):</strong> Has consolidado la precisión de extremos. Dibuja a velocidad constante sin titubeos ni paradas intermedias.
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <Zap className="w-4 h-4 text-black shrink-0 mt-0.5 stroke-[2.5]" />
-                          <span>
-                            <strong>Fase 3 (Velocidad):</strong> Has dominado la uniformidad del trazo. Ejecuta el trazo con inercia rápida e impulso reflejo.
-                          </span>
-                        </>
-                      )}
-                    </p>
-
-                    <button
-                      type="button"
-                      onClick={onDismissPhaseTransition}
-                      className="w-full btn-ink py-2 px-3 text-xs font-bold uppercase flex items-center justify-center gap-2 cursor-pointer shadow-[2px_2px_0px_#000000] hover:bg-neutral-900"
-                    >
-                      <span>Continuar a Fase {phaseTransitionNotice.toPhase}</span>
-                      <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
-                    </button>
-                  </>
-                )}
+                {/* Barra de progreso de 1 segundo */}
+                <div className="w-full h-1 bg-neutral-800 border border-neutral-700 overflow-hidden mt-1">
+                  <div className="h-full bg-white transition-all duration-1000 w-full animate-pulse" />
+                </div>
               </div>
             </div>
           )}
         </div>
 
-        {/* BARRA DE CONTROL INFERIOR Y EVALUACIÓN */}
+        {/* BARRA DE CONTROL INFERIOR Y EVALUACIÓN (RESPONSIVA: 2 FILAS EN MÓVIL VERTICAL, 1 FILA EN DESKTOP) */}
         <div className="w-full mt-2 font-mono">
           {!evaluation ? (
             /* Estado SIN EVALUAR: contador de trazos, undo, clear, auto-avance, capas y botón CORREGIR destacado */
-            <div className="flex items-center justify-between gap-2 p-2 border-2 border-black bg-white shadow-[2px_2px_0px_#000000]">
-              <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
-                <span className="text-[11px] font-bold text-neutral-700 bg-neutral-100 px-2 py-1 border border-black shadow-[1px_1px_0px_#000000]">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 p-2 border-2 border-black bg-white shadow-[2px_2px_0px_#000000]">
+              <div className="flex items-center justify-between sm:justify-start gap-1 sm:gap-1.5 flex-wrap">
+                <span className="text-[10px] sm:text-[11px] font-bold text-neutral-700 bg-neutral-100 px-1.5 sm:px-2 py-1 border border-black shadow-[1px_1px_0px_#000000] tabular-nums">
                   Trazos: {strokes.length} / {Math.max(1, challenge.minRequiredStrokes || (challenge.targetLines ? challenge.targetLines.length : 1))}
                 </span>
                 <button
@@ -1303,17 +1249,17 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                   <Trash2 className="w-3.5 h-3.5 stroke-[2.5]" />
                 </button>
 
-                {/* Alternar auto-avance */}
+                {/* Alternar auto-avance (1 segundo) */}
                 <button
                   type="button"
                   onClick={handleToggleAutoAdvance}
                   className={`px-2 py-1 text-xs font-bold border border-black flex items-center gap-1 cursor-pointer transition-colors shadow-[1px_1px_0px_#000000] ${
                     autoAdvance ? 'bg-black text-white' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
                   }`}
-                  title={autoAdvance ? "Auto-avance activado (espera 1.5s tras corregir). Haz clic para desactivar." : "Auto-avance desactivado. Haz clic para activar."}
+                  title={autoAdvance ? "Auto-avance activado (espera 1s tras corregir). Haz clic para desactivar." : "Auto-avance desactivado. Haz clic para activar."}
                 >
                   <Zap className={`w-3.5 h-3.5 ${autoAdvance ? 'fill-white' : ''}`} />
-                  <span className="text-[10px]">Auto: {autoAdvance ? 'ON (1.5s)' : 'OFF'}</span>
+                  <span className="text-[10px]">Auto: {autoAdvance ? 'ON (1s)' : 'OFF'}</span>
                 </button>
 
                 {/* Alternar capas: Trazo y Solución */}
@@ -1358,7 +1304,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                 type="button"
                 onClick={handleEvaluate}
                 disabled={strokes.length === 0}
-                className="btn-ink px-3 sm:px-4 py-1.5 text-xs font-bold uppercase disabled:opacity-30 disabled:pointer-events-none cursor-pointer shadow-[2px_2px_0px_#000000] flex items-center gap-1.5 shrink-0"
+                className="w-full sm:w-auto btn-ink px-4 py-2 sm:py-1.5 text-xs font-bold uppercase disabled:opacity-30 disabled:pointer-events-none cursor-pointer shadow-[2px_2px_0px_#000000] flex items-center justify-center gap-1.5 shrink-0"
                 title={strokes.length === 0 ? "Dibuja en el lienzo antes de corregir" : "Corregir trazo y ver nota (Enter)"}
               >
                 <span>Corregir</span>
@@ -1368,17 +1314,17 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
           ) : (
             /* Estado EVALUADO: NOTA visible, Siguiente, Reintentar, Stats del Trazo y Reporte */
             <div className="flex flex-col gap-1.5 w-full">
-              <div className="flex items-center justify-between gap-2 p-2 border-2 border-black bg-white shadow-[2px_2px_0px_#000000]">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 p-2 border-2 border-black bg-white shadow-[2px_2px_0px_#000000]">
                 {/* Lado izquierdo: Reintentar, Auto-toggle, capas, Stats y Reporte */}
-                <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
+                <div className="flex items-center justify-between sm:justify-start gap-1 sm:gap-1.5 flex-wrap">
                   <button
                     type="button"
                     onClick={handleRetry}
-                    className="btn-ink-outline px-2.5 py-1 text-xs font-bold flex items-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000000]"
+                    className="btn-ink-outline px-2 sm:px-2.5 py-1 text-xs font-bold flex items-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000000]"
                     title="Reintentar este ejercicio"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Reintentar</span>
+                    <span className="text-[11px]">Reintentar</span>
                   </button>
 
                   {/* Alternar auto-avance */}
@@ -1388,10 +1334,10 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                     className={`px-2 py-1 text-xs font-bold border border-black flex items-center gap-1 cursor-pointer transition-colors shadow-[1px_1px_0px_#000000] ${
                       autoAdvance ? 'bg-black text-white' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
                     }`}
-                    title={autoAdvance ? "Auto-avance activado (espera 1.5s tras corregir). Haz clic para pausar." : "Auto-avance desactivado. Haz clic para activar."}
+                    title={autoAdvance ? "Auto-avance activado (espera 1s tras corregir). Haz clic para pausar." : "Auto-avance desactivado. Haz clic para activar."}
                   >
                     <Zap className={`w-3.5 h-3.5 ${autoAdvance ? 'fill-white' : ''}`} />
-                    <span className="text-[10px]">Auto: {autoAdvance ? 'ON (1.5s)' : 'OFF'}</span>
+                    <span className="text-[10px]">Auto: {autoAdvance ? 'ON (1s)' : 'OFF'}</span>
                   </button>
 
                   {/* Alternar capas en evaluado */}
@@ -1446,14 +1392,14 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                 <button
                   type="button"
                   onClick={handleNext}
-                  className="btn-ink px-4 py-1.5 text-xs uppercase font-bold flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] relative overflow-hidden shrink-0"
+                  className="w-full sm:w-auto btn-ink px-4 py-2 sm:py-1.5 text-xs uppercase font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] relative overflow-hidden shrink-0"
                   title="Siguiente ejercicio o versión (Enter / Espacio)"
                 >
                   {autoAdvance && autoAdvanceCountdown !== null && autoAdvanceCountdown > 0 && (
                     <div
                       className="absolute bottom-0 left-0 top-0 bg-white/25 pointer-events-none transition-all duration-100 ease-linear"
                       style={{
-                        width: `${((1.5 - autoAdvanceCountdown) / 1.5) * 100}%`,
+                        width: `${((1.0 - autoAdvanceCountdown) / 1.0) * 100}%`,
                       }}
                     />
                   )}
@@ -1558,7 +1504,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                         {evaluation.phasePassed ? 'Cumplida' : 'No alcanzada'}
                       </span>
                       <span className="text-[10px] text-neutral-400 block">
-                        {currentPhase === 1 ? 'Ritmo libre' : currentPhase === 2 ? 'Fluidez ≥60%' : 'Velocidad ≥480 px/s'}
+                        {currentPhase === 1 ? 'Ritmo libre (≥80%)' : currentPhase === 2 ? 'Fluidez continua (≥85%)' : 'Velocidad ágil (≥90%)'}
                       </span>
                     </div>
                   </div>

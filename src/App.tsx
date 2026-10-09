@@ -570,7 +570,9 @@ export function App() {
     const recordedScore = Math.round(evalResult.overallScore);
     setScoresHistory((prev) => [...prev.slice(-19), recordedScore]);
 
-    if (evalResult.passed && evalResult.phasePassed !== false && recordedScore >= 90) {
+    const targetThreshold = currentPhase === 1 ? 80 : currentPhase === 2 ? 85 : 90;
+
+    if (evalResult.passed && evalResult.phasePassed !== false && recordedScore >= targetThreshold) {
       setAvatarMood('success-stars');
       setTimeout(() => setAvatarMood('neutral'), 2600);
       setXp((prev) => prev + 25);
@@ -1303,16 +1305,38 @@ export function App() {
 
         {/* PESTAÑA 1: HOME / PRÁCTICA RÁPIDA (REDiseño LIMPIO, INTUITIVO Y SIN DISTRACCIONES) */}
         {activeTab === 'practice' && (
-          <div className="flex-1 w-full flex flex-col items-center justify-center overflow-hidden relative min-h-[calc(100vh-64px)] bg-neutral-100 p-2 sm:p-4">
-            {/* PESTAÑA / BOTÓN TOGGLE FLOTANTE DEL PANEL (SIEMPRE ACCESIBLE) */}
+          <div className="flex-1 w-full flex flex-col items-center justify-start sm:justify-center overflow-hidden relative min-h-[calc(100vh-64px)] bg-neutral-100 p-2 sm:p-4">
+            {/* BARRA SUPERIOR EXCLUSIVA MÓVIL VERTICAL (< sm): ANCLAJE ELEGANTE DEL PANEL Y CONTEXTO */}
+            <div className="w-full max-w-[750px] flex items-center justify-between gap-2 px-0.5 pb-1 sm:hidden z-20 select-none">
+              <button
+                type="button"
+                onClick={() => setIsSidebarCollapsed((prev) => !prev)}
+                className="bg-white hover:bg-neutral-100 text-black px-2.5 py-1 border-2 border-black shadow-[2px_2px_0px_#000000] text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer active:scale-95 transition-transform"
+                title={isSidebarCollapsed ? "Abrir panel de práctica" : "Ocultar panel"}
+              >
+                <PanelLeft className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>Panel</span>
+              </button>
+
+              <div className="flex items-center gap-1 min-w-0 bg-white border border-black px-2 py-0.5 shadow-[1px_1px_0px_#000000]">
+                <span className="text-[10px] font-mono font-bold text-neutral-500 uppercase">
+                  {practiceMode === 'camino' ? (activeNode ? activeNode.code : '1.1') : 'RETO'}
+                </span>
+                <span className="text-[11px] font-mono font-bold text-black truncate max-w-[130px]">
+                  {practiceMode === 'camino' ? (activeNode?.title || '') : 'Diario'}
+                </span>
+              </div>
+            </div>
+
+            {/* BOTÓN TOGGLE FLOTANTE EN TABLET Y ESCRITORIO (>= sm) */}
             <button
               type="button"
               onClick={() => setIsSidebarCollapsed((prev) => !prev)}
-              className="absolute top-3 left-3 z-30 bg-white hover:bg-neutral-100 text-black px-2.5 py-1.5 border-2 border-black shadow-[2px_2px_0px_#000000] text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer transition-transform hover:scale-105 active:scale-95"
+              className="hidden sm:flex absolute top-3 left-3 z-30 bg-white hover:bg-neutral-100 text-black px-2.5 py-1.5 border-2 border-black shadow-[2px_2px_0px_#000000] text-xs font-mono font-bold items-center gap-1.5 cursor-pointer transition-transform hover:scale-105 active:scale-95"
               title={isSidebarCollapsed ? "Abrir panel de práctica" : "Ocultar panel"}
             >
               <PanelLeft className="w-4 h-4 stroke-[2.5]" />
-              <span className="hidden sm:inline">Panel</span>
+              <span>Panel</span>
             </button>
 
             {/* BACKDROP FLOTANTE CUANDO EL PANEL ESTÁ ABIERTO */}

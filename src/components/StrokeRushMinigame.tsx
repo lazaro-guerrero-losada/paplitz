@@ -13,6 +13,8 @@ import {
   AlertTriangle,
   Flag,
   Play,
+  PanelLeft,
+  X,
 } from 'lucide-react';
 import { LessonNode, MODULE_CALISTHENICS } from '../lib/curriculumData';
 import { AvatarMood } from '../lib/avatarTypes';
@@ -190,6 +192,7 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
   const [survivalTime, setSurvivalTime] = useState<number>(0);
   const [lastEval, setLastEval] = useState<LineEvaluation | null>(null);
   const [flashBanner, setFlashBanner] = useState<{ text: string; positive: boolean } | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
 
   // Récords según modo aleatorio o nodo específico
   const scoreKey = isRandomMode ? 'random' : selectedNode.code;
@@ -347,6 +350,7 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
 
   // Iniciar partida
   const startGame = useCallback((mode: 'survival' | 'blitz' = gameMode) => {
+    setIsSidebarOpen(false);
     setGameMode(mode);
     setGameState('playing');
     setClearedScores([]);
@@ -726,6 +730,7 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
   };
 
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    setIsSidebarOpen(false);
     if (e.button !== 0 || gameState !== 'playing') return;
     const canvas = canvasRef.current;
     if (canvas) {
@@ -865,35 +870,82 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
       : 0;
 
   return (
-    <div className="w-full flex-1 flex flex-col md:flex-row overflow-hidden bg-neutral-100 min-h-[calc(100vh-64px)] font-sans select-none">
-      {/* 1. BARRA LATERAL IZQUIERDA: TODA LA INFORMACIÓN, CONFIGURACIÓN Y ESTADÍSTICAS */}
-      <aside className="w-full md:w-80 bg-white border-r-2 border-black p-3.5 space-y-3 font-mono shadow-[4px_0px_0px_#000000] flex flex-col shrink-0 overflow-y-auto">
-        {/* CABECERA Y BOTÓN SALIR */}
-        <div className="flex items-center justify-between pb-2 border-b-2 border-black">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-black text-white flex items-center justify-center shadow-[1px_1px_0px_#000000]">
-              <Zap className="w-4 h-4" />
+    <div className="w-full flex-1 flex flex-col items-center justify-center overflow-hidden relative h-[calc(100vh-64px)] max-h-[calc(100vh-64px)] bg-neutral-100 font-sans select-none">
+      {/* BOTÓN FLOTANTE TOGGLE DEL PANEL (COMO EN EL PANEL DE PRÁCTICA) */}
+      <button
+        type="button"
+        onClick={() => setIsSidebarOpen((prev) => !prev)}
+        className="absolute top-3 left-3 z-30 bg-white hover:bg-neutral-100 text-black px-2.5 py-1.5 border-2 border-black shadow-[2px_2px_0px_#000000] text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer transition-transform hover:scale-105 active:scale-95"
+        title={isSidebarOpen ? "Ocultar panel" : "Abrir panel de opciones y estadísticas"}
+      >
+        <PanelLeft className="w-4 h-4 stroke-[2.5]" />
+        <span>Panel</span>
+      </button>
+
+      {/* BOTÓN RÁPIDO DE FINALIZAR DURANTE LA PARTIDA (DIRECTO EN EL LIENZO) */}
+      {gameState === 'playing' && (
+        <button
+          type="button"
+          onClick={() => finishGame('manual')}
+          className="absolute top-3 right-3 z-30 bg-white hover:bg-neutral-100 text-black px-2.5 py-1.5 border-2 border-black shadow-[2px_2px_0px_#000000] text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer transition-transform hover:scale-105 active:scale-95"
+          title="Finalizar partida y registrar tu progreso actual"
+        >
+          <Flag className="w-3.5 h-3.5 stroke-[2.5]" />
+          <span>Finalizar</span>
+        </button>
+      )}
+
+      {/* BACKDROP FLOTANTE CUANDO EL PANEL ESTÁ ABIERTO */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px]"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* 1. BARRA LATERAL IZQUIERDA EN MODO OVERLAY (COMO EN PANEL DE PRÁCTICA) */}
+      <aside
+        className={`fixed md:absolute top-0 bottom-0 left-0 z-50 bg-white border-r-2 border-black shadow-[6px_0px_0px_#000000] flex flex-col select-none transition-transform duration-200 ease-in-out ${
+          isSidebarOpen ? 'translate-x-0 pointer-events-auto' : '-translate-x-full pointer-events-none'
+        } w-full sm:w-85 md:w-80 h-full overflow-hidden`}
+      >
+        <div className="w-full flex flex-col h-full overflow-y-auto p-3.5 space-y-3 font-mono">
+          {/* CABECERA CON BOTÓN CERRAR PANEL Y BOTÓN SALIR */}
+          <div className="flex items-center justify-between pb-2 border-b-2 border-black">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 bg-black text-white flex items-center justify-center shadow-[1px_1px_0px_#000000]">
+                <Zap className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-neutral-500 uppercase block leading-none">
+                  Minijuego
+                </span>
+                <span className="text-xs font-bold font-display uppercase tracking-wider text-black">
+                  Avalancha
+                </span>
+              </div>
             </div>
-            <div>
-              <span className="text-[10px] font-bold text-neutral-500 uppercase block leading-none">
-                Minijuego
-              </span>
-              <span className="text-xs font-bold font-display uppercase tracking-wider text-black">
-                Avalancha
-              </span>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={onExit}
+                className="btn-ink-outline px-2 py-1 text-xs font-bold flex items-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000000]"
+                title="Volver al menú de minijuegos"
+              >
+                <Undo2 className="w-3.5 h-3.5" />
+                <span>Salir</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsSidebarOpen(false)}
+                className="p-1 border border-black hover:bg-neutral-100 cursor-pointer shadow-[1px_1px_0px_#000000]"
+                title="Cerrar panel y volver al lienzo"
+              >
+                <X className="w-4 h-4 stroke-[2.5]" />
+              </button>
             </div>
           </div>
-
-          <button
-            type="button"
-            onClick={onExit}
-            className="btn-ink-outline px-2.5 py-1 text-xs font-bold flex items-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000000]"
-            title="Volver al menú de minijuegos"
-          >
-            <Undo2 className="w-3.5 h-3.5" />
-            <span>Volver</span>
-          </button>
-        </div>
 
         {/* SELECTOR DE MODALIDAD: SUPERVIVENCIA VS BLITZ */}
         <div className="space-y-1">
@@ -1159,10 +1211,11 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
             </button>
           )}
         </div>
+        </div>
       </aside>
 
-      {/* 2. ÁREA CENTRAL: LIENZO CENTRADO EN SU PROPORCIÓN ORIGINAL (SIN ESTIRAR) */}
-      <div className="flex-1 flex flex-col items-center justify-center p-3 sm:p-6 overflow-hidden min-h-0 relative">
+      {/* 2. ÁREA CENTRAL: LIENZO 100% CENTRADO Y SIN SCROLL */}
+      <div className="flex-1 w-full flex flex-col items-center justify-center p-2 sm:p-4 overflow-hidden min-h-0 relative z-10">
         <div className="relative flex items-center justify-center select-none touch-none max-w-full">
           {/* Banner de Feedback instantáneo */}
           {flashBanner && (
@@ -1394,7 +1447,7 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
             onPointerCancel={handlePointerUp}
             className="border-2 border-black bg-white shadow-[4px_4px_0px_#000000] cursor-crosshair touch-none select-none max-w-full"
             style={{
-              width: 'min(100%, min(600px, calc((100vh - 140px) * (600 / 540))))',
+              width: 'min(100%, min(600px, calc((100vh - 165px) * (600 / 540))))',
               height: 'auto',
               aspectRatio: '600 / 540',
             }}
