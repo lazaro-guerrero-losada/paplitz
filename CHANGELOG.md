@@ -4,6 +4,17 @@ All notable changes, new features, bug fixes, and UX improvements to the Paplitz
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.5] — 2026-10-13
+
+### ⏱️ Auto-Advance Countdown Stability & Re-render Decoupling
+
+#### 🔄 Glitchless 1.0-Second Auto-Advance Countdown (`StrokePracticeCanvas.tsx`)
+- **🛑 Fixed Mid-Countdown Timer Reset Glitch**:
+  - Previously, the auto-advance countdown would occasionally glitch and reset midway (e.g. jumping back to 1.0s at 0.67s or 0.48s).
+  - **Root Cause**: The auto-advance countdown effect tracked `handleNext` in its dependency array. Because `handleNext` called `onNext` (passed down from `App.tsx` as `handleSidebarNext`), asynchronous parent state updates in `App.tsx` (such as avatar mood resets at ~400ms–520ms, SenseiCubo animations, XP level progress updates, or mastery streaks) caused `App` to re-render, generating a new function reference for `handleSidebarNext`. This triggered effect teardown and restarted the 1.0-second timer from scratch.
+  - **Mutable Action Refs (`handleNextRef`, `onDismissPhaseTransitionRef`)**: Decoupled timer execution from component render identity by storing action callbacks in mutable `useRef` containers synchronized on every render.
+  - **Real Clock-Time Tracking (`Date.now()`)**: Replaced discrete interval decrement subtraction with true delta clock-time calculation (`endTime = Date.now() + 1000` with 50ms smooth tick intervals). The countdown is now completely immune to re-render cycles, frame drops, and parent state changes, transitioning smoothly and precisely from 1.0s to 0.0s without resetting.
+
 ---
 
 ## [0.2.4] — 2026-10-13

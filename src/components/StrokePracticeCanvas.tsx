@@ -272,8 +272,19 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
       });
     }, []);
 
+    // Referencias mutables para callbacks de acción para desacoplar los timers de la identidad de las funciones
+    const handleNextRef = useRef(handleNext);
+    useEffect(() => {
+      handleNextRef.current = handleNext;
+    });
+
+    const onDismissPhaseTransitionRef = useRef(onDismissPhaseTransition);
+    useEffect(() => {
+      onDismissPhaseTransitionRef.current = onDismissPhaseTransition;
+    });
+
     // Temporizador de 1.0 segundo de auto-avance tras corregir
-    // Se pausa momentáneamente si se abren los modales de Stats o Reporte, o si hay aviso de cambio de fase
+    // Utiliza marcas de tiempo reales (Date.now()) para evitar desfases y es 100% inmune a re-renders
     useEffect(() => {
       if (!evaluation || !autoAdvance || phaseTransitionNotice || showStatsModal || showReportModal || showQuickCommentModal) {
         setAutoAdvanceCountdown(null);
@@ -281,34 +292,37 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
       }
 
       const TOTAL_MS = 1000;
-      const STEP_MS = 100;
-      let remainingMs = TOTAL_MS;
+      const startTime = Date.now();
+      const endTime = startTime + TOTAL_MS;
       setAutoAdvanceCountdown(1.0);
 
       const intervalId = setInterval(() => {
-        remainingMs -= STEP_MS;
+        const now = Date.now();
+        const remainingMs = Math.max(0, endTime - now);
+        const remainingSec = Math.round((remainingMs / 1000) * 10) / 10;
+
         if (remainingMs <= 0) {
           clearInterval(intervalId);
           setAutoAdvanceCountdown(0);
-          handleNext();
+          handleNextRef.current();
         } else {
-          setAutoAdvanceCountdown(Math.round(remainingMs / 100) / 10);
+          setAutoAdvanceCountdown(remainingSec);
         }
-      }, STEP_MS);
+      }, 50);
 
       return () => {
         clearInterval(intervalId);
       };
-    }, [evaluation, autoAdvance, phaseTransitionNotice, showStatsModal, showReportModal, showQuickCommentModal, handleNext]);
+    }, [evaluation, autoAdvance, phaseTransitionNotice, showStatsModal, showReportModal, showQuickCommentModal]);
 
     // Auto-dismiss del aviso de paso de fase tras 1.0 segundo (se quita solo y avanza automáticamente)
     useEffect(() => {
-      if (!phaseTransitionNotice || !onDismissPhaseTransition) return;
+      if (!phaseTransitionNotice) return;
       const timer = setTimeout(() => {
-        onDismissPhaseTransition();
+        onDismissPhaseTransitionRef.current?.();
       }, 1000);
       return () => clearTimeout(timer);
-    }, [phaseTransitionNotice, onDismissPhaseTransition]);
+    }, [phaseTransitionNotice]);
 
     // Generación dinámica del reporte en Markdown y JSON para diagnóstico
     const currentReportMarkdown = useMemo(() => {
