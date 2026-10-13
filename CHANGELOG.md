@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.2.3] — 2026-10-13
+
+### 🎯 Reto Diario (Daily Habit Set) Refinements & 📋 Modo Récord (Session Recorder)
+
+#### 🎯 Reto Diario: 1 Line per Exercise Problem (`App.tsx`, `StrokePracticeCanvas.tsx`, `DailyChallengePanel.tsx`)
+- **📏 1 Attempt = 1 Problem in Daily Set**: Fixed the daily challenge flow so that each individual stroke/line (or cube attempt) directly counts as 1 completed problem toward the total (e.g. 1/12). It no longer gets stuck or confuses the user by demanding full 3-phase curriculum progression (Phase 1, 2, 3 with 3 consecutive streaks) on a single problem.
+- **🔄 Multi-Discipline Problem Advancement**: Updated `handleSidebarNext`, `handleNextCubeOrProblem`, and `handleStartDailyChallenge` to properly load and advance seeds for both calisthenics stroke lines (`setCalisthenicsSeed`) and 3D perspective cubes (`setChallenge`).
+- **🏷️ Dedicated Daily Challenge Canvas HUD**: While a Daily Challenge session is active, the canvas HUD automatically displays `Reto Diario: Línea X/N` instead of standard progression mastery dots and phase selectors, providing clear feedback on daily set habit progress.
+- **🏆 Automatic Habit Completion & Rewards**: Evaluating the final problem immediately finalizes the daily set, persists individual marks to history, awards +50 XP habit bonus, and opens the `DailySetCompletedModal`.
+
+#### 📋 Modo Récord: Exercise Session Log & Bulk Reporting (`sessionRecorder.ts`, `SessionRecordPanel.tsx`, `App.tsx`, `StrokePracticeCanvas.tsx`, `DrawingCanvas.tsx`)
+- **📝 Automated Session Recording**: All completed exercises across both calisthenics and 3D cubes are automatically logged in the session record (`paplitz_session_records`), capturing execution timestamps, level codes, scores, pass/fail status, and full diagnostic reports.
+- **💬 Per-Exercise User Comments**:
+  - In the **Modo Récord** panel, users can view all recorded exercises and click `[+ Añadir comentario]` or `[✎ Editar]` on any specific exercise without needing to generate or download reports individually.
+  - On the canvas itself, an instant comment button (`💬`) in the toolbar allows adding a comment to the exercise just drawn, syncing directly with the session log.
+- **📦 Consolidated Bulk Exports**:
+  - **Copiar Reporte Completo (Markdown)**: Bundles the entire session into a clean Markdown report with a summary table, overall metrics, and detailed technical sections including each exercise's user notes.
+  - **Descargar JSON Completo**: Downloads a single structured `.json` file containing all session exercise attempts, user comments, and raw diagnostics.
+  - **Vaciar Registro**: Allows clearing the session history with confirmation.
+- **🧭 Sidebar Mode Selector Navigation**: Expanded the sidebar header switcher to 3 modes: `[ El Camino ]`, `[ Reto Diario ]`, and `[ Modo Récord ]` (with a live counter badge indicating the number of recorded exercises).
+
+---
+
 ## [0.2.2] — 2026-10-09
 
 ### 📱 Mobile Viewport UX: Snug Vertical Positioning & Landscape Redesign

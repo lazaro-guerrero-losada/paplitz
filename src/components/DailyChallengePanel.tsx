@@ -104,7 +104,7 @@ export const DailyChallengePanel: React.FC<DailyChallengePanelProps> = ({
               </div>
             ) : (
               <span className="text-[10px] text-neutral-500 block truncate">
-                Mini-set de práctica ({selectedCount} cubos)
+                Mini-set de práctica ({selectedCount} líneas / ejercicios)
               </span>
             )}
           </div>

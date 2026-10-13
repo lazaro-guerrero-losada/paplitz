@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { CubeChallenge, Point2D } from '../lib/geometry';
 import { UserStroke, ValidationFeedback, countDetectedAristas } from '../lib/validation';
-import { Undo2, Trash2, Check, ArrowRight, AlertTriangle, CheckCircle, Clock, Zap, Copy, Download, X, Pen, Hand, ArrowDown, ArrowUp, Eye, EyeOff, FileText, PanelLeft } from 'lucide-react';
+import { Undo2, Trash2, Check, ArrowRight, AlertTriangle, CheckCircle, Clock, Zap, Copy, Download, X, Pen, Hand, ArrowDown, ArrowUp, Eye, EyeOff, FileText, PanelLeft, MessageSquare } from 'lucide-react';
 import { buildDebugReport, copyReportToClipboard, downloadReportJson } from '../lib/debugReport';
 
 /**
@@ -150,6 +150,9 @@ export interface DrawingCanvasProps {
   isLandscapeMobile?: boolean;
   onToggleSidebar?: () => void;
   nodeCode?: string;
+  isDailyChallenge?: boolean;
+  dailyProgress?: { current: number; total: number };
+  onCommentChange?: (comment: string) => void;
 }
 
 const TOTAL_COUNTDOWN_SECONDS = 30;
@@ -169,6 +172,9 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((p
     isLandscapeMobile: propIsLandscapeMobile,
     onToggleSidebar,
     nodeCode,
+    isDailyChallenge = false,
+    dailyProgress,
+    onCommentChange,
   } = props;
 
   const [internalIsLandscape, setInternalIsLandscape] = useState<boolean>(() => {
@@ -1062,7 +1068,9 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((p
                   </button>
                 )}
                 <span className="text-[9px] font-bold bg-neutral-100 px-1 py-0.5 border border-black truncate">
-                  {nodeCode || activeLesson?.code || '1.1'}
+                  {isDailyChallenge && dailyProgress
+                    ? `Reto ${dailyProgress.current}/${dailyProgress.total}`
+                    : (nodeCode || activeLesson?.code || '1.1')}
                 </span>
               </div>
 
@@ -1074,8 +1082,8 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((p
                 </span>
               </div>
 
-              {/* Herramientas: Deshacer, Borrar, Reporte */}
-              <div className="grid grid-cols-3 gap-1">
+              {/* Herramientas: Deshacer, Borrar, Comentar, Reporte */}
+              <div className="grid grid-cols-4 gap-1">
                 <button
                   onClick={undoLastStroke}
                   disabled={strokes.length === 0 || showSolution}
@@ -1091,6 +1099,15 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((p
                   title="Borrar todo"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={handleOpenReportModal}
+                  className={`btn-ink-outline p-1 text-xs font-mono font-bold flex items-center justify-center cursor-pointer shadow-[1px_1px_0px_#000000] ${
+                    userNote.trim() ? 'bg-black text-white' : ''
+                  }`}
+                  title={userNote.trim() ? `Nota: "${userNote}"` : "Añadir comentario (Modo Récord)"}
+                >
+                  <MessageSquare className="w-3.5 h-3.5 stroke-[2.5]" />
                 </button>
                 <button
                   onClick={handleOpenReportModal}
@@ -1402,6 +1419,17 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((p
             {/* Fila 2: Diagnóstico/Reporte a la izquierda y Botón Siguiente a la derecha */}
             <div className="flex items-center justify-between gap-1.5 pt-0.5 w-full">
               <div className="flex items-center gap-1.5 shrink-0">
+                {/* Botón Rápido de Comentario (Modo Récord) */}
+                <button
+                  onClick={handleOpenReportModal}
+                  className={`btn-ink-outline p-1.5 text-xs font-mono font-bold flex items-center gap-1 cursor-pointer transition-transform active:scale-95 shadow-[1px_1px_0px_#000000] shrink-0 ${
+                    userNote.trim() ? 'bg-black text-white' : ''
+                  }`}
+                  title={userNote.trim() ? `Comentario guardado: "${userNote}"` : "Añadir comentario a este cubo (Modo Récord)"}
+                >
+                  <MessageSquare className="w-3.5 h-3.5 stroke-[2.5]" />
+                </button>
+
                 {/* Botón de Reporte */}
                 <button
                   onClick={handleOpenReportModal}
@@ -1529,7 +1557,10 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((p
               </label>
               <textarea
                 value={userNote}
-                onChange={(e) => setUserNote(e.target.value)}
+                onChange={(e) => {
+                  setUserNote(e.target.value);
+                  onCommentChange?.(e.target.value);
+                }}
                 placeholder="Escribe aquí qué ocurrió (ej: 'El punto 3 converge hacia VPR pero dio 0%', 'Arista no detectada', 'Fallo en la sombra proyectada')..."
                 className="w-full h-20 p-2 text-xs font-mono bg-white border border-black resize-none focus:outline-none focus:ring-2 focus:ring-black selection:bg-black selection:text-white"
                 autoFocus
@@ -1540,7 +1571,11 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((p
                   <button
                     key={tag}
                     type="button"
-                    onClick={() => setUserNote((prev) => (prev ? `${prev} · ${tag}` : tag))}
+                    onClick={() => {
+                      const nextVal = userNote ? `${userNote} · ${tag}` : tag;
+                      setUserNote(nextVal);
+                      onCommentChange?.(nextVal);
+                    }}
                     className="text-[10px] font-mono bg-white hover:bg-black hover:text-white border border-black px-1.5 py-0.5 cursor-pointer transition-colors shadow-[1px_1px_0px_#000000]"
                   >
                     +{tag}
@@ -1549,7 +1584,10 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((p
                 {userNote && (
                   <button
                     type="button"
-                    onClick={() => setUserNote('')}
+                    onClick={() => {
+                      setUserNote('');
+                      onCommentChange?.('');
+                    }}
                     className="text-[10px] font-mono text-neutral-500 hover:text-black ml-auto underline cursor-pointer"
                   >
                     Borrar nota

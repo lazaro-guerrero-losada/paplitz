@@ -26,6 +26,7 @@ import { StreakModal } from './components/StreakModal';
 import { DailyChallengePanel } from './components/DailyChallengePanel';
 import { DailySetCompletedModal } from './components/DailySetCompletedModal';
 import { LevelCompletionModal } from './components/LevelCompletionModal';
+import { SessionRecordPanel } from './components/SessionRecordPanel';
 import { calculatePlayerLevel } from './lib/levelSystem';
 import { SenseiCubo } from './components/avatar/SenseiCubo';
 import { AvatarMood } from './lib/avatarTypes';
@@ -45,6 +46,7 @@ import {
   PanelLeft,
   Maximize2,
   ArrowRight,
+  FileText,
 } from 'lucide-react';
 import { PaplitzSaveData, applySaveDataToLocalStorage, fastForwardCurriculum } from './lib/saveSystem';
 import { recordDailyPractice } from './lib/streakSystem';
@@ -57,6 +59,13 @@ import {
   loadDailyChallengeHistory,
   recordCompletedDailySet,
 } from './lib/dailyChallenge';
+import {
+  SessionRecordItem,
+  loadSessionRecords,
+  addSessionRecord,
+  updateSessionRecordComment,
+} from './lib/sessionRecorder';
+import { buildDebugReport } from './lib/debugReport';
 
 function GithubIcon({ className = 'w-3.5 h-3.5' }: { className?: string }) {
   return (
@@ -210,8 +219,18 @@ export function App() {
     score: 0,
   });
 
-  // Modo de práctica en la barra lateral: 'camino' (por defecto) o 'daily' (reto diario)
-  const [practiceMode, setPracticeMode] = useState<'camino' | 'daily'>('camino');
+  // Modo de práctica en la barra lateral: 'camino' (por defecto), 'daily' (reto diario), o 'record' (modo récord de sesión)
+  const [practiceMode, setPracticeMode] = useState<'camino' | 'daily' | 'record'>('camino');
+  // Registro de ejercicios de la sesión (Modo Récord)
+  const [sessionRecords, setSessionRecords] = useState<SessionRecordItem[]>(() => loadSessionRecords());
+
+  const handleUpdateLatestRecordComment = (comment: string) => {
+    setSessionRecords((prev) => {
+      if (prev.length === 0) return prev;
+      return updateSessionRecordComment(prev[0].id, comment, prev);
+    });
+  };
+
   // Colapso de la barra lateral izquierda (por defecto oculta en modo enfoque)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(true);
   // Visibilidad de trazos de usuario y soluciones/guías
@@ -418,18 +437,23 @@ export function App() {
           currentIndex: nextIndex,
         });
         setActiveNode(nextProblem.node);
-        setChallenge(
-          generateCubeChallenge(nextProblem.seed, 600, 540, {
-            mode: nextProblem.node.perspectiveMode,
-            axesMode: nextProblem.node.axesMode,
-            forceSide: nextProblem.node.forceSide,
-            isShadowLevel: nextProblem.node.isShadowLevel,
-            hasGroundGrid: nextProblem.node.hasGroundGrid,
-          })
-        );
+        if (nextProblem.node.isCalisthenics) {
+          setCalisthenicsSeed(nextProblem.seed);
+        } else {
+          setChallenge(
+            generateCubeChallenge(nextProblem.seed, 600, 540, {
+              mode: nextProblem.node.perspectiveMode,
+              axesMode: nextProblem.node.axesMode,
+              forceSide: nextProblem.node.forceSide,
+              isShadowLevel: nextProblem.node.isShadowLevel,
+              hasGroundGrid: nextProblem.node.hasGroundGrid,
+            })
+          );
+        }
         setFeedback(null);
         setShowSolution(false);
         setStrokes([]);
+        setStrokeEvaluation(null);
         setAvatarMood('neutral');
         return;
       }
@@ -449,18 +473,23 @@ export function App() {
     const firstProblem = newSession.problems[0];
     if (firstProblem) {
       setActiveNode(firstProblem.node);
-      setChallenge(
-        generateCubeChallenge(firstProblem.seed, 600, 540, {
-          mode: firstProblem.node.perspectiveMode,
-          axesMode: firstProblem.node.axesMode,
-          forceSide: firstProblem.node.forceSide,
-          isShadowLevel: firstProblem.node.isShadowLevel,
-          hasGroundGrid: firstProblem.node.hasGroundGrid,
-        })
-      );
+      if (firstProblem.node.isCalisthenics) {
+        setCalisthenicsSeed(firstProblem.seed);
+      } else {
+        setChallenge(
+          generateCubeChallenge(firstProblem.seed, 600, 540, {
+            mode: firstProblem.node.perspectiveMode,
+            axesMode: firstProblem.node.axesMode,
+            forceSide: firstProblem.node.forceSide,
+            isShadowLevel: firstProblem.node.isShadowLevel,
+            hasGroundGrid: firstProblem.node.hasGroundGrid,
+          })
+        );
+      }
       setFeedback(null);
       setShowSolution(false);
       setStrokes([]);
+      setStrokeEvaluation(null);
       setAvatarMood('speed-lightning');
       setTimeout(() => setAvatarMood('neutral'), 2200);
     }
@@ -558,6 +587,16 @@ export function App() {
 
   const handleSidebarNext = () => {
     setStrokeEvaluation(null);
+    setFeedback(null);
+    setShowSolution(false);
+    setStrokes([]);
+
+    // Si hay un reto diario activo, avanzar al siguiente problema del lote (línea o cubo)
+    if (dailySetSession && !dailySetSession.isCompleted) {
+      handleNextCubeOrProblem();
+      return;
+    }
+
     if (activeNode?.isCalisthenics) {
       // En calistenia, avanzar genera una nueva semilla del mismo ejercicio y versión.
       // NO avanza de versión. El avance de versión requiere superar las 3 fases (3 x 3 maestrías por versión).
@@ -568,12 +607,81 @@ export function App() {
   };
 
   // Evaluación de trazos de calistenia completada
-  const handleCalisthenicsEvaluationComplete = (evalResult: StrokeEvaluation | null) => {
+  const handleCalisthenicsEvaluationComplete = (
+    evalResult: StrokeEvaluation | null,
+    context?: {
+      challenge: any;
+      strokes: any[];
+      reportMarkdown: string;
+      reportJsonString: string;
+    }
+  ) => {
     setStrokeEvaluation(evalResult);
     if (!evalResult) return;
 
     const recordedScore = Math.round(evalResult.overallScore);
     setScoresHistory((prev) => [...prev.slice(-19), recordedScore]);
+
+    // 1. Guardar en el Modo Récord (registro de sesión de ejercicios y notas)
+    const reportMd = context?.reportMarkdown || '';
+    const newRecord: SessionRecordItem = {
+      id: `rec-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      timestamp: new Date().toISOString(),
+      displayTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      type: 'calisthenics',
+      nodeCode: activeNode?.code || '1.1',
+      nodeTitle: activeNode?.title || 'Ejercicio de Trazo',
+      seed: calisthenicsSeed,
+      score: recordedScore,
+      passed: evalResult.passed,
+      phase: currentPhase,
+      userComment: '',
+      metricsSummary: `Rectitud: ${evalResult.metrics.straightnessScore}% · Puntería: ${evalResult.metrics.boundaryScore}%`,
+      reportMarkdown: reportMd,
+    };
+    setSessionRecords((prev) => addSessionRecord(newRecord, prev));
+
+    // 2. Si hay un reto diario activo, registrar la nota de esta línea
+    if (dailySetSession && !dailySetSession.isCompleted) {
+      const updatedProblems = [...dailySetSession.problems];
+      updatedProblems[dailySetSession.currentIndex] = {
+        ...updatedProblems[dailySetSession.currentIndex],
+        score: recordedScore,
+        passed: evalResult.passed,
+      };
+
+      const isLastProblem = dailySetSession.currentIndex >= dailySetSession.totalCount - 1;
+      if (isLastProblem) {
+        const completedSession: DailySetSession = {
+          ...dailySetSession,
+          problems: updatedProblems,
+          isCompleted: true,
+          completedAt: new Date().toISOString(),
+        };
+        const historyItem = recordCompletedDailySet(completedSession);
+        setDailySetHistory((prev) => [historyItem, ...prev]);
+        setDailySetSession(null);
+        setXp((prev) => prev + 50);
+        setCompletedDailySetForModal(historyItem);
+      } else {
+        setDailySetSession({
+          ...dailySetSession,
+          problems: updatedProblems,
+        });
+      }
+
+      if (evalResult.passed) {
+        setAvatarMood('success-stars');
+        setTimeout(() => setAvatarMood('neutral'), 2600);
+        setXp((prev) => prev + 25);
+      } else {
+        setAvatarMood('fail-spiral');
+        setTimeout(() => setAvatarMood('neutral'), 3000);
+      }
+
+      // En el Reto Diario cada línea es 1 ejercicio del lote; no evalúa ni altera las fases de El Camino
+      return;
+    }
 
     const targetThreshold = currentPhase === 1 ? 80 : currentPhase === 2 ? 85 : 90;
 
@@ -703,7 +811,26 @@ export function App() {
 
     const currentScore = res.totalScore ?? res.score;
 
-    // Registrar puntuación en el reto diario activo si existe
+    // 1. Guardar en el Modo Récord (registro de sesión de ejercicios y comentarios)
+    const cubeReport = buildDebugReport(challenge, strokes, res, activeNode);
+    const newRecord: SessionRecordItem = {
+      id: `rec-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      timestamp: new Date().toISOString(),
+      displayTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      type: 'cube',
+      nodeCode: activeNode?.code || '3D',
+      nodeTitle: activeNode?.title || 'Cubo en Perspectiva',
+      seed: challenge.seed,
+      score: currentScore,
+      passed: res.passed,
+      userComment: '',
+      metricsSummary: `Vértices: ${res.vertexAccuracyScore}% · Perspectiva: ${res.perspectiveScore}%`,
+      reportMarkdown: cubeReport.markdownText,
+      reportJsonString: cubeReport.jsonString,
+    };
+    setSessionRecords((prev) => addSessionRecord(newRecord, prev));
+
+    // 2. Registrar puntuación en el reto diario activo si existe
     if (dailySetSession && !dailySetSession.isCompleted) {
       const updatedProblems = [...dailySetSession.problems];
       updatedProblems[dailySetSession.currentIndex] = {
@@ -732,6 +859,18 @@ export function App() {
           problems: updatedProblems,
         });
       }
+
+      if (res.passed) {
+        setAvatarMood('success-stars');
+        setTimeout(() => setAvatarMood('neutral'), 3500);
+        setXp((prev) => prev + 25);
+      } else {
+        setAvatarMood('fail-spiral');
+        setTimeout(() => setAvatarMood('neutral'), 3000);
+      }
+
+      // En el Reto Diario cada dibujo es 1 ejercicio del lote; no altera las fases de El Camino
+      return;
     }
 
     if (res.passed) {
@@ -1334,10 +1473,10 @@ export function App() {
 
                 <div className="flex items-center gap-1 min-w-0 bg-white border border-black px-2 py-0.5 shadow-[1px_1px_0px_#000000]">
                   <span className="text-[10px] font-mono font-bold text-neutral-500 uppercase">
-                    {practiceMode === 'camino' ? (activeNode ? activeNode.code : '1.1') : 'RETO'}
+                    {dailySetSession ? `${dailySetSession.currentIndex + 1}/${dailySetSession.totalCount}` : (practiceMode === 'camino' ? (activeNode ? activeNode.code : '1.1') : 'RETO')}
                   </span>
                   <span className="text-[11px] font-mono font-bold text-black truncate max-w-[130px]">
-                    {practiceMode === 'camino' ? (activeNode?.title || '') : 'Diario'}
+                    {dailySetSession ? `Reto (${activeNode?.code || ''})` : (practiceMode === 'camino' ? (activeNode?.title || '') : 'Diario')}
                   </span>
                 </div>
               </div>
@@ -1389,31 +1528,53 @@ export function App() {
                   </button>
                 </div>
 
-                {/* 1. SELECTOR DE MODO: [ EL CAMINO ] vs [ RETO DIARIO ] */}
-                <div className="grid grid-cols-2 gap-1.5 p-1 border-2 border-black bg-neutral-100 shadow-[2px_2px_0px_#000000]">
+                {/* 1. SELECTOR DE MODO: [ EL CAMINO ] vs [ RETO DIARIO ] vs [ MODO RÉCORD ] */}
+                <div className="grid grid-cols-3 gap-1 p-1 border-2 border-black bg-neutral-100 shadow-[2px_2px_0px_#000000]">
                   <button
                     type="button"
                     onClick={() => setPracticeMode('camino')}
-                    className={`py-1.5 px-2 text-xs font-mono font-bold flex items-center justify-center gap-1.5 cursor-pointer border border-black transition-colors ${
+                    className={`py-1.5 px-1 text-[11px] font-mono font-bold flex items-center justify-center gap-1 cursor-pointer border border-black transition-colors ${
                       practiceMode === 'camino'
                         ? 'bg-black text-white shadow-[1px_1px_0px_#000000]'
                         : 'bg-white text-black hover:bg-neutral-200'
                     }`}
+                    title="El Camino: Progresión de niveles y fases"
                   >
-                    <Map className="w-3.5 h-3.5" />
-                    <span>El Camino</span>
+                    <Map className="w-3 h-3" />
+                    <span className="truncate">Camino</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setPracticeMode('daily')}
-                    className={`py-1.5 px-2 text-xs font-mono font-bold flex items-center justify-center gap-1.5 cursor-pointer border border-black transition-colors ${
+                    className={`py-1.5 px-1 text-[11px] font-mono font-bold flex items-center justify-center gap-1 cursor-pointer border border-black transition-colors ${
                       practiceMode === 'daily'
                         ? 'bg-black text-white shadow-[1px_1px_0px_#000000]'
                         : 'bg-white text-black hover:bg-neutral-200'
                     }`}
+                    title="Reto Diario: Mini-set de 12 ejercicios para crear hábito"
                   >
-                    <Target className="w-3.5 h-3.5" />
-                    <span>Reto Diario</span>
+                    <Target className="w-3 h-3" />
+                    <span className="truncate">Reto {dailySetSession ? `(${dailySetSession.currentIndex + 1}/${dailySetSession.totalCount})` : ''}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPracticeMode('record')}
+                    className={`py-1.5 px-1 text-[11px] font-mono font-bold flex items-center justify-center gap-1 cursor-pointer border border-black transition-colors relative ${
+                      practiceMode === 'record'
+                        ? 'bg-black text-white shadow-[1px_1px_0px_#000000]'
+                        : 'bg-white text-black hover:bg-neutral-200'
+                    }`}
+                    title="Modo Récord: Historial de todos los ejercicios de la sesión, comentarios y exportación"
+                  >
+                    <FileText className="w-3 h-3" />
+                    <span className="truncate">Récord</span>
+                    {sessionRecords.length > 0 && (
+                      <span className={`text-[8px] font-mono font-black px-1 rounded-full ${
+                        practiceMode === 'record' ? 'bg-white text-black' : 'bg-black text-white'
+                      }`}>
+                        {sessionRecords.length}
+                      </span>
+                    )}
                   </button>
                 </div>
 
@@ -1493,6 +1654,15 @@ export function App() {
                   />
                 )}
 
+                {/* 3. SI MODO ES "MODO RÉCORD": HISTORIAL DE SESIÓN, COMENTARIOS Y EXPORTACIÓN */}
+                {practiceMode === 'record' && (
+                  <SessionRecordPanel
+                    records={sessionRecords}
+                    onRecordsChange={setSessionRecords}
+                    onClearRecords={() => setSessionRecords([])}
+                  />
+                )}
+
                 {/* SENSEI CUBO Y BOTÓN CERRAR PANEL */}
                 <div className="pt-2 flex flex-col items-center gap-2">
                   <SenseiCubo
@@ -1547,8 +1717,11 @@ export function App() {
                     onPhaseChange={(phase) => setCurrentPhase(phase)}
                     isLandscapeMobile={isLandscapeMobile}
                     onToggleSidebar={() => setIsSidebarCollapsed((prev) => !prev)}
-                    nodeCode={practiceMode === 'camino' ? (activeNode ? activeNode.code : '1.1') : 'RETO'}
-                    nodeTitle={practiceMode === 'camino' ? (activeNode?.title || '') : 'Diario'}
+                    nodeCode={dailySetSession ? `${dailySetSession.currentIndex + 1}/${dailySetSession.totalCount}` : (practiceMode === 'camino' ? (activeNode ? activeNode.code : '1.1') : 'RETO')}
+                    nodeTitle={dailySetSession ? `Reto Diario (${activeNode?.code || ''})` : (practiceMode === 'camino' ? (activeNode?.title || '') : 'Diario')}
+                    isDailyChallenge={Boolean(dailySetSession && !dailySetSession.isCompleted)}
+                    dailyProgress={dailySetSession ? { current: dailySetSession.currentIndex + 1, total: dailySetSession.totalCount } : undefined}
+                    onCommentChange={handleUpdateLatestRecordComment}
                   />
                 ) : (
                   <DrawingCanvas
@@ -1565,7 +1738,10 @@ export function App() {
                     activeLesson={activeNode}
                     isLandscapeMobile={isLandscapeMobile}
                     onToggleSidebar={() => setIsSidebarCollapsed((prev) => !prev)}
-                    nodeCode={practiceMode === 'camino' ? (activeNode ? activeNode.code : '1.1') : 'RETO'}
+                    nodeCode={dailySetSession ? `${dailySetSession.currentIndex + 1}/${dailySetSession.totalCount}` : (practiceMode === 'camino' ? (activeNode ? activeNode.code : '1.1') : 'RETO')}
+                    isDailyChallenge={Boolean(dailySetSession && !dailySetSession.isCompleted)}
+                    dailyProgress={dailySetSession ? { current: dailySetSession.currentIndex + 1, total: dailySetSession.totalCount } : undefined}
+                    onCommentChange={handleUpdateLatestRecordComment}
                   />
                 )}
               </div>

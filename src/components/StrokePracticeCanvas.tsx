@@ -16,6 +16,7 @@ import {
   X,
   AlertTriangle,
   PanelLeft,
+  MessageSquare,
 } from 'lucide-react';
 import {
   LabExerciseDef,
@@ -40,7 +41,15 @@ export interface StrokePracticeCanvasProps {
   currentPhase: 1 | 2 | 3;
   showSolution: boolean;
   showUserStrokes: boolean;
-  onEvaluationComplete: (evaluation: StrokeEvaluation | null) => void;
+  onEvaluationComplete: (
+    evaluation: StrokeEvaluation | null,
+    context?: {
+      challenge: ProceduralStrokeChallenge;
+      strokes: RawStroke[];
+      reportMarkdown: string;
+      reportJsonString: string;
+    }
+  ) => void;
   onDrawingStateChange?: (isDrawing: boolean) => void;
   seed?: number;
   onNewSeed?: (seed: number) => void;
@@ -67,6 +76,9 @@ export interface StrokePracticeCanvasProps {
   onToggleSidebar?: () => void;
   nodeCode?: string;
   nodeTitle?: string;
+  isDailyChallenge?: boolean;
+  dailyProgress?: { current: number; total: number };
+  onCommentChange?: (comment: string) => void;
 }
 
 export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePracticeCanvasProps>(
@@ -94,6 +106,9 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
       onToggleSidebar,
       nodeCode,
       nodeTitle,
+      isDailyChallenge = false,
+      dailyProgress,
+      onCommentChange,
     },
     ref
   ) => {
@@ -194,7 +209,13 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
       if (strokes.length === 0) return;
       const res = evaluateStrokeSubmission(strokes, challenge);
       setEvaluation(res);
-      onEvaluationComplete(res);
+      const repMd = buildStrokeDebugReport(challenge, strokes, res);
+      onEvaluationComplete(res, {
+        challenge,
+        strokes,
+        reportMarkdown: repMd,
+        reportJsonString: '',
+      });
     }, [strokes, challenge, onEvaluationComplete]);
 
     const handleNext = useCallback(() => {
@@ -1079,7 +1100,13 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
           currentStrokeRef.current = [];
           const result = evaluateStrokeSubmission(newStrokes, challenge);
           setEvaluation(result);
-          onEvaluationComplete(result);
+          const repMd = buildStrokeDebugReport(challenge, newStrokes, result);
+          onEvaluationComplete(result, {
+            challenge,
+            strokes: newStrokes,
+            reportMarkdown: repMd,
+            reportJsonString: '',
+          });
           renderCanvas();
           return;
         }
@@ -1120,77 +1147,90 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                 className="block w-full h-full cursor-crosshair touch-none select-none"
               />
 
-              {/* HUD SUPERIOR IZQUIERDO: MAESTRÍA Y FASE CINEMÁTICA */}
+              {/* HUD SUPERIOR IZQUIERDO: RETO DIARIO O MAESTRÍA Y FASE CINEMÁTICA */}
               <div className="absolute top-1.5 left-1.5 z-20 flex flex-col gap-1 p-1 bg-white/95 border border-black shadow-[1px_1px_0px_#000000] font-mono pointer-events-auto select-none text-[10px]">
-                {/* Maestría: M [✓][✓][ ] 0/3 [i] */}
-                <div className={`flex items-center gap-1 text-[10px] transition-transform ${justEarnedMastery ? 'scale-105' : ''}`}>
-                  <span className="font-bold text-neutral-600">M:</span>
-                  <div className="flex items-center gap-0.5">
-                    {[0, 1, 2].map((i) => {
-                      const isFilled = i < (masteryStreak ?? 0);
-                      const isJustFilled = justEarnedMastery && i === (masteryStreak ?? 0) - 1;
-                      return (
-                        <span
-                          key={i}
-                          className={`w-3 h-3 border border-black flex items-center justify-center transition-all ${
-                            isJustFilled
-                              ? 'bg-black text-white animate-mastery-pop scale-110 z-10'
-                              : isFilled
-                              ? 'bg-black text-white'
-                              : 'bg-neutral-100 text-transparent'
-                          }`}
+                {isDailyChallenge && dailyProgress ? (
+                  <div className="flex items-center gap-1 text-[10px]">
+                    <span className="bg-black text-white px-1 py-0.2 text-[8px] font-bold uppercase shadow-[1px_1px_0px_#000]">
+                      Reto
+                    </span>
+                    <span className="font-bold text-[10px] text-black">
+                      Línea {dailyProgress.current}/{dailyProgress.total}
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    {/* Maestría: M [✓][✓][ ] 0/3 [i] */}
+                    <div className={`flex items-center gap-1 text-[10px] transition-transform ${justEarnedMastery ? 'scale-105' : ''}`}>
+                      <span className="font-bold text-neutral-600">M:</span>
+                      <div className="flex items-center gap-0.5">
+                        {[0, 1, 2].map((i) => {
+                          const isFilled = i < (masteryStreak ?? 0);
+                          const isJustFilled = justEarnedMastery && i === (masteryStreak ?? 0) - 1;
+                          return (
+                            <span
+                              key={i}
+                              className={`w-3 h-3 border border-black flex items-center justify-center transition-all ${
+                                isJustFilled
+                                  ? 'bg-black text-white animate-mastery-pop scale-110 z-10'
+                                  : isFilled
+                                  ? 'bg-black text-white'
+                                  : 'bg-neutral-100 text-transparent'
+                              }`}
+                            >
+                              {isFilled && <Check className="w-2 h-2 stroke-[3] text-white" />}
+                            </span>
+                          );
+                        })}
+                      </div>
+                      <span className={`font-bold tabular-nums ${justEarnedMastery ? 'text-black font-black' : ''}`}>
+                        {masteryStreak ?? 0}/3
+                      </span>
+                      {onOpenMasteryInfo && (
+                        <button
+                          type="button"
+                          onClick={onOpenMasteryInfo}
+                          className="w-3 h-3 border border-black flex items-center justify-center text-[8px] font-bold text-neutral-600 hover:text-black hover:bg-neutral-200 cursor-pointer"
+                          title={`Información de Maestría (Racha de 3 aciertos ≥${targetMasteryScore}%)`}
                         >
-                          {isFilled && <Check className="w-2 h-2 stroke-[3] text-white" />}
-                        </span>
-                      );
-                    })}
-                  </div>
-                  <span className={`font-bold tabular-nums ${justEarnedMastery ? 'text-black font-black' : ''}`}>
-                    {masteryStreak ?? 0}/3
-                  </span>
-                  {onOpenMasteryInfo && (
-                    <button
-                      type="button"
-                      onClick={onOpenMasteryInfo}
-                      className="w-3 h-3 border border-black flex items-center justify-center text-[8px] font-bold text-neutral-600 hover:text-black hover:bg-neutral-200 cursor-pointer"
-                      title={`Información de Maestría (Racha de 3 aciertos ≥${targetMasteryScore}%)`}
-                    >
-                      i
-                    </button>
-                  )}
-                </div>
+                          i
+                        </button>
+                      )}
+                    </div>
 
-                {/* Fase de Motricidad: F [1][2][3] [i] */}
-                <div className="flex items-center gap-1 pt-0.5 border-t border-neutral-300 text-[10px]">
-                  <span className="font-bold text-neutral-600">F:</span>
-                  <div className="flex items-center gap-0.5">
-                    {([1, 2, 3] as const).map((ph) => (
-                      <button
-                        key={ph}
-                        type="button"
-                        onClick={() => onPhaseChange && onPhaseChange(ph)}
-                        className={`w-3.5 h-3.5 border border-black flex items-center justify-center text-[8px] font-bold cursor-pointer transition-colors ${
-                          currentPhase === ph
-                            ? 'bg-black text-white shadow-[1px_1px_0px_#000000]'
-                            : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
-                        }`}
-                        title={`Fase ${ph}: ${ph === 1 ? 'Precisión (extremos, ≥80%)' : ph === 2 ? 'Fluidez (velocidad constante, ≥85%)' : 'Velocidad (inercia ágil, ≥90%)'}`}
-                      >
-                        {ph}
-                      </button>
-                    ))}
-                  </div>
-                  {onOpenPhaseInfo && (
-                    <button
-                      type="button"
-                      onClick={onOpenPhaseInfo}
-                      className="w-3 h-3 border border-black flex items-center justify-center text-[8px] font-bold text-neutral-600 hover:text-black hover:bg-neutral-200 cursor-pointer"
-                      title="Información de Fases de Motricidad"
-                    >
-                      i
-                    </button>
-                  )}
-                </div>
+                    {/* Fase de Motricidad: F [1][2][3] [i] */}
+                    <div className="flex items-center gap-1 pt-0.5 border-t border-neutral-300 text-[10px]">
+                      <span className="font-bold text-neutral-600">F:</span>
+                      <div className="flex items-center gap-0.5">
+                        {([1, 2, 3] as const).map((ph) => (
+                          <button
+                            key={ph}
+                            type="button"
+                            onClick={() => onPhaseChange && onPhaseChange(ph)}
+                            className={`w-3.5 h-3.5 border border-black flex items-center justify-center text-[8px] font-bold cursor-pointer transition-colors ${
+                              currentPhase === ph
+                                ? 'bg-black text-white shadow-[1px_1px_0px_#000000]'
+                                : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+                            }`}
+                            title={`Fase ${ph}: ${ph === 1 ? 'Precisión (extremos, ≥80%)' : ph === 2 ? 'Fluidez (velocidad constante, ≥85%)' : 'Velocidad (inercia ágil, ≥90%)'}`}
+                          >
+                            {ph}
+                          </button>
+                        ))}
+                      </div>
+                      {onOpenPhaseInfo && (
+                        <button
+                          type="button"
+                          onClick={onOpenPhaseInfo}
+                          className="w-3 h-3 border border-black flex items-center justify-center text-[8px] font-bold text-neutral-600 hover:text-black hover:bg-neutral-200 cursor-pointer"
+                          title="Información de Fases de Motricidad"
+                        >
+                          i
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* HUD SUPERIOR DERECHO: NOTA SI ESTÁ EVALUADO */}
@@ -1331,6 +1371,19 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                   </button>
                   <button
                     type="button"
+                    onClick={() => {
+                      setAutoAdvanceCountdown(null);
+                      setShowReportModal(true);
+                    }}
+                    className={`p-1 text-xs font-bold border border-black cursor-pointer shadow-[1px_1px_0px_#000000] flex items-center justify-center transition-colors ${
+                      userNote.trim() ? 'bg-black text-white' : 'bg-white hover:bg-neutral-100'
+                    }`}
+                    title={userNote.trim() ? `Nota: "${userNote}"` : "Añadir comentario (Modo Récord)"}
+                  >
+                    <MessageSquare className="w-3.5 h-3.5 stroke-[2.5]" />
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setShowReportModal(true)}
                     className="p-1 text-xs font-bold border border-black cursor-pointer shadow-[1px_1px_0px_#000000] bg-white hover:bg-neutral-100 flex items-center justify-center"
                     title="Reportar anomalía"
@@ -1427,82 +1480,95 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
             className="block w-full h-full cursor-crosshair touch-none select-none"
           />
 
-          {/* HUD SUPERIOR IZQUIERDO: MAESTRÍA Y FASE CINEMÁTICA (NÚMEROS, CUADRITOS E INFO) */}
+          {/* HUD SUPERIOR IZQUIERDO: RETO DIARIO O MAESTRÍA Y FASE CINEMÁTICA */}
           <div className="absolute top-2.5 left-2.5 z-20 flex flex-col gap-1.5 p-1.5 bg-white/95 border-2 border-black shadow-[2px_2px_0px_#000000] font-mono pointer-events-auto select-none">
-            {/* Maestría: M [✓][✓][ ] 0/3 [i] */}
-            <div className={`flex items-center gap-1.5 text-xs transition-transform ${justEarnedMastery ? 'scale-105' : ''}`}>
-              <span className="text-[10px] font-bold text-neutral-600">M:</span>
-              <div className="flex items-center gap-0.5">
-                {[0, 1, 2].map((i) => {
-                  const isFilled = i < (masteryStreak ?? 0);
-                  const isJustFilled = justEarnedMastery && i === (masteryStreak ?? 0) - 1;
-                  return (
-                    <span
-                      key={i}
-                      className={`w-3.5 h-3.5 border border-black flex items-center justify-center transition-all ${
-                        isJustFilled
-                          ? 'bg-black text-white animate-mastery-pop scale-125 z-10 shadow-[0_0_0_2px_#000000]'
-                          : isFilled
-                          ? 'bg-black text-white'
-                          : 'bg-neutral-100 text-transparent'
-                      }`}
-                    >
-                      {isFilled && <Check className="w-2.5 h-2.5 stroke-[3] text-white" />}
-                    </span>
-                  );
-                })}
-              </div>
-              <span className={`text-[10px] font-bold tabular-nums transition-colors ${justEarnedMastery ? 'text-black font-black' : ''}`}>
-                {masteryStreak ?? 0}/3
-              </span>
-              {justEarnedMastery && (
-                <span className="bg-black text-white text-[8px] font-black px-1 border border-black animate-bounce shadow-[1px_1px_0px_#000]">
-                  +1
+            {isDailyChallenge && dailyProgress ? (
+              <div className="flex items-center gap-1.5 text-xs">
+                <span className="bg-black text-white px-1.5 py-0.5 text-[9px] font-bold uppercase shadow-[1px_1px_0px_#000]">
+                  Reto Diario
                 </span>
-              )}
-              {onOpenMasteryInfo && (
-                <button
-                  type="button"
-                  onClick={onOpenMasteryInfo}
-                  className="w-3.5 h-3.5 border border-black flex items-center justify-center text-[9px] font-bold text-neutral-600 hover:text-black hover:bg-neutral-200 cursor-pointer"
-                  title={`Información de Maestría (Racha de 3 aciertos ≥${targetMasteryScore}%)`}
-                >
-                  i
-                </button>
-              )}
-            </div>
-
-            {/* Fase de Motricidad: F [1][2][3] [i] */}
-            <div className="flex items-center gap-1.5 pt-1 border-t border-neutral-300 text-xs">
-              <span className="text-[10px] font-bold text-neutral-600">F:</span>
-              <div className="flex items-center gap-1">
-                {([1, 2, 3] as const).map((ph) => (
-                  <button
-                    key={ph}
-                    type="button"
-                    onClick={() => onPhaseChange && onPhaseChange(ph)}
-                    className={`w-4 h-4 border border-black flex items-center justify-center text-[9px] font-bold cursor-pointer transition-colors ${
-                      currentPhase === ph
-                        ? 'bg-black text-white shadow-[1px_1px_0px_#000000]'
-                        : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
-                    }`}
-                    title={`Fase ${ph}: ${ph === 1 ? 'Precisión (extremos, ≥80%)' : ph === 2 ? 'Fluidez (velocidad constante, ≥85%)' : 'Velocidad (inercia ágil, ≥90%)'}`}
-                  >
-                    {ph}
-                  </button>
-                ))}
+                <span className="font-bold text-[11px] text-black">
+                  Línea {dailyProgress.current}/{dailyProgress.total}
+                </span>
               </div>
-              {onOpenPhaseInfo && (
-                <button
-                  type="button"
-                  onClick={onOpenPhaseInfo}
-                  className="w-3.5 h-3.5 border border-black flex items-center justify-center text-[9px] font-bold text-neutral-600 hover:text-black hover:bg-neutral-200 cursor-pointer"
-                  title="Información de Fases de Motricidad"
-                >
-                  i
-                </button>
-              )}
-            </div>
+            ) : (
+              <>
+                {/* Maestría: M [✓][✓][ ] 0/3 [i] */}
+                <div className={`flex items-center gap-1.5 text-xs transition-transform ${justEarnedMastery ? 'scale-105' : ''}`}>
+                  <span className="text-[10px] font-bold text-neutral-600">M:</span>
+                  <div className="flex items-center gap-0.5">
+                    {[0, 1, 2].map((i) => {
+                      const isFilled = i < (masteryStreak ?? 0);
+                      const isJustFilled = justEarnedMastery && i === (masteryStreak ?? 0) - 1;
+                      return (
+                        <span
+                          key={i}
+                          className={`w-3.5 h-3.5 border border-black flex items-center justify-center transition-all ${
+                            isJustFilled
+                              ? 'bg-black text-white animate-mastery-pop scale-125 z-10 shadow-[0_0_0_2px_#000000]'
+                              : isFilled
+                              ? 'bg-black text-white'
+                              : 'bg-neutral-100 text-transparent'
+                          }`}
+                        >
+                          {isFilled && <Check className="w-2.5 h-2.5 stroke-[3] text-white" />}
+                        </span>
+                      );
+                    })}
+                  </div>
+                  <span className={`text-[10px] font-bold tabular-nums transition-colors ${justEarnedMastery ? 'text-black font-black' : ''}`}>
+                    {masteryStreak ?? 0}/3
+                  </span>
+                  {justEarnedMastery && (
+                    <span className="bg-black text-white text-[8px] font-black px-1 border border-black animate-bounce shadow-[1px_1px_0px_#000]">
+                      +1
+                    </span>
+                  )}
+                  {onOpenMasteryInfo && (
+                    <button
+                      type="button"
+                      onClick={onOpenMasteryInfo}
+                      className="w-3.5 h-3.5 border border-black flex items-center justify-center text-[9px] font-bold text-neutral-600 hover:text-black hover:bg-neutral-200 cursor-pointer"
+                      title={`Información de Maestría (Racha de 3 aciertos ≥${targetMasteryScore}%)`}
+                    >
+                      i
+                    </button>
+                  )}
+                </div>
+
+                {/* Fase de Motricidad: F [1][2][3] [i] */}
+                <div className="flex items-center gap-1.5 pt-1 border-t border-neutral-300 text-xs">
+                  <span className="text-[10px] font-bold text-neutral-600">F:</span>
+                  <div className="flex items-center gap-1">
+                    {([1, 2, 3] as const).map((ph) => (
+                      <button
+                        key={ph}
+                        type="button"
+                        onClick={() => onPhaseChange && onPhaseChange(ph)}
+                        className={`w-4 h-4 border border-black flex items-center justify-center text-[9px] font-bold cursor-pointer transition-colors ${
+                          currentPhase === ph
+                            ? 'bg-black text-white shadow-[1px_1px_0px_#000000]'
+                            : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+                        }`}
+                        title={`Fase ${ph}: ${ph === 1 ? 'Precisión (extremos, ≥80%)' : ph === 2 ? 'Fluidez (velocidad constante, ≥85%)' : 'Velocidad (inercia ágil, ≥90%)'}`}
+                      >
+                        {ph}
+                      </button>
+                    ))}
+                  </div>
+                  {onOpenPhaseInfo && (
+                    <button
+                      type="button"
+                      onClick={onOpenPhaseInfo}
+                      className="w-3.5 h-3.5 border border-black flex items-center justify-center text-[9px] font-bold text-neutral-600 hover:text-black hover:bg-neutral-200 cursor-pointer"
+                      title="Información de Fases de Motricidad"
+                    >
+                      i
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           {/* HUD SUPERIOR DERECHO: NOTA OBTENIDA EN GRANDE */}
@@ -1717,6 +1783,21 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                     title="Ver estadísticas detalladas del trazo y biomecánica (pausa el auto-avance)"
                   >
                     <Activity className="w-3.5 h-3.5 stroke-[2.5]" />
+                  </button>
+
+                  {/* BOTÓN RÁPIDO DE COMENTARIO (MODO RÉCORD) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAutoAdvanceCountdown(null);
+                      setShowReportModal(true);
+                    }}
+                    className={`p-1.5 text-xs font-bold border border-black cursor-pointer shadow-[1px_1px_0px_#000000] flex items-center justify-center transition-colors ${
+                      userNote.trim() ? 'bg-black text-white' : 'bg-white hover:bg-neutral-100 text-black'
+                    }`}
+                    title={userNote.trim() ? `Comentario guardado: "${userNote}"` : "Añadir comentario a este ejercicio (Modo Récord)"}
+                  >
+                    <MessageSquare className="w-3.5 h-3.5 stroke-[2.5]" />
                   </button>
 
                   {/* BOTÓN DE REPORTE (SOLO ICONO TRIANGULAR) */}
@@ -2008,7 +2089,10 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                 </label>
                 <textarea
                   value={userNote}
-                  onChange={(e) => setUserNote(e.target.value)}
+                  onChange={(e) => {
+                    setUserNote(e.target.value);
+                    onCommentChange?.(e.target.value);
+                  }}
                   placeholder="Escribe aquí qué ocurrió (ej: 'El trazo iba fluido pero dio 75%', 'Sentido inverso erróneo', 'Dianas desalineadas')..."
                   className="w-full h-20 p-2 text-xs font-mono bg-white border border-black resize-none focus:outline-none focus:ring-2 focus:ring-black selection:bg-black selection:text-white"
                   autoFocus
@@ -2019,7 +2103,11 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                     <button
                       key={tag}
                       type="button"
-                      onClick={() => setUserNote((prev) => (prev ? `${prev} · ${tag}` : tag))}
+                      onClick={() => {
+                        const nextVal = userNote ? `${userNote} · ${tag}` : tag;
+                        setUserNote(nextVal);
+                        onCommentChange?.(nextVal);
+                      }}
                       className="text-[10px] font-mono bg-white hover:bg-black hover:text-white border border-black px-1.5 py-0.5 cursor-pointer transition-colors shadow-[1px_1px_0px_#000000]"
                     >
                       +{tag}
@@ -2028,7 +2116,10 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                   {userNote && (
                     <button
                       type="button"
-                      onClick={() => setUserNote('')}
+                      onClick={() => {
+                        setUserNote('');
+                        onCommentChange?.('');
+                      }}
                       className="text-[10px] font-mono text-neutral-500 hover:text-black ml-auto underline cursor-pointer"
                     >
                       Borrar nota
