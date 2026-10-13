@@ -17,55 +17,47 @@ export interface SessionRecordItem {
   reportJsonString?: string;
 }
 
-const STORAGE_KEY_RECORDS = 'paplitz_session_records';
+const LEGACY_STORAGE_KEY_RECORDS = 'paplitz_session_records';
+
+// Limpieza proactiva de cualquier registro residual en localStorage para garantizar
+// sesiones 100% volátiles en memoria (se limpian automáticamente al recargar la web).
+try {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    localStorage.removeItem(LEGACY_STORAGE_KEY_RECORDS);
+  }
+} catch (e) {
+  // Ignorar en entornos sin acceso a almacenamiento
+}
 
 /**
- * Carga el registro de ejercicios de la sesión desde localStorage
+ * Carga el registro de ejercicios de la sesión.
+ * Por requisito de diseño estricto, la sesión es 100% volátil en memoria React:
+ * al recargar la web o reiniciar, siempre retorna un array vacío [].
  */
 export function loadSessionRecords(): SessionRecordItem[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_RECORDS);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (err) {
-    console.error('Error al cargar session records:', err);
-    return [];
-  }
+  // Siempre array vacío: la sesión no se persiste en disco salvo que el usuario la exporte.
+  return [];
 }
 
 /**
- * Guarda el registro de ejercicios de la sesión en localStorage
- */
-export function saveSessionRecords(records: SessionRecordItem[]): void {
-  try {
-    localStorage.setItem(STORAGE_KEY_RECORDS, JSON.stringify(records));
-  } catch (err) {
-    console.error('Error al guardar session records:', err);
-  }
-}
-
-/**
- * Añade un nuevo ejercicio al registro de la sesión (máximo 100 ejercicios recientes)
+ * Añade un nuevo ejercicio al registro de la sesión en memoria (máximo 100 ejercicios recientes)
  */
 export function addSessionRecord(
   newRecord: SessionRecordItem,
   currentRecords: SessionRecordItem[]
 ): SessionRecordItem[] {
-  const updated = [newRecord, ...currentRecords].slice(0, 100);
-  saveSessionRecords(updated);
-  return updated;
+  return [newRecord, ...currentRecords].slice(0, 100);
 }
 
 /**
- * Actualiza el comentario de un ejercicio específico en el registro
+ * Actualiza el comentario de un ejercicio específico en el registro en memoria
  */
 export function updateSessionRecordComment(
   recordId: string,
   comment: string,
   currentRecords: SessionRecordItem[]
 ): SessionRecordItem[] {
-  const updated = currentRecords.map((item) => {
+  return currentRecords.map((item) => {
     if (item.id !== recordId) return item;
 
     // Actualizar también la nota en el cuerpo del markdown si está presente
@@ -84,31 +76,28 @@ export function updateSessionRecordComment(
       reportMarkdown: updatedMarkdown,
     };
   });
-
-  saveSessionRecords(updated);
-  return updated;
 }
 
 /**
- * Elimina un ejercicio específico del registro
+ * Elimina un ejercicio específico del registro en memoria
  */
 export function deleteSessionRecord(
   recordId: string,
   currentRecords: SessionRecordItem[]
 ): SessionRecordItem[] {
-  const updated = currentRecords.filter((item) => item.id !== recordId);
-  saveSessionRecords(updated);
-  return updated;
+  return currentRecords.filter((item) => item.id !== recordId);
 }
 
 /**
- * Vacía por completo el registro de la sesión
+ * Vacía por completo el registro de la sesión y asegura eliminación de datos residuales
  */
 export function clearSessionRecords(): void {
   try {
-    localStorage.removeItem(STORAGE_KEY_RECORDS);
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.removeItem(LEGACY_STORAGE_KEY_RECORDS);
+    }
   } catch (err) {
-    console.error('Error al vaciar session records:', err);
+    console.error('Error al vaciar session records residuales:', err);
   }
 }
 

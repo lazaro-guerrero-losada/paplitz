@@ -28,6 +28,7 @@ import {
 import { generateStrokeChallenge } from '../lib/strokeProceduralGenerator';
 import { evaluateStrokeSubmission, buildStrokeDebugReport } from '../lib/strokeEvaluator';
 import { copyReportToClipboard, downloadReportJson } from '../lib/debugReport';
+import { QuickCommentModal } from './QuickCommentModal';
 
 export interface StrokePracticeCanvasRef {
   undo: () => void;
@@ -79,6 +80,11 @@ export interface StrokePracticeCanvasProps {
   isDailyChallenge?: boolean;
   dailyProgress?: { current: number; total: number };
   onCommentChange?: (comment: string) => void;
+  isRecording?: boolean;
+  recordedCount?: number;
+  onToggleRecording?: () => void;
+  onOpenRecordModal?: () => void;
+  onAddCurrentToRecording?: (comment?: string) => void;
 }
 
 export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePracticeCanvasProps>(
@@ -109,6 +115,11 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
       isDailyChallenge = false,
       dailyProgress,
       onCommentChange,
+      isRecording = false,
+      recordedCount = 0,
+      onToggleRecording,
+      onOpenRecordModal,
+      onAddCurrentToRecording,
     },
     ref
   ) => {
@@ -155,6 +166,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
     // Estados para modales de estadísticas detalladas y reporte de depuración
     const [showStatsModal, setShowStatsModal] = useState<boolean>(false);
     const [showReportModal, setShowReportModal] = useState<boolean>(false);
+    const [showQuickCommentModal, setShowQuickCommentModal] = useState<boolean>(false);
     const [userNote, setUserNote] = useState<string>('');
     const [copiedReport, setCopiedReport] = useState<boolean>(false);
     const [downloadedReport, setDownloadedReport] = useState<boolean>(false);
@@ -263,7 +275,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
     // Temporizador de 1.0 segundo de auto-avance tras corregir
     // Se pausa momentáneamente si se abren los modales de Stats o Reporte, o si hay aviso de cambio de fase
     useEffect(() => {
-      if (!evaluation || !autoAdvance || phaseTransitionNotice || showStatsModal || showReportModal) {
+      if (!evaluation || !autoAdvance || phaseTransitionNotice || showStatsModal || showReportModal || showQuickCommentModal) {
         setAutoAdvanceCountdown(null);
         return;
       }
@@ -287,7 +299,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
       return () => {
         clearInterval(intervalId);
       };
-    }, [evaluation, autoAdvance, phaseTransitionNotice, showStatsModal, showReportModal, handleNext]);
+    }, [evaluation, autoAdvance, phaseTransitionNotice, showStatsModal, showReportModal, showQuickCommentModal, handleNext]);
 
     // Auto-dismiss del aviso de paso de fase tras 1.0 segundo (se quita solo y avanza automáticamente)
     useEffect(() => {
@@ -1371,14 +1383,25 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                   </button>
                   <button
                     type="button"
+                    onClick={isRecording ? onOpenRecordModal : onToggleRecording}
+                    className={`p-1 text-xs font-mono font-bold border border-black cursor-pointer shadow-[1px_1px_0px_#000000] flex items-center justify-center transition-colors ${
+                      isRecording ? 'bg-black text-white' : 'bg-white hover:bg-neutral-100 text-black'
+                    }`}
+                    title={isRecording ? `Grabando: ${recordedCount} ejercicios. Clic para ver o exportar.` : "Activar grabación (Modo Récord)"}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-neutral-400'}`} />
+                    <span className="text-[9px] ml-0.5">{isRecording ? `REC(${recordedCount})` : 'REC'}</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => {
                       setAutoAdvanceCountdown(null);
-                      setShowReportModal(true);
+                      setShowQuickCommentModal(true);
                     }}
                     className={`p-1 text-xs font-bold border border-black cursor-pointer shadow-[1px_1px_0px_#000000] flex items-center justify-center transition-colors ${
                       userNote.trim() ? 'bg-black text-white' : 'bg-white hover:bg-neutral-100'
                     }`}
-                    title={userNote.trim() ? `Nota: "${userNote}"` : "Añadir comentario (Modo Récord)"}
+                    title={userNote.trim() ? `Nota: "${userNote}"` : "Añadir comentario a este ejercicio (Modo Récord)"}
                   >
                     <MessageSquare className="w-3.5 h-3.5 stroke-[2.5]" />
                   </button>
@@ -1697,6 +1720,19 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                   </button>
                 )}
 
+                {/* Botón Modo Récord antes de evaluar */}
+                <button
+                  type="button"
+                  onClick={isRecording ? onOpenRecordModal : onToggleRecording}
+                  className={`px-2 py-1 text-xs font-mono font-bold border border-black cursor-pointer shadow-[1px_1px_0px_#000000] flex items-center gap-1 transition-colors ${
+                    isRecording ? 'bg-black text-white' : 'bg-white hover:bg-neutral-100 text-black'
+                  }`}
+                  title={isRecording ? `Grabando: ${recordedCount} ejercicios. Clic para ver o exportar sesión` : "Activar grabación de sesión (Modo Récord)"}
+                >
+                  <span className={`w-2 h-2 rounded-full ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-neutral-400 border border-black'}`} />
+                  <span>{isRecording ? `REC (${recordedCount})` : 'REC'}</span>
+                </button>
+
                 {/* Botón Reporte accesible antes de evaluar (solo icono de triángulo) */}
                 <button
                   type="button"
@@ -1785,12 +1821,25 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                     <Activity className="w-3.5 h-3.5 stroke-[2.5]" />
                   </button>
 
+                  {/* BOTÓN MODO RÉCORD TRAS EVALUAR */}
+                  <button
+                    type="button"
+                    onClick={isRecording ? onOpenRecordModal : onToggleRecording}
+                    className={`px-2 py-1 text-xs font-mono font-bold border border-black cursor-pointer shadow-[1px_1px_0px_#000000] flex items-center gap-1 transition-colors ${
+                      isRecording ? 'bg-black text-white' : 'bg-white hover:bg-neutral-100 text-black'
+                    }`}
+                    title={isRecording ? `Grabando: ${recordedCount} ejercicios. Clic para ver o exportar sesión` : "Activar grabación de sesión (Modo Récord)"}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-neutral-400 border border-black'}`} />
+                    <span>{isRecording ? `REC (${recordedCount})` : 'REC'}</span>
+                  </button>
+
                   {/* BOTÓN RÁPIDO DE COMENTARIO (MODO RÉCORD) */}
                   <button
                     type="button"
                     onClick={() => {
                       setAutoAdvanceCountdown(null);
-                      setShowReportModal(true);
+                      setShowQuickCommentModal(true);
                     }}
                     className={`p-1.5 text-xs font-bold border border-black cursor-pointer shadow-[1px_1px_0px_#000000] flex items-center justify-center transition-colors ${
                       userNote.trim() ? 'bg-black text-white' : 'bg-white hover:bg-neutral-100 text-black'
@@ -2039,6 +2088,27 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
             </div>
           </div>
         )}
+
+        {/* MODAL RÁPIDO DE COMENTARIO PARA MODO RÉCORD */}
+        <QuickCommentModal
+          isOpen={showQuickCommentModal}
+          onClose={() => setShowQuickCommentModal(false)}
+          initialComment={userNote}
+          onSave={(comment) => {
+            setUserNote(comment);
+            onCommentChange?.(comment);
+          }}
+          nodeCode={challenge.code}
+          nodeTitle={challenge.title}
+          score={evaluation?.overallScore}
+          seed={challenge.seed}
+          phase={currentPhase}
+          isRecording={Boolean(isRecording)}
+          onStartRecordingAndSave={(comment) => {
+            setUserNote(comment);
+            onAddCurrentToRecording?.(comment);
+          }}
+        />
 
         {/* MODAL DE REPORTE DE EVALUACIÓN Y DEPURACIÓN */}
         {showReportModal && (

@@ -8,7 +8,6 @@ import {
   downloadConsolidatedJson,
 } from '../lib/sessionRecorder';
 import {
-  FileText,
   Copy,
   Download,
   Trash2,
@@ -20,18 +19,26 @@ import {
   ChevronUp,
   X,
   Edit2,
+  Radio,
+  Info,
 } from 'lucide-react';
 
 interface SessionRecordPanelProps {
   records: SessionRecordItem[];
   onRecordsChange: (records: SessionRecordItem[]) => void;
   onClearRecords: () => void;
+  isRecording?: boolean;
+  onToggleRecording?: () => void;
+  onClose?: () => void;
 }
 
 export const SessionRecordPanel: React.FC<SessionRecordPanelProps> = ({
   records,
   onRecordsChange,
   onClearRecords,
+  isRecording = false,
+  onToggleRecording,
+  onClose,
 }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState<string>('');
@@ -99,43 +106,79 @@ export const SessionRecordPanel: React.FC<SessionRecordPanelProps> = ({
 
   return (
     <div className="w-full border-2 border-black bg-white shadow-[3px_3px_0px_#000000] font-sans text-xs">
-      {/* 1. ENCABEZADO Y RESUMEN DE SESIÓN */}
+      {/* 1. ENCABEZADO Y CONTROL DE GRABACIÓN */}
       <div className="p-3 border-b-2 border-black bg-neutral-50">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between mb-2.5">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 border border-black bg-black text-white flex items-center justify-center shrink-0 shadow-[1px_1px_0px_#000000]">
-              <FileText className="w-3.5 h-3.5" />
+            <div className={`w-6 h-6 border border-black flex items-center justify-center shrink-0 shadow-[1px_1px_0px_#000000] ${
+              isRecording ? 'bg-black text-white' : 'bg-neutral-200 text-black'
+            }`}>
+              <Radio className="w-3.5 h-3.5" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="font-display font-bold text-xs uppercase tracking-tight text-black">
                   Modo Récord
                 </span>
-                <span className="px-1.5 py-0.2 bg-black text-white font-mono font-bold text-[9px] uppercase shadow-[1px_1px_0px_#000000]">
-                  REC ({totalExercises})
+                <span className={`px-1.5 py-0.2 border border-black font-mono font-bold text-[9px] uppercase shadow-[1px_1px_0px_#000000] flex items-center gap-1 ${
+                  isRecording ? 'bg-black text-white' : 'bg-white text-neutral-600'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${
+                    isRecording ? 'bg-red-500 animate-pulse' : 'bg-neutral-400'
+                  }`} />
+                  {isRecording ? `REC (${totalExercises})` : 'PAUSADO'}
                 </span>
               </div>
               <span className="text-[10px] text-neutral-500 font-mono block">
-                Historial y notas de sesión
+                Sesión temporal en memoria
               </span>
             </div>
           </div>
 
-          {totalExercises > 0 && (
-            <button
-              type="button"
-              onClick={() => {
-                if (window.confirm('¿Deseas vaciar todos los ejercicios registrados de esta sesión?')) {
-                  clearSessionRecords();
-                  onClearRecords();
-                }
-              }}
-              className="p-1.5 border border-black text-neutral-500 hover:text-black hover:bg-neutral-200 transition-colors cursor-pointer shadow-[1px_1px_0px_#000000]"
-              title="Vaciar registro de sesión"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          )}
+          <div className="flex items-center gap-1.5">
+            {onToggleRecording && (
+              <button
+                type="button"
+                onClick={onToggleRecording}
+                className={`px-2 py-1 border border-black text-[10px] font-mono font-bold flex items-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000000] transition-colors ${
+                  isRecording
+                    ? 'bg-neutral-200 hover:bg-neutral-300 text-black'
+                    : 'bg-black hover:bg-neutral-800 text-white'
+                }`}
+                title={isRecording ? 'Pausar grabación' : 'Activar grabación'}
+              >
+                <span className={`w-2 h-2 rounded-full ${isRecording ? 'bg-red-600' : 'bg-white'}`} />
+                <span>{isRecording ? 'Pausar' : 'Grabar'}</span>
+              </button>
+            )}
+
+            {totalExercises > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('¿Deseas vaciar todos los ejercicios registrados de esta sesión?')) {
+                    clearSessionRecords();
+                    onClearRecords();
+                  }
+                }}
+                className="p-1.5 border border-black text-neutral-500 hover:text-black hover:bg-neutral-200 transition-colors cursor-pointer shadow-[1px_1px_0px_#000000]"
+                title="Vaciar registro de sesión"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+
+            {onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-1.5 border border-black hover:bg-neutral-200 cursor-pointer shadow-[1px_1px_0px_#000000]"
+                title="Cerrar panel"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Resumen rápido de métricas */}
@@ -157,10 +200,18 @@ export const SessionRecordPanel: React.FC<SessionRecordPanelProps> = ({
             </div>
           </div>
         ) : (
-          <div className="bg-white border border-dashed border-neutral-300 p-2.5 text-center text-[10px] text-neutral-500 font-sans">
-            Cada ejercicio que dibujas y compruebas se registra aquí automáticamente. No necesitas exportar uno a uno: anota los que quieras y expórtalos todos juntos.
+          <div className="bg-white border border-dashed border-neutral-300 p-2.5 text-center text-[10px] text-neutral-600 font-sans">
+            {isRecording
+              ? '🔴 Grabación activa: cada ejercicio que dibujes y compruebes se guardará aquí automáticamente. ¡Dibuja tranquilamente!'
+              : 'Pulsa el botón "Grabar" para activar el Modo Récord. Cuando acabes, expórtalos todos juntos sin ir uno a uno.'}
           </div>
         )}
+
+        {/* Nota informativa de no-persistencia al reiniciar */}
+        <div className="mt-2 text-[9px] font-mono text-neutral-500 flex items-center gap-1">
+          <Info className="w-3 h-3 shrink-0" />
+          <span>La sesión se limpia automáticamente si recargas la web sin exportar.</span>
+        </div>
 
         {/* Botones de Exportación Consolidada */}
         {totalExercises > 0 && (
@@ -179,7 +230,7 @@ export const SessionRecordPanel: React.FC<SessionRecordPanelProps> = ({
               ) : (
                 <>
                   <Copy className="w-3.5 h-3.5" />
-                  <span>Copiar Reporte</span>
+                  <span>Exportar Sesión</span>
                 </>
               )}
             </button>
@@ -207,13 +258,15 @@ export const SessionRecordPanel: React.FC<SessionRecordPanelProps> = ({
       </div>
 
       {/* 2. LISTA DE EJERCICIOS REGISTRADOS */}
-      <div className="p-2 space-y-2 max-h-[500px] overflow-y-auto">
+      <div className="p-2 space-y-2 max-h-[480px] overflow-y-auto">
         {records.length === 0 ? (
           <div className="p-6 text-center text-neutral-400 font-mono text-[11px]">
             <Sparkles className="w-8 h-8 mx-auto mb-2 text-neutral-300 stroke-[1.5]" />
             <p className="font-bold text-neutral-600 mb-1">Sin ejercicios en esta sesión</p>
             <p className="text-[10px] text-neutral-500 font-sans">
-              Dibuja en El Camino o en el Reto Diario para que tus ejercicios aparezcan aquí.
+              {isRecording
+                ? 'Dibuja en El Camino o en el Reto Diario para que tus ejercicios aparezcan aquí.'
+                : 'Activa la grabación (REC) para empezar a guardar tus ejercicios.'}
             </p>
           </div>
         ) : (

@@ -61,7 +61,6 @@ import {
 } from './lib/dailyChallenge';
 import {
   SessionRecordItem,
-  loadSessionRecords,
   addSessionRecord,
   updateSessionRecordComment,
 } from './lib/sessionRecorder';
@@ -221,14 +220,35 @@ export function App() {
 
   // Modo de práctica en la barra lateral: 'camino' (por defecto), 'daily' (reto diario), o 'record' (modo récord de sesión)
   const [practiceMode, setPracticeMode] = useState<'camino' | 'daily' | 'record'>('camino');
-  // Registro de ejercicios de la sesión (Modo Récord)
-  const [sessionRecords, setSessionRecords] = useState<SessionRecordItem[]>(() => loadSessionRecords());
+  // Estado de grabación activa del Modo Récord (por defecto inactivo al entrar o recargar)
+  const [isRecording, setIsRecording] = useState<boolean>(false);
+  // Visibilidad del modal flotante de Modo Récord
+  const [isRecordModalOpen, setIsRecordModalOpen] = useState<boolean>(false);
+  // Registro de ejercicios de la sesión (Modo Récord) - 100% volátil en memoria
+  const [sessionRecords, setSessionRecords] = useState<SessionRecordItem[]>([]);
+  // Referencia al último ejercicio evaluado para poder guardarlo con comentario si el usuario activa REC a posteriori
+  const lastEvaluatedRecordRef = useRef<SessionRecordItem | null>(null);
 
   const handleUpdateLatestRecordComment = (comment: string) => {
     setSessionRecords((prev) => {
       if (prev.length === 0) return prev;
       return updateSessionRecordComment(prev[0].id, comment, prev);
     });
+  };
+
+  const handleStartRecordingAndAddCurrent = (comment: string = '') => {
+    setIsRecording(true);
+    if (lastEvaluatedRecordRef.current) {
+      const trimmed = comment.trim();
+      const recordToAdd: SessionRecordItem = {
+        ...lastEvaluatedRecordRef.current,
+        userComment: trimmed,
+        reportMarkdown: trimmed
+          ? `### NOTA DEL USUARIO:\n> ${trimmed}\n\n${lastEvaluatedRecordRef.current.reportMarkdown}`
+          : lastEvaluatedRecordRef.current.reportMarkdown,
+      };
+      setSessionRecords((prev) => addSessionRecord(recordToAdd, prev));
+    }
   };
 
   // Colapso de la barra lateral izquierda (por defecto oculta en modo enfoque)
@@ -622,14 +642,14 @@ export function App() {
     const recordedScore = Math.round(evalResult.overallScore);
     setScoresHistory((prev) => [...prev.slice(-19), recordedScore]);
 
-    // 1. Guardar en el Modo Récord (registro de sesión de ejercicios y notas)
+    // 1. Guardar en el Modo Récord si la grabación está activa
     const reportMd = context?.reportMarkdown || '';
     const newRecord: SessionRecordItem = {
       id: `rec-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       timestamp: new Date().toISOString(),
       displayTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
       type: 'calisthenics',
-      nodeCode: activeNode?.code || '1.1',
+      nodeCode: dailySetSession ? `${dailySetSession.currentIndex + 1}/${dailySetSession.totalCount}` : (activeNode?.code || '1.1'),
       nodeTitle: activeNode?.title || 'Ejercicio de Trazo',
       seed: calisthenicsSeed,
       score: recordedScore,
@@ -639,7 +659,11 @@ export function App() {
       metricsSummary: `Rectitud: ${evalResult.metrics.straightnessScore}% · Puntería: ${evalResult.metrics.boundaryScore}%`,
       reportMarkdown: reportMd,
     };
-    setSessionRecords((prev) => addSessionRecord(newRecord, prev));
+    lastEvaluatedRecordRef.current = newRecord;
+
+    if (isRecording) {
+      setSessionRecords((prev) => addSessionRecord(newRecord, prev));
+    }
 
     // 2. Si hay un reto diario activo, registrar la nota de esta línea
     if (dailySetSession && !dailySetSession.isCompleted) {
@@ -811,14 +835,14 @@ export function App() {
 
     const currentScore = res.totalScore ?? res.score;
 
-    // 1. Guardar en el Modo Récord (registro de sesión de ejercicios y comentarios)
+    // 1. Guardar en el Modo Récord si la grabación está activa
     const cubeReport = buildDebugReport(challenge, strokes, res, activeNode);
     const newRecord: SessionRecordItem = {
       id: `rec-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       timestamp: new Date().toISOString(),
       displayTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
       type: 'cube',
-      nodeCode: activeNode?.code || '3D',
+      nodeCode: dailySetSession ? `${dailySetSession.currentIndex + 1}/${dailySetSession.totalCount}` : (activeNode?.code || '3D'),
       nodeTitle: activeNode?.title || 'Cubo en Perspectiva',
       seed: challenge.seed,
       score: currentScore,
@@ -828,7 +852,11 @@ export function App() {
       reportMarkdown: cubeReport.markdownText,
       reportJsonString: cubeReport.jsonString,
     };
-    setSessionRecords((prev) => addSessionRecord(newRecord, prev));
+    lastEvaluatedRecordRef.current = newRecord;
+
+    if (isRecording) {
+      setSessionRecords((prev) => addSessionRecord(newRecord, prev));
+    }
 
     // 2. Registrar puntuación en el reto diario activo si existe
     if (dailySetSession && !dailySetSession.isCompleted) {
@@ -1178,8 +1206,38 @@ export function App() {
             </button>
           </nav>
 
-          {/* Estadísticas de Gamificación & Hojas A4 en Desktop (>= lg) */}
+          {/* Estadísticas de Gamificación, Modo Récord & Hojas A4 en Desktop (>= lg) */}
           <div className="hidden lg:flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Botón Modo Récord (REC) */}
+            <button
+              type="button"
+              onClick={() => {
+                if (!isRecording) {
+                  setIsRecording(true);
+                  showToast('🔴', 'Modo Récord Activado', 'Cada ejercicio que completes se guardará en esta sesión temporal.', 'Ver', () => setIsRecordModalOpen(true));
+                } else {
+                  setIsRecordModalOpen(true);
+                }
+              }}
+              className={`px-2 sm:px-2.5 py-1 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer border-2 border-black transition-colors shadow-[2px_2px_0px_#000000] ${
+                isRecording
+                  ? 'bg-black text-white hover:bg-neutral-800'
+                  : 'bg-white hover:bg-neutral-100 text-black'
+              }`}
+              title={
+                isRecording
+                  ? `Modo Récord ACTIVO (${sessionRecords.length} ejercicios). Clic para ver o exportar sesión.`
+                  : 'Activar Modo Récord para guardar todos los ejercicios de la sesión'
+              }
+            >
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  isRecording ? 'bg-red-500 animate-pulse' : 'bg-neutral-400 border border-black'
+                }`}
+              />
+              <span>{isRecording ? `REC (${sessionRecords.length})` : 'REC'}</span>
+            </button>
+
             <button
               onClick={() => setShowAnalogModal(true)}
               className="btn-ink-outline px-2 sm:px-2.5 py-1 text-xs flex items-center gap-1 cursor-pointer font-mono"
@@ -1238,8 +1296,28 @@ export function App() {
             </a>
           </div>
 
-          {/* Barra de Acciones Móvil (< lg): Racha + Nivel + Botón Hamburguesa */}
+          {/* Barra de Acciones Móvil (< lg): REC + Racha + Nivel + Botón Hamburguesa */}
           <div className="flex lg:hidden items-center gap-1.5 shrink-0">
+            {/* REC Button en móvil */}
+            <button
+              type="button"
+              onClick={() => {
+                if (!isRecording) {
+                  setIsRecording(true);
+                  showToast('🔴', 'Modo Récord Activado', 'Cada ejercicio se guardará en esta sesión.');
+                } else {
+                  setIsRecordModalOpen(true);
+                }
+              }}
+              className={`flex items-center gap-1 border-2 border-black px-1.5 py-1 text-[11px] font-mono font-bold shadow-[1px_1px_0px_#000000] cursor-pointer ${
+                isRecording ? 'bg-black text-white' : 'bg-white text-black'
+              }`}
+              title={isRecording ? `Grabando (${sessionRecords.length}). Clic para ver o exportar` : 'Activar Modo Récord'}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-neutral-400'}`} />
+              <span>{isRecording ? `REC(${sessionRecords.length})` : 'REC'}</span>
+            </button>
+
             {/* Racha compacta */}
             <div
               onClick={() => setStreakModalState({ isOpen: true, isNewDayAward: false })}
@@ -1568,6 +1646,9 @@ export function App() {
                   >
                     <FileText className="w-3 h-3" />
                     <span className="truncate">Récord</span>
+                    {isRecording && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse shrink-0" />
+                    )}
                     {sessionRecords.length > 0 && (
                       <span className={`text-[8px] font-mono font-black px-1 rounded-full ${
                         practiceMode === 'record' ? 'bg-white text-black' : 'bg-black text-white'
@@ -1660,6 +1741,8 @@ export function App() {
                     records={sessionRecords}
                     onRecordsChange={setSessionRecords}
                     onClearRecords={() => setSessionRecords([])}
+                    isRecording={isRecording}
+                    onToggleRecording={() => setIsRecording((prev) => !prev)}
                   />
                 )}
 
@@ -1722,6 +1805,11 @@ export function App() {
                     isDailyChallenge={Boolean(dailySetSession && !dailySetSession.isCompleted)}
                     dailyProgress={dailySetSession ? { current: dailySetSession.currentIndex + 1, total: dailySetSession.totalCount } : undefined}
                     onCommentChange={handleUpdateLatestRecordComment}
+                    isRecording={isRecording}
+                    recordedCount={sessionRecords.length}
+                    onToggleRecording={() => setIsRecording((prev) => !prev)}
+                    onOpenRecordModal={() => setIsRecordModalOpen(true)}
+                    onAddCurrentToRecording={handleStartRecordingAndAddCurrent}
                   />
                 ) : (
                   <DrawingCanvas
@@ -1742,6 +1830,11 @@ export function App() {
                     isDailyChallenge={Boolean(dailySetSession && !dailySetSession.isCompleted)}
                     dailyProgress={dailySetSession ? { current: dailySetSession.currentIndex + 1, total: dailySetSession.totalCount } : undefined}
                     onCommentChange={handleUpdateLatestRecordComment}
+                    isRecording={isRecording}
+                    recordedCount={sessionRecords.length}
+                    onToggleRecording={() => setIsRecording((prev) => !prev)}
+                    onOpenRecordModal={() => setIsRecordModalOpen(true)}
+                    onAddCurrentToRecording={handleStartRecordingAndAddCurrent}
                   />
                 )}
               </div>
@@ -1889,6 +1982,41 @@ export function App() {
             setLevelCompletionModal({ isOpen: false, completedNode: null, nextNode: null, score: 0 });
           }}
         />
+      )}
+      {/* Modal de Sesión de Grabación (Modo Récord) */}
+      {isRecordModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 animate-fade-in font-sans">
+          <div className="bg-white border-4 border-black max-w-xl w-full shadow-[8px_8px_0px_#000000] flex flex-col max-h-[90vh] overflow-hidden">
+            <div className="p-3 border-b-2 border-black flex items-center justify-between bg-neutral-100">
+              <div className="flex items-center gap-2">
+                <span className={`w-3 h-3 rounded-full border border-black ${
+                  isRecording ? 'bg-red-500 animate-pulse' : 'bg-neutral-400'
+                }`} />
+                <h2 className="font-display font-bold text-sm sm:text-base uppercase tracking-tight">
+                  Sesión de Grabación {isRecording ? '(REC Activo)' : '(Pausado)'}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsRecordModalOpen(false)}
+                className="p-1 border border-black hover:bg-neutral-200 cursor-pointer shadow-[1px_1px_0px_#000000]"
+                title="Cerrar modal"
+              >
+                <X className="w-4 h-4 text-black stroke-[2.5]" />
+              </button>
+            </div>
+            <div className="overflow-y-auto flex-1 p-2 sm:p-3">
+              <SessionRecordPanel
+                records={sessionRecords}
+                onRecordsChange={setSessionRecords}
+                onClearRecords={() => setSessionRecords([])}
+                isRecording={isRecording}
+                onToggleRecording={() => setIsRecording((prev) => !prev)}
+                onClose={() => setIsRecordModalOpen(false)}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -3,6 +3,7 @@ import { CubeChallenge, Point2D } from '../lib/geometry';
 import { UserStroke, ValidationFeedback, countDetectedAristas } from '../lib/validation';
 import { Undo2, Trash2, Check, ArrowRight, AlertTriangle, CheckCircle, Clock, Zap, Copy, Download, X, Pen, Hand, ArrowDown, ArrowUp, Eye, EyeOff, FileText, PanelLeft, MessageSquare } from 'lucide-react';
 import { buildDebugReport, copyReportToClipboard, downloadReportJson } from '../lib/debugReport';
+import { QuickCommentModal } from './QuickCommentModal';
 
 /**
  * Dibuja trama manga screentone bilineal en perspectiva sobre una cara cuadrilátera
@@ -153,6 +154,11 @@ export interface DrawingCanvasProps {
   isDailyChallenge?: boolean;
   dailyProgress?: { current: number; total: number };
   onCommentChange?: (comment: string) => void;
+  isRecording?: boolean;
+  recordedCount?: number;
+  onToggleRecording?: () => void;
+  onOpenRecordModal?: () => void;
+  onAddCurrentToRecording?: (comment?: string) => void;
 }
 
 const TOTAL_COUNTDOWN_SECONDS = 30;
@@ -175,6 +181,11 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((p
     isDailyChallenge = false,
     dailyProgress,
     onCommentChange,
+    isRecording = false,
+    recordedCount = 0,
+    onToggleRecording,
+    onOpenRecordModal,
+    onAddCurrentToRecording,
   } = props;
 
   const [internalIsLandscape, setInternalIsLandscape] = useState<boolean>(() => {
@@ -222,6 +233,7 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((p
 
   // Estados para el reporte y diagnóstico del cubo con notas del usuario
   const [showReportModal, setShowReportModal] = useState<boolean>(false);
+  const [showQuickCommentModal, setShowQuickCommentModal] = useState<boolean>(false);
   const [userNote, setUserNote] = useState<string>('');
   const [copiedReport, setCopiedReport] = useState<boolean>(false);
   const [downloadedReport, setDownloadedReport] = useState<boolean>(false);
@@ -1101,11 +1113,21 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((p
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
                 <button
-                  onClick={handleOpenReportModal}
+                  onClick={isRecording ? onOpenRecordModal : onToggleRecording}
+                  className={`btn-ink-outline p-1 text-xs font-mono font-bold flex items-center justify-center cursor-pointer shadow-[1px_1px_0px_#000000] ${
+                    isRecording ? 'bg-black text-white' : 'bg-white text-black'
+                  }`}
+                  title={isRecording ? `Grabando: ${recordedCount} ejercicios. Clic para ver o exportar.` : "Activar grabación (Modo Récord)"}
+                >
+                  <span className={`w-2 h-2 rounded-full ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-neutral-400'}`} />
+                  <span className="text-[9px] ml-0.5">{isRecording ? `REC(${recordedCount})` : 'REC'}</span>
+                </button>
+                <button
+                  onClick={() => setShowQuickCommentModal(true)}
                   className={`btn-ink-outline p-1 text-xs font-mono font-bold flex items-center justify-center cursor-pointer shadow-[1px_1px_0px_#000000] ${
                     userNote.trim() ? 'bg-black text-white' : ''
                   }`}
-                  title={userNote.trim() ? `Nota: "${userNote}"` : "Añadir comentario (Modo Récord)"}
+                  title={userNote.trim() ? `Nota: "${userNote}"` : "Añadir comentario a este cubo (Modo Récord)"}
                 >
                   <MessageSquare className="w-3.5 h-3.5 stroke-[2.5]" />
                 </button>
@@ -1332,8 +1354,20 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((p
               </span>
             </div>
 
-            {/* Lado Derecho: Reporte y Comprobar */}
+            {/* Lado Derecho: REC, Reporte y Comprobar */}
             <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={isRecording ? onOpenRecordModal : onToggleRecording}
+                className={`px-2 py-1 text-xs font-mono font-bold border border-black cursor-pointer shadow-[1px_1px_0px_#000000] flex items-center gap-1 transition-colors ${
+                  isRecording ? 'bg-black text-white' : 'bg-white hover:bg-neutral-100 text-black'
+                }`}
+                title={isRecording ? `Grabando: ${recordedCount} ejercicios. Clic para ver o exportar sesión` : "Activar grabación de sesión (Modo Récord)"}
+              >
+                <span className={`w-2 h-2 rounded-full ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-neutral-400 border border-black'}`} />
+                <span>{isRecording ? `REC (${recordedCount})` : 'REC'}</span>
+              </button>
+
               <button
                 onClick={handleOpenReportModal}
                 className="btn-ink-outline p-1.5 text-xs font-mono font-bold flex items-center gap-1 cursor-pointer transition-transform active:scale-95 shadow-[1px_1px_0px_#000000] shrink-0"
@@ -1419,9 +1453,22 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((p
             {/* Fila 2: Diagnóstico/Reporte a la izquierda y Botón Siguiente a la derecha */}
             <div className="flex items-center justify-between gap-1.5 pt-0.5 w-full">
               <div className="flex items-center gap-1.5 shrink-0">
+                {/* Botón Modo Récord tras evaluar */}
+                <button
+                  type="button"
+                  onClick={isRecording ? onOpenRecordModal : onToggleRecording}
+                  className={`px-2 py-1 text-xs font-mono font-bold border border-black cursor-pointer shadow-[1px_1px_0px_#000000] flex items-center gap-1 transition-colors ${
+                    isRecording ? 'bg-black text-white' : 'bg-white hover:bg-neutral-100 text-black'
+                  }`}
+                  title={isRecording ? `Grabando: ${recordedCount} ejercicios. Clic para ver o exportar sesión` : "Activar grabación de sesión (Modo Récord)"}
+                >
+                  <span className={`w-2 h-2 rounded-full ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-neutral-400 border border-black'}`} />
+                  <span>{isRecording ? `REC (${recordedCount})` : 'REC'}</span>
+                </button>
+
                 {/* Botón Rápido de Comentario (Modo Récord) */}
                 <button
-                  onClick={handleOpenReportModal}
+                  onClick={() => setShowQuickCommentModal(true)}
                   className={`btn-ink-outline p-1.5 text-xs font-mono font-bold flex items-center gap-1 cursor-pointer transition-transform active:scale-95 shadow-[1px_1px_0px_#000000] shrink-0 ${
                     userNote.trim() ? 'bg-black text-white' : ''
                   }`}
@@ -1508,6 +1555,26 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((p
           </span>
         </div>
       )}
+
+      {/* Modal Rápido de Comentario para Modo Récord */}
+      <QuickCommentModal
+        isOpen={showQuickCommentModal}
+        onClose={() => setShowQuickCommentModal(false)}
+        initialComment={userNote}
+        onSave={(comment) => {
+          setUserNote(comment);
+          onCommentChange?.(comment);
+        }}
+        nodeCode={nodeCode || (activeLesson ? activeLesson.code || 'Cubo' : 'Cubo')}
+        nodeTitle={activeLesson?.title || challenge.mode}
+        score={feedback?.totalScore ?? feedback?.score}
+        seed={challenge.seed}
+        isRecording={Boolean(isRecording)}
+        onStartRecordingAndSave={(comment) => {
+          setUserNote(comment);
+          onAddCurrentToRecording?.(comment);
+        }}
+      />
 
       {/* Modal de Reporte de Depuración y Diagnóstico con Notas */}
       {showReportModal && (

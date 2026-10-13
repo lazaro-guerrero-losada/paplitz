@@ -6,6 +6,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.2.4] — 2026-10-13
+
+### ⏺️ Modo Récord Refinement: Active REC Toggle, Volatile Session Lifetime & Quick Commenting
+
+#### ⏺️ Active REC Toggle Workflow (`App.tsx`, `StrokePracticeCanvas.tsx`, `DrawingCanvas.tsx`, `SessionRecordPanel.tsx`)
+- **🔘 Explicit REC Toggle**: Added an active toggle REC button (`[ ⏺ REC ]` ➔ `[ 🔴 REC (N) ]`) across all main interfaces:
+  - **Desktop Header**: Prominent toggle button with live count and pulsing red status indicator.
+  - **Mobile Header**: Compact header badge allowing 1-tap activation and access on phones.
+  - **Canvas Action Bars**: Available both before evaluating and after evaluating in both Calisthenics (`StrokePracticeCanvas`) and 3D Cubes (`DrawingCanvas`), in portrait and landscape orientations.
+  - **Sidebar / Drawer Panel**: Dedicated toggle in `SessionRecordPanel` allowing instant pausing or resuming.
+- **🔒 Active-Only Recording**: Exercises are only recorded to the session log while REC is toggled ON, preventing accidental accumulation. If the user draws while REC is off, the session remains completely unaffected.
+
+#### 💨 Volatile In-Memory Session Lifetime (Zero Persistence on Reload) (`sessionRecorder.ts`, `App.tsx`)
+- **🗑️ Auto-Wipe on Refresh**: Session records are kept strictly in React volatile memory. If the user refreshes (`F5`), reloads, or restarts the browser without exporting, the session is cleared automatically to `[]` and REC resets to inactive.
+- **🧹 Legacy LocalStorage Purge**: Completely eliminated `localStorage` reads/writes for session records and pro-actively removes any leftover `paplitz_session_records` keys from previous versions.
+
+#### 💬 Instant Quick Comment Modal (`QuickCommentModal.tsx`)
+- **⚡ 1-Tap Per-Exercise Commenting**: Clicking the speech bubble button (`💬`) immediately opens a lightweight dedicated modal (`QuickCommentModal`) focused exclusively on note-taking:
+  - Displays exercise code, seed, and score.
+  - Pre-filled with existing comment (if any).
+  - Quick-tag pills for instant insertion (`+Nota injusta`, `+Trazo tembloroso`, `+Fallo de velocidad`, `+Sentido invertido`, `+Dianas desalineadas`, `+Buena sensación`).
+  - Automatically pauses auto-advance while editing.
+- **✨ Retroactive REC Activation**: If the user completed an exercise while REC was off and clicks to add a comment, the modal offers a 1-tap option to activate REC and save that exercise along with the note.
+
+#### 📋 Consolidated Session Export Modal (`App.tsx`, `SessionRecordPanel.tsx`)
+- **🪟 Centered Session Overlay**: Clicking the active `[ 🔴 REC (N) ]` button anywhere opens a modal dialog over the canvas without losing the drawing context:
+  - One-click `[ 📋 Exportar Sesión ]` copies the entire Markdown table, diagnostics, and per-exercise notes to the clipboard ready to paste into chat.
+  - `[ 💾 Descargar JSON ]` exports raw JSON diagnostics.
+  - In-line comment editing and deletion for any exercise in the session.
+
+---
+
 ## [0.2.3] — 2026-10-13
 
 ### 🎯 Reto Diario (Daily Habit Set) Refinements & 📋 Modo Récord (Session Recorder)
