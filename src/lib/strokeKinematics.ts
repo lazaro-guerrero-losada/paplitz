@@ -65,13 +65,28 @@ export function getUserSpeedProfile(): UserSpeedProfile {
 }
 
 /**
- * Guarda y actualiza la media adaptativa del usuario por dirección biomecánica
+ * Guarda y actualiza la media adaptativa del usuario por dirección biomecánica.
+ * Ignora trazos con mala geometría para no envenenar la media de velocidad con barridos descontrolados.
  */
-export function recordStrokeSpeed(direction: StrokeDirection | string, speedPxPerSec: number): UserSpeedProfile {
+export function recordStrokeSpeed(
+  direction: StrokeDirection | string,
+  speedPxPerSec: number,
+  qualityOptions?: { straightnessScore?: number; boundaryScore?: number }
+): UserSpeedProfile {
   const profile = getUserSpeedProfile();
   if (speedPxPerSec <= 40 || speedPxPerSec > 3500) {
     // Descartar valores atípicos (clicks erróneos o saltos de puntero)
     return profile;
+  }
+
+  // Descartar trazos descontrolados o con mala geometría para no contaminar la media adaptativa
+  if (qualityOptions) {
+    if (
+      (qualityOptions.straightnessScore !== undefined && qualityOptions.straightnessScore < 60) ||
+      (qualityOptions.boundaryScore !== undefined && qualityOptions.boundaryScore < 55)
+    ) {
+      return profile;
+    }
   }
 
   const dirKey = direction || 'general';
@@ -219,8 +234,8 @@ export function analyzeStrokeKinematics(
     }
   } else if (currentPhase === 2) {
     // FASE 2: RITMO Y FLUIDEZ
-    // Exige velocidad continua de dibujo sin titubeos ni micro-paradas (fluidez >= 60% y velocidad sostenida >= 220 px/s o 60% baseline)
-    const minSpeed = Math.max(220, Math.round(userBaseline * 0.60));
+    // Exige velocidad continua de dibujo sin titubeos ni micro-paradas (fluidez >= 60% y velocidad sostenida >= 200 px/s o 55% baseline, hasta un tope razonable de 380 px/s)
+    const minSpeed = Math.min(380, Math.max(200, Math.round(userBaseline * 0.55)));
     phaseRequirementText = `Fase 2: Trazo continuo y fluido (≥${minSpeed} px/s sin vacilaciones)`;
     phasePassed = fluencyScore >= 60 && avgSpeedPxPerSec >= minSpeed && microStopCount <= 2;
 
@@ -233,8 +248,8 @@ export function analyzeStrokeKinematics(
     }
   } else {
     // FASE 3: VELOCIDAD Y DISPARO BALÍSTICO
-    // Exige golpe decidido y rápido con buen impulso reflejo (>= 360 px/s o 95% baseline)
-    const targetFastSpeed = Math.max(360, Math.round(userBaseline * 0.95));
+    // Exige golpe decidido y rápido con buen impulso reflejo (≥340 px/s o 85% baseline, con un tope saludable de 520 px/s para evitar descontrol)
+    const targetFastSpeed = Math.min(520, Math.max(340, Math.round(userBaseline * 0.85)));
     const maxDurationMs = Math.max(700, Math.round(totalLength * 1.8));
     phaseRequirementText = `Fase 3: Trazo balístico rápido (≥${targetFastSpeed} px/s en ≤${maxDurationMs}ms)`;
     phasePassed = avgSpeedPxPerSec >= targetFastSpeed && durationMs <= maxDurationMs;

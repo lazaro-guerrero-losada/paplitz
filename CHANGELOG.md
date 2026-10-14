@@ -4,6 +4,49 @@ All notable changes, new features, bug fixes, and UX improvements to the Paplitz
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.6] — 2026-10-14
+
+### 🎯 Biomechanical Stroke Evaluation Calibration & Quality Engine Overhaul
+
+Based on empirical session data (#1 to #31 on C1.1 V2), this release resolves multiple systemic inconsistencies, eliminates score inflation on crooked/wavy strokes ("fast banana" bug), synchronizes evaluator pass gates with App progression thresholds, and prevents the adaptive speed baseline runaway trap.
+
+#### 🍌 Anti-Inflation & Straightness Dominance ("Fast Banana" Fix) (`strokeEvaluator.ts`)
+- **Root Problem**: Previously, strokes with catastrophic straightness flaws (e.g. 36% in Exercise #25, 40% in Exercise #1, 18% in Exercise #15) received inflated marks (up to 86%) because start/end endpoint accuracy was double-counted (40% boundary + 25% parallelism), while straightness only accounted for 35% of geometry and merely 21% of Phase 3 overall score ($0.35 \times 0.60$).
+- **Rebalanced Geometric Weighting**:
+  - `straightnessScore`: Increased from 35% to **50%** (dominant quality pillar of a straight line).
+  - `boundaryScore`: Rebalanced from 40% to **35%**, combining average endpoint error and worst-case endpoint penalty to prevent a 3px start from masking a 31px overshoot/undershoot.
+  - `parallelismScore`: Reduced from 25% to **15%** (eliminates angular redundancy with start/end targets).
+- **Non-Linear Quality Capping**:
+  - If `straightnessScore < 40%`: Geometric score is hard-capped at **45%** (wavy/bowed strokes can never pass).
+  - If `straightnessScore < 50%`: Hard-capped at **55%**.
+  - If `straightnessScore < 60%`: Hard-capped at **65%**.
+  - If `straightnessScore < 70%`: Hard-capped at **75%**.
+  - If `straightnessScore < 80%`: Hard-capped at **84%**.
+
+#### ⚡ Speed De-escalation & Biomechanical Ceiling (`strokeKinematics.ts`, `strokeEvaluator.ts`)
+- **Balanced Speed Weight in Phase 3**: Replaced the additive $60/40$ split with an $80/20$ ratio (`geometricScore * 0.80 + speedScore * 0.20`). Drawing fast is now a secondary bonus rather than an engine that hands out 40 free points to crooked strokes. If geometry is failing ($<86\%$), speed cannot artificially push the score into passing territory.
+- **Biomechanical Speed Cap (520 px/s Ceiling)**: Capped the Phase 3 target speed at $\le 520\text{ px/s}$ (`targetFastSpeed = Math.min(520, Math.max(340, userBaseline * 0.85))`). This eliminates the "moving goalposts trap" where a single 1000 px/s outlier stroke (Exercise #20) spiked the user baseline to 788 px/s and failed 8 consecutive controlled fast strokes (550–714 px/s).
+- **Phase 2 Steady Rhythm Cap**: Capped Phase 2 minimum speed at $\le 380\text{ px/s}$ (`Math.min(380, Math.max(200, userBaseline * 0.55))`).
+- **Baseline Speed Pollution Protection**: `recordStrokeSpeed` now requires acceptable geometry (`straightnessScore >= 60` and `boundaryScore >= 55`) to update the adaptive baseline, preventing wild or uncontrolled swipes from poisoning user metrics.
+
+#### 🔄 Universal Evaluator & App Progression Synchronization (`strokeEvaluator.ts`)
+- **Phase Threshold Alignment**: Exported and unified `getPhasePassingThreshold`:
+  - **Fase 1 (Precisión)**: $\ge 80\%$
+  - **Fase 2 (Fluidez)**: $\ge 85\%$
+  - **Fase 3 (Velocidad)**: $\ge 90\%$
+- **Eliminated False "Aprobado" Bug**: Previously, the evaluator hardcoded 75% as passing, marking strokes of 79%, 82%, 83%, 84% as `✅ Aprobado` / `Superado: SÍ` in the UI while `App.tsx` secretly reset the user's mastery streak to 0. The evaluator now strictly checks the active phase's target threshold across all evaluators (`evaluateSingleStrokeSubmission`, `evaluateMultiLineSubmission`, `evaluateMultiStrokeConnected`, `evaluateBoxTracing`, `evaluateHatchingExercise`, `evaluateCrossHatching`, `evaluateShadingGradation`).
+- **Resolved "91% ❌ A mejorar" Contradiction**: If a strict gate fails (e.g. insufficient speed or straightness $<60\%$), the displayed overall score is automatically capped below the passing threshold (`targetThreshold - 3`), preventing the confusing juxtaposition of an "A" grade mark with a red failure badge.
+
+#### 🎯 Calibrated Endpoint Error Tolerances (`strokeEvaluator.ts`)
+- **Phase-Specific Endpoint Gates**:
+  - **Fase 1**: Max allowed error: Start 30px, End 34px.
+  - **Fase 2**: Max allowed error: Start 22px, End 24px.
+  - **Fase 3**: Max allowed error: Start 24px, End 26px.
+  - Fixes Exercise #14, where a stroke stopping 34px short was previously marked as "Aprobado".
+- **Enhanced Debug Reports**: All generated reports in Markdown and text now display `Fase Activa: Fase X (Umbral Requerido: ≥Y% · Fase Superada: SÍ/NO)`, ensuring full diagnostic clarity for future audits.
+
+---
+
 ## [0.2.5] — 2026-10-13
 
 ### ⏱️ Auto-Advance Countdown Stability & Re-render Decoupling

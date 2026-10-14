@@ -284,6 +284,16 @@ export function calculateOpticalDensity(
 }
 
 /**
+ * Obtiene el umbral numérico de aprobación según la fase de motricidad activa:
+ * Fase 1 (Precisión): ≥80%
+ * Fase 2 (Fluidez): ≥85%
+ * Fase 3 (Velocidad): ≥90%
+ */
+export function getPhasePassingThreshold(phase: 1 | 2 | 3 = 1): number {
+  return phase === 1 ? 80 : phase === 2 ? 85 : 90;
+}
+
+/**
  * Evaluación instantánea de Calistenia de Trazo Único (Línea o Curva)
  */
 export function evaluateSingleStrokeSubmission(
@@ -356,10 +366,12 @@ export function evaluateSingleStrokeSubmission(
   const startErr = isReversed ? distStartTo2 : distStartTo1;
   const endErr = isReversed ? distEndTo1 : distEndTo2;
   const avgEndpointErr = (startErr + endErr) / 2;
-  // Margen de gracia de 6px; después penalización firme
-  let boundaryScore = Math.round(
-    Math.max(0, 100 - Math.max(0, avgEndpointErr - 6) * 2.4)
-  );
+  const maxEndpointErr = Math.max(startErr, endErr);
+
+  // Margen de gracia de 5px; después penalización equilibrando promedio y peor extremo
+  // Evita que un error catastrófico en un extremo quede enmascarado por un buen inicio
+  const endpointErrPenalty = Math.max(0, avgEndpointErr - 5) * 2.0 + Math.max(0, maxEndpointErr - 10) * 1.5;
+  let boundaryScore = Math.round(Math.max(0, 100 - endpointErrPenalty));
 
   // 5. Rectitud / Curvatura
   let straightnessScore = 100;
@@ -394,7 +406,8 @@ export function evaluateSingleStrokeSubmission(
   }
 
   // 6. Análisis Cinemático y Derivadas (Velocidad, Aceleración, Fluidez y Fase)
-  const activePhase = challenge.activePhase || 1;
+  const activePhase = (challenge.activePhase || 1) as 1 | 2 | 3;
+  const targetThreshold = getPhasePassingThreshold(activePhase);
   const directionKey =
     challenge.directionKey || (challenge.category === 'single_stroke_curve' ? 'curve_c' : 'general');
   const kinematics = analyzeStrokeKinematics(
@@ -404,36 +417,73 @@ export function evaluateSingleStrokeSubmission(
     challenge.targetLengthPx || 220
   );
 
-  // Si no está invertido y tiene un anclaje razonable, registrar la velocidad para nutrir el perfil adaptativo del usuario
-  if (!isReversed && boundaryScore >= 60) {
-    recordStrokeSpeed(directionKey, kinematics.avgSpeedPxPerSec);
+  // Si no está invertido y tiene un anclaje y rectitud razonable, registrar la velocidad para nutrir el perfil adaptativo del usuario
+  if (!isReversed && boundaryScore >= 60 && straightnessScore >= 60) {
+    recordStrokeSpeed(directionKey, kinematics.avgSpeedPxPerSec, { straightnessScore, boundaryScore });
   }
 
   // 7. Cálculo Global Ponderado según Fase de Motricidad
-  const geometricScore = Math.round(
-    boundaryScore * 0.40 + straightnessScore * 0.35 + parallelismScore * 0.25
+  // Rectitud es la habilidad reina de una línea recta (50%), Puntería en dianas (35%), Paralelismo/Ángulo (15%)
+  let geometricScore = Math.round(
+    straightnessScore * 0.50 + boundaryScore * 0.35 + parallelismScore * 0.15
   );
 
+  // Calidad no lineal: si la línea no es recta, no puede obtener una nota alta bajo ningún concepto
+  if (!isCurve) {
+    if (straightnessScore < 40) {
+      geometricScore = Math.min(geometricScore, 45);
+    } else if (straightnessScore < 50) {
+      geometricScore = Math.min(geometricScore, 55);
+    } else if (straightnessScore < 60) {
+      geometricScore = Math.min(geometricScore, 65);
+    } else if (straightnessScore < 70) {
+      geometricScore = Math.min(geometricScore, 75);
+    } else if (straightnessScore < 80) {
+      geometricScore = Math.min(geometricScore, 84);
+    }
+  }
+
   let overallScore = geometricScore;
-  let phasePassed = false;
 
   if (activePhase === 1) {
-    // Fase 1: Precisión pura de puntería y rectitud
+    // Fase 1: Precisión pura de puntería y rectitud (umbral ≥80%)
     overallScore = geometricScore;
-    phasePassed = overallScore >= 75 && kinematics.phasePassed;
   } else if (activePhase === 2) {
-    // Fase 2: Fluidez (70% Geometría + 30% Fluidez cinemática)
-    overallScore = Math.round(geometricScore * 0.70 + kinematics.fluencyScore * 0.30);
-    phasePassed = overallScore >= 75 && kinematics.phasePassed;
+    // Fase 2: Fluidez (75% Geometría + 25% Fluidez cinemática, umbral ≥85%)
+    overallScore = Math.round(geometricScore * 0.75 + kinematics.fluencyScore * 0.25);
   } else {
-    // Fase 3: Velocidad Balística (60% Geometría + 40% Velocidad Balística ponderada)
-    const targetFastSpeed = Math.max(360, Math.round(kinematics.userBaselineSpeedPxPerSec * 0.95));
+    // Fase 3: Velocidad Balística (80% Geometría + 20% Velocidad Balística, umbral ≥90%)
+    const targetFastSpeed = Math.min(520, Math.max(340, Math.round(kinematics.userBaselineSpeedPxPerSec * 0.85)));
     const speedRatio = kinematics.avgSpeedPxPerSec / targetFastSpeed;
     const speedScore = Math.min(100, Math.round(Math.max(0, speedRatio * 100)));
 
-    overallScore = Math.round(geometricScore * 0.60 + speedScore * 0.40);
-    phasePassed = overallScore >= 75 && kinematics.phasePassed;
+    overallScore = Math.round(geometricScore * 0.80 + speedScore * 0.20);
+
+    // La velocidad no puede rescatar una geometría insuficiente para la Fase 3
+    if (geometricScore < 86) {
+      overallScore = Math.min(overallScore, 87);
+    }
   }
+
+  // Tolerancias máximas de anclaje según fase
+  const maxStartErrAllowed = activePhase === 1 ? 30 : activePhase === 2 ? 22 : 24;
+  const maxEndErrAllowed = activePhase === 1 ? 34 : activePhase === 2 ? 24 : 26;
+
+  let failedGateReason: string | null = null;
+  if (isReversed) {
+    failedGateReason = 'reversed_direction';
+  } else if (startErr > maxStartErrAllowed || endErr > maxEndErrAllowed) {
+    failedGateReason = 'endpoint_error';
+  } else if (!isCurve && angleDiff > 20) {
+    failedGateReason = 'angle_error';
+  } else if (!isCurve && straightnessScore < 60) {
+    failedGateReason = 'straightness_error';
+  } else if (!kinematics.phasePassed) {
+    failedGateReason = 'kinematics_failed';
+  }
+
+  let phasePassed = !failedGateReason && overallScore >= targetThreshold;
+  let passed = phasePassed;
 
   let directionWarning: string | undefined;
   if (isReversed) {
@@ -442,19 +492,12 @@ export function evaluateSingleStrokeSubmission(
     straightnessScore = 0;
     parallelismScore = 0;
     phasePassed = false;
+    passed = false;
     directionWarning = '⚠️ DIRECCIÓN INVERTIDA: Has trazado en sentido contrario (de ② hacia ①). Debes iniciar en ① y proyectar hacia ②.';
-  }
-
-  // Criterios estrictos de aprobación (Geometría + Cinemática de Fase cumplida)
-  let passed = !isReversed && overallScore >= 75 && phasePassed;
-  if (startErr > 38 || endErr > 44) {
-    passed = false;
-  }
-  if (!isCurve && angleDiff > 20) {
-    passed = false;
-  }
-  if (!isCurve && straightnessScore < 60) {
-    passed = false;
+  } else if (!passed && overallScore >= targetThreshold) {
+    // Si la nota aritmética daba aprobada pero falló una compuerta estricta (ej. falta de velocidad o rectitud),
+    // recortar la nota final visible para eliminar contradicciones visuales (ej. 91% pero con 'Reintentar')
+    overallScore = targetThreshold - 3;
   }
 
   let feedbackTitle = '¡Buen Trazo!';
@@ -478,6 +521,16 @@ export function evaluateSingleStrokeSubmission(
       feedbackMessage = `${kinematics.speedDiagnosisLabel}. Velocidad: ${kinematics.avgSpeedPxPerSec} px/s. ${kinematics.phaseRequirementText}.`;
       tipMessage = 'Proyecta el movimiento con dos pasadas rápidas en el aire (ghosting) y dispara sin miedo con impulso balístico.';
       avatarMood = 'curious';
+    } else if (overallScore < targetThreshold) {
+      feedbackTitle = `Puntuación Insuficiente (Fase ${activePhase}) 🏹`;
+      feedbackMessage = `Nota: ${overallScore}% (Fase ${activePhase} requiere ≥${targetThreshold}%). Puntería: ${boundaryScore}%, Rectitud: ${straightnessScore}%.`;
+      tipMessage =
+        activePhase === 1
+          ? 'Haz 1 o 2 pasadas en el aire antes de tocar la pantalla (Ghosting).'
+          : activePhase === 2
+          ? 'Mantén un ritmo continuo sin frenar.'
+          : 'Dispara con impulso balístico rápido.';
+      avatarMood = 'curious';
     } else if (overallScore >= 50) {
       feedbackTitle = 'Cerca de la Diana 🏹';
       feedbackMessage = `Desviación en extremos (error: ${Math.round(avgEndpointErr)}px) o ángulo desviado (${Math.round(angleDiff)}°).`;
@@ -493,17 +546,17 @@ export function evaluateSingleStrokeSubmission(
     // Fase plenamente superada (Geometría + Cinemática)
     if (activePhase === 1) {
       feedbackTitle = '¡Fase 1 Superada: Puntería Diáfana! 🎯';
-      feedbackMessage = `Anclaje exacto (${boundaryScore}% puntería). ${kinematics.durationMs}ms a ${kinematics.avgSpeedPxPerSec} px/s.`;
+      feedbackMessage = `Anclaje exacto (${boundaryScore}% puntería, ${straightnessScore}% rectitud). Nota: ${overallScore}% (≥${targetThreshold}%).`;
       tipMessage = '¡Excelente! Ahora avanza a la Fase 2 (Fluidez) para mecanizar el ritmo.';
       avatarMood = overallScore >= 90 ? 'success-stars' : 'wink';
     } else if (activePhase === 2) {
       feedbackTitle = '¡Fase 2 Superada: Ritmo & Fluidez! 〰️';
-      feedbackMessage = `Trazo continuo sin titubeos (Fluidez: ${kinematics.fluencyScore}%, ${kinematics.avgSpeedPxPerSec} px/s).`;
+      feedbackMessage = `Trazo continuo sin titubeos (Fluidez: ${kinematics.fluencyScore}%, ${kinematics.avgSpeedPxPerSec} px/s). Nota: ${overallScore}% (≥${targetThreshold}%).`;
       tipMessage = '¡Gran soltura! Listo para la Fase 3: Disparo balístico a máxima velocidad.';
       avatarMood = 'success-stars';
     } else {
       feedbackTitle = '¡Fase 3 Dominada: Velocidad Pura! ⚡';
-      feedbackMessage = `Trazo balístico magistral (${kinematics.avgSpeedPxPerSec} px/s, ${kinematics.durationMs}ms) sin perder puntería (${boundaryScore}%).`;
+      feedbackMessage = `Trazo balístico magistral (${kinematics.avgSpeedPxPerSec} px/s, ${kinematics.durationMs}ms) con ${straightnessScore}% de rectitud. Nota: ${overallScore}% (≥${targetThreshold}%).`;
       tipMessage = '¡Memoria muscular forjada! Tienes este ángulo dominado en todos los registros.';
       avatarMood = 'success-stars';
     }
@@ -708,7 +761,9 @@ export function evaluateMultiLineSubmission(
     const startErr = isReversed ? distStartToEnd : distStartToStart;
     const endErr = isReversed ? distEndToStart : distEndToEnd;
     const avgErr = (startErr + endErr) / 2;
-    const boundaryScore = Math.round(Math.max(0, 100 - Math.max(0, avgErr - 6) * 2.4));
+    const maxErr = Math.max(startErr, endErr);
+    const endpointErrPenalty = Math.max(0, avgErr - 5) * 2.0 + Math.max(0, maxErr - 10) * 1.5;
+    const boundaryScore = Math.round(Math.max(0, 100 - endpointErrPenalty));
 
     let maxDev = 0;
     let sumDev = 0;
@@ -720,7 +775,11 @@ export function evaluateMultiLineSubmission(
     const avgDev = pts.length > 2 ? sumDev / (pts.length - 2) : 0;
     const straightnessScore = Math.round(Math.max(0, 100 - avgDev * 5 - maxDev * 2.8));
 
-    let overallLine = Math.round(boundaryScore * 0.40 + straightnessScore * 0.35 + angleScore * 0.25);
+    let overallLine = Math.round(straightnessScore * 0.50 + boundaryScore * 0.35 + angleScore * 0.15);
+    if (straightnessScore < 40) overallLine = Math.min(overallLine, 45);
+    else if (straightnessScore < 55) overallLine = Math.min(overallLine, 55);
+    else if (straightnessScore < 70) overallLine = Math.min(overallLine, 75);
+
     if (isReversed) {
       overallLine = 0;
       directionWarnings.push(
@@ -785,7 +844,8 @@ export function evaluateMultiLineSubmission(
   const hasAnyReversed = lineResults.some((r) => r.isReversed);
 
   // 4. Cinemática de cada trazo y agregación
-  const activePhase = challenge.activePhase || 1;
+  const activePhase = (challenge.activePhase || 1) as 1 | 2 | 3;
+  const targetThreshold = getPhasePassingThreshold(activePhase);
   const directionKey = challenge.directionKey || 'general';
 
   const kinematicResults = lineResults.map((r) =>
@@ -793,8 +853,11 @@ export function evaluateMultiLineSubmission(
   );
 
   for (let i = 0; i < lineResults.length; i++) {
-    if (!lineResults[i].isReversed && lineResults[i].boundaryScore >= 60) {
-      recordStrokeSpeed(directionKey, kinematicResults[i].avgSpeedPxPerSec);
+    if (!lineResults[i].isReversed && lineResults[i].boundaryScore >= 60 && lineResults[i].straightnessScore >= 60) {
+      recordStrokeSpeed(directionKey, kinematicResults[i].avgSpeedPxPerSec, {
+        straightnessScore: lineResults[i].straightnessScore,
+        boundaryScore: lineResults[i].boundaryScore,
+      });
     }
   }
 
@@ -816,27 +879,36 @@ export function evaluateMultiLineSubmission(
   if (activePhase === 1) {
     overallScore = geometricScore;
   } else if (activePhase === 2) {
-    overallScore = Math.round(geometricScore * 0.70 + avgFluency * 0.30);
+    overallScore = Math.round(geometricScore * 0.75 + avgFluency * 0.25);
   } else {
-    const targetFastSpeed = Math.max(360, Math.round(userBaseline * 0.95));
+    const targetFastSpeed = Math.min(520, Math.max(340, Math.round(userBaseline * 0.85)));
     const speedRatio = avgSpeed / targetFastSpeed;
     const speedScore = Math.min(100, Math.round(Math.max(0, speedRatio * 100)));
-    overallScore = Math.round(geometricScore * 0.60 + speedScore * 0.40);
+    overallScore = Math.round(geometricScore * 0.80 + speedScore * 0.20);
+    if (geometricScore < 86) {
+      overallScore = Math.min(overallScore, 87);
+    }
   }
 
   if (hasAnyReversed) {
     overallScore = 0;
   }
 
-  const phasePassed = !hasAnyReversed && allPhasesPassed && overallScore >= 75;
+  const maxStartErrAllowed = activePhase === 1 ? 30 : activePhase === 2 ? 22 : 24;
+  const maxEndErrAllowed = activePhase === 1 ? 34 : activePhase === 2 ? 24 : 26;
 
-  // Criterios estrictos de aprobación (Geometría + Cinemática de Fase)
-  let passed = !hasAnyReversed && overallScore >= 75 && phasePassed;
+  let hasGateFailure = false;
   for (const r of lineResults) {
-    if (r.startErr > 40 || r.endErr > 46 || r.angleDiff > 22 || r.straightnessScore < 55) {
-      passed = false;
+    if (r.startErr > maxStartErrAllowed || r.endErr > maxEndErrAllowed || r.angleDiff > 20 || r.straightnessScore < 60) {
+      hasGateFailure = true;
       break;
     }
+  }
+
+  const phasePassed = !hasAnyReversed && allPhasesPassed && !hasGateFailure && overallScore >= targetThreshold;
+  let passed = phasePassed;
+  if (!passed && overallScore >= targetThreshold) {
+    overallScore = targetThreshold - 3;
   }
 
   let speedDiagnosis = 'Ritmo constante en todas las líneas';
@@ -979,7 +1051,7 @@ export function buildStrokeDebugReport(
       ``,
       `--- RESULTADO DE EVALUACIÓN ---`,
       `Nota Global: ${evaluation.overallScore}% (Superado: ${evaluation.passed ? 'SÍ' : 'NO'})`,
-      evaluation.currentPhase ? `Fase Activa: Fase ${evaluation.currentPhase} (Fase Superada: ${evaluation.phasePassed ? 'SÍ' : 'NO'})` : '',
+      evaluation.currentPhase ? `Fase Activa: Fase ${evaluation.currentPhase} (Umbral Requerido: ≥${getPhasePassingThreshold(evaluation.currentPhase as 1 | 2 | 3)}% · Fase Superada: ${evaluation.phasePassed ? 'SÍ' : 'NO'})` : '',
       `Puntería en Dianas: ${evaluation.metrics.boundaryScore}%`,
       `Rectitud Media: ${evaluation.metrics.straightnessScore}%`,
       `Paralelismo / Vector: ${evaluation.metrics.parallelismScore}%`,
@@ -1023,7 +1095,7 @@ export function buildStrokeDebugReport(
       ``,
       `--- RESULTADO DE EVALUACIÓN ---`,
       `Nota Global: ${evaluation.overallScore}% (Superado: ${evaluation.passed ? 'SÍ' : 'NO'})`,
-      evaluation.currentPhase ? `Fase Activa: Fase ${evaluation.currentPhase} (Fase Superada: ${evaluation.phasePassed ? 'SÍ' : 'NO'})` : '',
+      evaluation.currentPhase ? `Fase Activa: Fase ${evaluation.currentPhase} (Umbral Requerido: ≥${getPhasePassingThreshold(evaluation.currentPhase as 1 | 2 | 3)}% · Fase Superada: ${evaluation.phasePassed ? 'SÍ' : 'NO'})` : '',
       `Espaciado y Ritmo: ${evaluation.metrics.spacingScore}%`,
       `Contención en Carriles: ${evaluation.metrics.boundaryScore}%`,
       `Rectitud: ${evaluation.metrics.straightnessScore}%`,
@@ -1080,7 +1152,7 @@ export function buildStrokeDebugReport(
     ``,
     `--- RESULTADO DE EVALUACIÓN ---`,
     `Nota Global: ${evaluation.overallScore}% (Superado: ${evaluation.passed ? 'SÍ' : 'NO'})`,
-    evaluation.currentPhase ? `Fase Activa: Fase ${evaluation.currentPhase} (Fase Superada: ${evaluation.phasePassed ? 'SÍ' : 'NO'})` : '',
+    evaluation.currentPhase ? `Fase Activa: Fase ${evaluation.currentPhase} (Umbral Requerido: ≥${getPhasePassingThreshold(evaluation.currentPhase as 1 | 2 | 3)}% · Fase Superada: ${evaluation.phasePassed ? 'SÍ' : 'NO'})` : '',
     `Puntería en Dianas: ${evaluation.metrics.boundaryScore}%`,
     `Rectitud / Curva: ${evaluation.metrics.straightnessScore}%`,
     `Paralelismo / Vector: ${evaluation.metrics.parallelismScore}%`,
@@ -2576,23 +2648,24 @@ export function evaluateSpacingTrackSubmission(
       geometricScore = Math.min(geometricScore, 40);
     }
 
+    const targetThreshold = getPhasePassingThreshold(activePhase as 1 | 2 | 3);
     let overallScore = geometricScore;
     let phasePassed = false;
     if (activePhase === 1) {
       overallScore = geometricScore;
-      phasePassed = overallScore >= 75;
+      phasePassed = overallScore >= targetThreshold;
     } else if (activePhase === 2) {
       const fluency = kinematics?.fluencyScore || 80;
       overallScore = Math.round(geometricScore * 0.80 + fluency * 0.20);
-      phasePassed = overallScore >= 75 && fluency >= 70;
+      phasePassed = overallScore >= targetThreshold && fluency >= 70;
     } else {
       const speedPassed = kinematics?.phasePassed ?? true;
       const speedScore = speedPassed ? 100 : 50;
       overallScore = Math.round(geometricScore * 0.70 + speedScore * 0.30);
-      phasePassed = overallScore >= 75 && speedPassed;
+      phasePassed = overallScore >= targetThreshold && speedPassed;
     }
 
-    let passed = overallScore >= 75;
+    let passed = phasePassed;
 
     const solutionOverlay = {
       points: [],
@@ -2856,23 +2929,24 @@ export function evaluateSpacingTrackSubmission(
       geometricScore = Math.min(geometricScore, 40);
     }
 
+    const targetThreshold = getPhasePassingThreshold(activePhase as 1 | 2 | 3);
     let overallScore = geometricScore;
     let phasePassed = false;
     if (activePhase === 1) {
       overallScore = geometricScore;
-      phasePassed = overallScore >= 75;
+      phasePassed = overallScore >= targetThreshold;
     } else if (activePhase === 2) {
       const fluency = kinematics?.fluencyScore || 80;
       overallScore = Math.round(geometricScore * 0.80 + fluency * 0.20);
-      phasePassed = overallScore >= 75 && fluency >= 70;
+      phasePassed = overallScore >= targetThreshold && fluency >= 70;
     } else {
       const speedPassed = kinematics?.phasePassed ?? true;
       const speedScore = speedPassed ? 100 : 50;
       overallScore = Math.round(geometricScore * 0.70 + speedScore * 0.30);
-      phasePassed = overallScore >= 75 && speedPassed;
+      phasePassed = overallScore >= targetThreshold && speedPassed;
     }
 
-    let passed = overallScore >= 75;
+    let passed = phasePassed;
 
     const solutionOverlay = {
       points: [],
@@ -3160,23 +3234,24 @@ export function evaluateSpacingTrackSubmission(
       geometricScore = Math.min(geometricScore, 40);
     }
 
+    const targetThreshold = getPhasePassingThreshold(activePhase as 1 | 2 | 3);
     let overallScore = geometricScore;
     let phasePassed = false;
     if (activePhase === 1) {
       overallScore = geometricScore;
-      phasePassed = overallScore >= 75;
+      phasePassed = overallScore >= targetThreshold;
     } else if (activePhase === 2) {
       const fluency = kinematics?.fluencyScore || 80;
       overallScore = Math.round(geometricScore * 0.80 + fluency * 0.20);
-      phasePassed = overallScore >= 75 && fluency >= 70;
+      phasePassed = overallScore >= targetThreshold && fluency >= 70;
     } else {
       const speedPassed = kinematics?.phasePassed ?? true;
       const speedScore = speedPassed ? 100 : 50;
       overallScore = Math.round(geometricScore * 0.70 + speedScore * 0.30);
-      phasePassed = overallScore >= 75 && speedPassed;
+      phasePassed = overallScore >= targetThreshold && speedPassed;
     }
 
-    let passed = overallScore >= 75;
+    let passed = phasePassed;
 
     let patternLabel = `Paso Objetivo: ${targetSpacing}px con Relámpago Z/N ↗↘↗`;
     let successTitle = '¡Relámpagos Z/N y Espaciado Logrados!';
@@ -3502,23 +3577,24 @@ export function evaluateSpacingTrackSubmission(
       geometricScore = Math.min(geometricScore, 40);
     }
 
+    const targetThreshold = getPhasePassingThreshold(activePhase as 1 | 2 | 3);
     let overallScore = geometricScore;
     let phasePassed = false;
     if (activePhase === 1) {
       overallScore = geometricScore;
-      phasePassed = overallScore >= 75;
+      phasePassed = overallScore >= targetThreshold;
     } else if (activePhase === 2) {
       const fluency = kinematics?.fluencyScore || 80;
       overallScore = Math.round(geometricScore * 0.80 + fluency * 0.20);
-      phasePassed = overallScore >= 75 && fluency >= 70;
+      phasePassed = overallScore >= targetThreshold && fluency >= 70;
     } else {
       const speedPassed = kinematics?.phasePassed ?? true;
       const speedScore = speedPassed ? 100 : 50;
       overallScore = Math.round(geometricScore * 0.70 + speedScore * 0.30);
-      phasePassed = overallScore >= 75 && speedPassed;
+      phasePassed = overallScore >= targetThreshold && speedPassed;
     }
 
-    let passed = overallScore >= 75;
+    let passed = phasePassed;
 
     const solutionOverlay = {
       points: [],
@@ -3889,28 +3965,28 @@ export function evaluateSpacingTrackSubmission(
 
   geometricScore = Math.max(0, Math.min(100, Math.round(geometricScore)));
 
-  // Ponderación por Fase
+  const targetThreshold = getPhasePassingThreshold(activePhase as 1 | 2 | 3);
   let overallScore = geometricScore;
   let phasePassed = false;
 
   if (activePhase === 1) {
     // Fase 1: Precisión Pura
     overallScore = geometricScore;
-    phasePassed = overallScore >= 75;
+    phasePassed = overallScore >= targetThreshold;
   } else if (activePhase === 2) {
     // Fase 2: Fluidez (80% geom, 20% fluidez)
     const fluency = kinematics?.fluencyScore || 80;
     overallScore = Math.round(geometricScore * 0.80 + fluency * 0.20);
-    phasePassed = overallScore >= 75 && fluency >= 70;
+    phasePassed = overallScore >= targetThreshold && fluency >= 70;
   } else {
     // Fase 3: Velocidad (70% geom, 30% velocidad)
     const speedPassed = kinematics?.phasePassed ?? true;
     const speedScore = speedPassed ? 100 : 50;
     overallScore = Math.round(geometricScore * 0.70 + speedScore * 0.30);
-    phasePassed = overallScore >= 75 && speedPassed;
+    phasePassed = overallScore >= targetThreshold && speedPassed;
   }
 
-  let passed = overallScore >= 75;
+  let passed = phasePassed;
 
   // Solución overlay con las líneas ideales
   const solutionOverlay = {
