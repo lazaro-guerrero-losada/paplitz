@@ -22,9 +22,8 @@ Based on empirical session telemetry (#1 to #52 on C1.1), this release eliminate
     `maxPenalty = Math.max(0, maxEndpointErr - 7) * 3.6`
   - A $24\text{px}$ miss now drops `boundaryScore` to $17\%$ (instead of $79\%$).
 - **Dedicated Endpoint Failure Gate & Score Cap**:
-  - Missing either target dot now triggers `failedGateReason = 'endpoint_error'`.
   - Automatically caps the visible overall score to `targetThreshold - 8` ($\le 72\%$ in Phase 1, $\le 77\%$ in Phase 2, $\le 82\%$ in Phase 3), preventing any misleading "Aprobado" status.
-  - Displays explicit feedback: *"Diana No Alcanzada 🎯: No has tocado la diana ② (desviación: Xpx, máximo permitido: Ypx). El trazo debe conectar con las dianas."*
+  - Retains standard concise feedback messages (Puntería/Rectitud score breakdown) without intrusive popup text.
 - **Synchronized Across Evaluators**: Applied the same calibrated tolerances and penalty gradients to `evaluateMultiLineSubmission`.
 - **Diagnostic Reports**: Debug reports now print the exact tolerance threshold for both points: `Error en ②: Xpx (Tolerancia: ≤Ypx)`.
 

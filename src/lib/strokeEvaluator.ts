@@ -519,22 +519,7 @@ export function evaluateSingleStrokeSubmission(
     tipMessage = 'Observa el número 1 antes de apoyar el lápiz.';
     avatarMood = 'fail-spiral';
   } else if (!passed) {
-    if (failedGateReason === 'endpoint_error') {
-      const isStart = startErr > maxStartErrAllowed;
-      const isEnd = endErr > maxEndErrAllowed;
-      const whichPoint = isStart && isEnd ? 'las dianas ① y ②' : isStart ? 'la diana ①' : 'la diana ②';
-      const worstErr = Math.round(isStart && isEnd ? Math.max(startErr, endErr) : isStart ? startErr : endErr);
-      const maxAllowed = isStart ? maxStartErrAllowed : maxEndErrAllowed;
-      feedbackTitle = 'Diana No Alcanzada 🎯';
-      feedbackMessage = `No has tocado ${whichPoint} (desviación: ${worstErr}px, máximo permitido: ${maxAllowed}px). El trazo debe conectar con las dianas.`;
-      tipMessage = 'Apunta visualmente a la diana ② antes de soltar el trazo.';
-      avatarMood = 'curious';
-    } else if (failedGateReason === 'straightness_error') {
-      feedbackTitle = 'Línea Excesivamente Curvada o Inestable 〰️';
-      feedbackMessage = `Rectitud: ${straightnessScore}% (mínimo requerido: 60%). Mantén el antebrazo firme sin rotar la muñeca.`;
-      tipMessage = 'Bloquea la muñeca y usa el codo y hombro para proyectar una línea recta pura.';
-      avatarMood = 'curious';
-    } else if (activePhase === 2 && !kinematics.phasePassed) {
+    if (activePhase === 2 && !kinematics.phasePassed) {
       feedbackTitle = 'Línea Precisa pero Falta Fluidez 〰️';
       feedbackMessage = `${kinematics.speedDiagnosisLabel}. Fluidez: ${kinematics.fluencyScore}%. ${kinematics.phaseRequirementText}.`;
       tipMessage = 'Bloquea la muñeca y mueve el antebrazo en un único impulso sin corregir a mitad de camino.';
