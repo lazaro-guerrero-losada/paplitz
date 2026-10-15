@@ -4,6 +4,42 @@ All notable changes, new features, bug fixes, and UX improvements to the Paplitz
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.8] — 2026-10-15
+
+### 🎯 Strict Target Arrival Calibration & Adaptive Speed Ceiling
+
+Based on empirical session telemetry (#1 to #52 on C1.1), this release eliminates false-positive passes on strokes stopping short of Point ② (Exercises #20, #34, #51, #52), tightens endpoint gates to the physical geometry of the visual targets, and bounds adaptive baseline speed.
+
+#### 🛑 Point ② Miss Prevention & Physical Target Alignment (`strokeEvaluator.ts`)
+- **Root Problem**: The visual target on the canvas has a solid center of radius $r=3.5\text{px}$ and an outer precision ring of radius $R=7\text{px}$. However, the previous endpoint gate permitted an endpoint error of up to $34\text{px}$ in Phase 1 and $24\text{px}$ in Phase 2. As reported by the user in Exercises #20 and #34, strokes stopping $24\text{px}$ short ($\Delta: -29\text{px}$) received an inflated mark of 88% and "Aprobado", despite visibly terminating in empty canvas without touching Point ②.
+- **Physical Target Gates**:
+  - **Fase 1 (Precisión)**: Reduced maximum allowed endpoint error from $34\text{px}$ to **$14\text{px}$** (guarantees the pen tip contacts or directly touches the $7\text{px}$ target ring).
+  - **Fase 2 (Fluidez)**: Reduced from $24\text{px}$ to **$15\text{px}$**.
+  - **Fase 3 (Velocidad)**: Reduced from $26\text{px}$ to **$17\text{px}$**.
+- **Steep Endpoint Penalty Ramping (`boundaryScore`)**:
+  - Replaced the overly lenient formula ($1.5 \times \text{error}$) with a steep penalty gradient once the stroke exits the $7\text{px}$ ring:
+    `avgPenalty = Math.max(0, avgEndpointErr - 4) * 2.2`
+    `maxPenalty = Math.max(0, maxEndpointErr - 7) * 3.6`
+  - A $24\text{px}$ miss now drops `boundaryScore` to $17\%$ (instead of $79\%$).
+- **Dedicated Endpoint Failure Gate & Score Cap**:
+  - Missing either target dot now triggers `failedGateReason = 'endpoint_error'`.
+  - Automatically caps the visible overall score to `targetThreshold - 8` ($\le 72\%$ in Phase 1, $\le 77\%$ in Phase 2, $\le 82\%$ in Phase 3), preventing any misleading "Aprobado" status.
+  - Displays explicit feedback: *"Diana No Alcanzada 🎯: No has tocado la diana ② (desviación: Xpx, máximo permitido: Ypx). El trazo debe conectar con las dianas."*
+- **Synchronized Across Evaluators**: Applied the same calibrated tolerances and penalty gradients to `evaluateMultiLineSubmission`.
+- **Diagnostic Reports**: Debug reports now print the exact tolerance threshold for both points: `Error en ②: Xpx (Tolerancia: ≤Ypx)`.
+
+#### ⚡ Adaptive Baseline Speed Sanity Bounds (`strokeKinematics.ts`)
+- **Speed Baseline Bounding ($\le 620\text{ px/s}$)**: Bounded `recordStrokeSpeed` and `getUserBaselineSpeed` to a maximum of $620\text{ px/s}$. This prevents outlier fast swipes (e.g. $1227\text{ px/s}$ in Exercise #52) from driving the user's historical baseline up to $868\text{ px/s}$ and inflating subsequent velocity requirements.
+
+#### ℹ️ Phase Mastery Progression Confirmation
+- Confirmed the 3-streak mastery thresholds:
+  - **Fase 1 (Precisión)**: $\ge 80\%$ (3 consecutive passes to advance to Phase 2)
+  - **Fase 2 (Fluidez)**: $\ge 85\%$ (3 consecutive passes to advance to Phase 3)
+  - **Fase 3 (Velocidad)**: $\ge 90\%$ (3 consecutive passes to advance version/level)
+- User note on Exercise #47 (*"Con un 93 he pasado de fase, no era un 95? O es un 90?"*): Scoring 93% rightfully completed Phase 3 because $93\% \ge 90\%$.
+
+---
+
 ## [0.2.7] — 2026-10-15
 
 ### 🗺️ Expandable Level Details in "El Camino" & Interactive Variant Dropdown

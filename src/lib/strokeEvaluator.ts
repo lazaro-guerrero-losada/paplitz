@@ -368,9 +368,13 @@ export function evaluateSingleStrokeSubmission(
   const avgEndpointErr = (startErr + endErr) / 2;
   const maxEndpointErr = Math.max(startErr, endErr);
 
-  // Margen de gracia de 5px; después penalización equilibrando promedio y peor extremo
-  // Evita que un error catastrófico en un extremo quede enmascarado por un buen inicio
-  const endpointErrPenalty = Math.max(0, avgEndpointErr - 5) * 2.0 + Math.max(0, maxEndpointErr - 10) * 1.5;
+  // Diana visual: centro sólido r=3.5px, anillo exterior R=7px.
+  // Diana perfecta: error <= 4px (100% puntería).
+  // En contacto con anillo: error <= 8px (≥88% puntería).
+  // Fuera del anillo (>8px): penalización estricta por píxel para evitar notas altas en trazos que no tocan el punto 2.
+  const avgPenalty = Math.max(0, avgEndpointErr - 4) * 2.2;
+  const maxPenalty = Math.max(0, maxEndpointErr - 7) * 3.6;
+  const endpointErrPenalty = avgPenalty + maxPenalty;
   let boundaryScore = Math.round(Math.max(0, 100 - endpointErrPenalty));
 
   // 5. Rectitud / Curvatura
@@ -465,9 +469,13 @@ export function evaluateSingleStrokeSubmission(
     }
   }
 
-  // Tolerancias máximas de anclaje según fase
-  const maxStartErrAllowed = activePhase === 1 ? 30 : activePhase === 2 ? 22 : 24;
-  const maxEndErrAllowed = activePhase === 1 ? 34 : activePhase === 2 ? 24 : 26;
+  // Tolerancias máximas de anclaje según fase:
+  // La diana visual tiene un centro de r=3.5px y un anillo exterior de R=7px.
+  // En Fase 1 (Precisión): tolerancia máxima de 14px (área de contacto directo con la diana).
+  // En Fase 2 (Fluidez): tolerancia máxima de 15px.
+  // En Fase 3 (Velocidad): tolerancia máxima de 17px (ligero margen por inercia balística rápida).
+  const maxStartErrAllowed = activePhase === 1 ? 14 : activePhase === 2 ? 15 : 17;
+  const maxEndErrAllowed = activePhase === 1 ? 14 : activePhase === 2 ? 15 : 17;
 
   let failedGateReason: string | null = null;
   if (isReversed) {
@@ -495,9 +503,9 @@ export function evaluateSingleStrokeSubmission(
     passed = false;
     directionWarning = '⚠️ DIRECCIÓN INVERTIDA: Has trazado en sentido contrario (de ② hacia ①). Debes iniciar en ① y proyectar hacia ②.';
   } else if (!passed && overallScore >= targetThreshold) {
-    // Si la nota aritmética daba aprobada pero falló una compuerta estricta (ej. falta de velocidad o rectitud),
+    // Si la nota aritmética daba aprobada pero falló una compuerta estricta (ej. falta de velocidad, rectitud o diana no alcanzada),
     // recortar la nota final visible para eliminar contradicciones visuales (ej. 91% pero con 'Reintentar')
-    overallScore = targetThreshold - 3;
+    overallScore = failedGateReason === 'endpoint_error' ? targetThreshold - 8 : targetThreshold - 3;
   }
 
   let feedbackTitle = '¡Buen Trazo!';
@@ -511,7 +519,22 @@ export function evaluateSingleStrokeSubmission(
     tipMessage = 'Observa el número 1 antes de apoyar el lápiz.';
     avatarMood = 'fail-spiral';
   } else if (!passed) {
-    if (activePhase === 2 && !kinematics.phasePassed) {
+    if (failedGateReason === 'endpoint_error') {
+      const isStart = startErr > maxStartErrAllowed;
+      const isEnd = endErr > maxEndErrAllowed;
+      const whichPoint = isStart && isEnd ? 'las dianas ① y ②' : isStart ? 'la diana ①' : 'la diana ②';
+      const worstErr = Math.round(isStart && isEnd ? Math.max(startErr, endErr) : isStart ? startErr : endErr);
+      const maxAllowed = isStart ? maxStartErrAllowed : maxEndErrAllowed;
+      feedbackTitle = 'Diana No Alcanzada 🎯';
+      feedbackMessage = `No has tocado ${whichPoint} (desviación: ${worstErr}px, máximo permitido: ${maxAllowed}px). El trazo debe conectar con las dianas.`;
+      tipMessage = 'Apunta visualmente a la diana ② antes de soltar el trazo.';
+      avatarMood = 'curious';
+    } else if (failedGateReason === 'straightness_error') {
+      feedbackTitle = 'Línea Excesivamente Curvada o Inestable 〰️';
+      feedbackMessage = `Rectitud: ${straightnessScore}% (mínimo requerido: 60%). Mantén el antebrazo firme sin rotar la muñeca.`;
+      tipMessage = 'Bloquea la muñeca y usa el codo y hombro para proyectar una línea recta pura.';
+      avatarMood = 'curious';
+    } else if (activePhase === 2 && !kinematics.phasePassed) {
       feedbackTitle = 'Línea Precisa pero Falta Fluidez 〰️';
       feedbackMessage = `${kinematics.speedDiagnosisLabel}. Fluidez: ${kinematics.fluencyScore}%. ${kinematics.phaseRequirementText}.`;
       tipMessage = 'Bloquea la muñeca y mueve el antebrazo en un único impulso sin corregir a mitad de camino.';
@@ -762,8 +785,9 @@ export function evaluateMultiLineSubmission(
     const endErr = isReversed ? distEndToStart : distEndToEnd;
     const avgErr = (startErr + endErr) / 2;
     const maxErr = Math.max(startErr, endErr);
-    const endpointErrPenalty = Math.max(0, avgErr - 5) * 2.0 + Math.max(0, maxErr - 10) * 1.5;
-    const boundaryScore = Math.round(Math.max(0, 100 - endpointErrPenalty));
+    const avgPenalty = Math.max(0, avgErr - 4) * 2.2;
+    const maxPenalty = Math.max(0, maxErr - 7) * 3.6;
+    const boundaryScore = Math.round(Math.max(0, 100 - (avgPenalty + maxPenalty)));
 
     let maxDev = 0;
     let sumDev = 0;
@@ -894,12 +918,19 @@ export function evaluateMultiLineSubmission(
     overallScore = 0;
   }
 
-  const maxStartErrAllowed = activePhase === 1 ? 30 : activePhase === 2 ? 22 : 24;
-  const maxEndErrAllowed = activePhase === 1 ? 34 : activePhase === 2 ? 24 : 26;
+  // Tolerancias máximas de anclaje según fase
+  const maxStartErrAllowed = activePhase === 1 ? 14 : activePhase === 2 ? 15 : 17;
+  const maxEndErrAllowed = activePhase === 1 ? 14 : activePhase === 2 ? 15 : 17;
 
   let hasGateFailure = false;
+  let hasEndpointGateFailure = false;
   for (const r of lineResults) {
-    if (r.startErr > maxStartErrAllowed || r.endErr > maxEndErrAllowed || r.angleDiff > 20 || r.straightnessScore < 60) {
+    if (r.startErr > maxStartErrAllowed || r.endErr > maxEndErrAllowed) {
+      hasEndpointGateFailure = true;
+      hasGateFailure = true;
+      break;
+    }
+    if (r.angleDiff > 20 || r.straightnessScore < 60) {
       hasGateFailure = true;
       break;
     }
@@ -908,7 +939,7 @@ export function evaluateMultiLineSubmission(
   const phasePassed = !hasAnyReversed && allPhasesPassed && !hasGateFailure && overallScore >= targetThreshold;
   let passed = phasePassed;
   if (!passed && overallScore >= targetThreshold) {
-    overallScore = targetThreshold - 3;
+    overallScore = hasEndpointGateFailure ? targetThreshold - 8 : targetThreshold - 3;
   }
 
   let speedDiagnosis = 'Ritmo constante en todas las líneas';
@@ -1131,6 +1162,9 @@ export function buildStrokeDebugReport(
   const uLen = Math.hypot(uEnd.x - uStart.x, uEnd.y - uStart.y);
   const tLen = Math.hypot(tEnd.x - tStart.x, tEnd.y - tStart.y);
 
+  const activePh = (evaluation.currentPhase || 1) as 1 | 2 | 3;
+  const maxErrAllowed = activePh === 1 ? 14 : activePh === 2 ? 15 : 17;
+
   return [
     `=== REPORTE DE DEPURACIÓN DE TRAZO (PAPLITZ LAB) ===`,
     `Fecha: ${new Date().toISOString()}`,
@@ -1145,8 +1179,8 @@ export function buildStrokeDebugReport(
     ``,
     `--- TRAZO DEL USUARIO ---`,
     `Puntos muestreados: ${pts.length}`,
-    `Punto Inicio: (${Math.round(uStart.x)}, ${Math.round(uStart.y)}) -> Error en ①: ${Math.round(startErr)}px`,
-    `Punto Fin: (${Math.round(uEnd.x)}, ${Math.round(uEnd.y)}) -> Error en ②: ${Math.round(endErr)}px`,
+    `Punto Inicio: (${Math.round(uStart.x)}, ${Math.round(uStart.y)}) -> Error en ①: ${Math.round(startErr)}px (Tolerancia: ≤${maxErrAllowed}px)`,
+    `Punto Fin: (${Math.round(uEnd.x)}, ${Math.round(uEnd.y)}) -> Error en ②: ${Math.round(endErr)}px (Tolerancia: ≤${maxErrAllowed}px)`,
     `Longitud Real: ${Math.round(uLen)}px (Δ: ${Math.round(uLen - tLen)}px)`,
     `Ángulo Medido: ${evaluation.detectedStats.measuredAvgAngleDeg}°`,
     ``,

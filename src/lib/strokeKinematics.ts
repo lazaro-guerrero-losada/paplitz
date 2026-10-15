@@ -99,7 +99,8 @@ export function recordStrokeSpeed(
 
   // Media móvil ponderada exponencial: da más peso al historial a medida que acumula intentos
   const alpha = existing.count < 5 ? 0.35 : 0.18;
-  const newAvg = Math.round(existing.avgSpeedPxPerSec * (1 - alpha) + speedPxPerSec * alpha);
+  const cappedSpeed = Math.min(620, Math.max(120, speedPxPerSec));
+  const newAvg = Math.min(620, Math.round(existing.avgSpeedPxPerSec * (1 - alpha) + cappedSpeed * alpha));
   const fastest = Math.max(existing.fastestSpeedPxPerSec, Math.round(speedPxPerSec));
 
   profile.directions[dirKey] = {
@@ -115,7 +116,7 @@ export function recordStrokeSpeed(
   const allDirs = Object.values(profile.directions);
   if (allDirs.length > 0) {
     const sum = allDirs.reduce((acc, d) => acc + d.avgSpeedPxPerSec, 0);
-    profile.globalAvgSpeedPxPerSec = Math.round(sum / allDirs.length);
+    profile.globalAvgSpeedPxPerSec = Math.min(620, Math.round(sum / allDirs.length));
   }
 
   try {
@@ -136,9 +137,9 @@ export function getUserBaselineSpeed(direction: StrokeDirection | string): numbe
   const profile = getUserSpeedProfile();
   const dirKey = direction || 'general';
   if (profile.directions[dirKey] && profile.directions[dirKey].count >= 2) {
-    return profile.directions[dirKey].avgSpeedPxPerSec;
+    return Math.min(620, profile.directions[dirKey].avgSpeedPxPerSec);
   }
-  return profile.globalAvgSpeedPxPerSec || DEFAULT_INITIAL_SPEED;
+  return Math.min(620, profile.globalAvgSpeedPxPerSec || DEFAULT_INITIAL_SPEED);
 }
 
 /**
