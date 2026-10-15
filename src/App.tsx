@@ -27,6 +27,7 @@ import { DailyChallengePanel } from './components/DailyChallengePanel';
 import { DailySetCompletedModal } from './components/DailySetCompletedModal';
 import { LevelCompletionModal } from './components/LevelCompletionModal';
 import { SessionRecordPanel } from './components/SessionRecordPanel';
+import { VariantSelectorModal } from './components/VariantSelectorModal';
 import { calculatePlayerLevel } from './lib/levelSystem';
 import { SenseiCubo } from './components/avatar/SenseiCubo';
 import { AvatarMood } from './lib/avatarTypes';
@@ -42,6 +43,7 @@ import {
   X,
   ChevronRight,
   ChevronLeft,
+  ChevronDown,
   Target,
   PanelLeft,
   Maximize2,
@@ -284,6 +286,9 @@ export function App() {
     ? (nodeVariantIndices[activeNode?.id || ''] || 0) % activeVariants.length
     : 0;
   const currentExerciseDef = activeVariants[currentVariantIndex] || activeNode?.exerciseDef || ALL_SINGLE_STROKE_EXERCISES[0];
+
+  // Modal selector desplegable de variantes
+  const [isVariantSelectorOpen, setIsVariantSelectorOpen] = useState<boolean>(false);
 
   // Modales
   const [guidebookUnit, setGuidebookUnit] = useState<Unit | null>(null);
@@ -555,9 +560,12 @@ export function App() {
   };
 
   // Al hacer clic en un nodo del Camino
-  const handleSelectNode = (node: LessonNode) => {
+  const handleSelectNode = (node: LessonNode, variantIndex?: number) => {
     setPlacementTestNode(null);
     setActiveNode(node);
+    if (variantIndex !== undefined) {
+      setNodeVariantIndices((prev) => ({ ...prev, [node.id]: variantIndex }));
+    }
     setCurrentPhase(1);
     setFeedback(null);
     setShowSolution(false);
@@ -1673,7 +1681,7 @@ export function App() {
                         </span>
                       </div>
 
-                      {/* Variante (si aplica) con flechas compactas */}
+                      {/* Variante (si aplica) con flechas compactas y selector */}
                       {activeNode?.isCalisthenics && activeVariants.length > 1 && (
                         <div className="flex items-center gap-0.5 shrink-0 bg-neutral-100 border border-black px-1 py-0.5">
                           <button
@@ -1688,9 +1696,14 @@ export function App() {
                           >
                             <ChevronLeft className="w-3 h-3 stroke-[2.5]" />
                           </button>
-                          <span className="text-[10px] font-bold tabular-nums">
+                          <button
+                            type="button"
+                            onClick={() => setIsVariantSelectorOpen(true)}
+                            className="text-[10px] font-bold tabular-nums hover:underline cursor-pointer px-1 hover:bg-neutral-200 transition-colors"
+                            title="Ver qué hace cada versión y elegir subnivel"
+                          >
                             V{currentVariantIndex + 1}/{activeVariants.length}
-                          </span>
+                          </button>
                           <button
                             type="button"
                             onClick={() => {
@@ -1706,6 +1719,29 @@ export function App() {
                         </div>
                       )}
                     </div>
+
+                    {/* Tarjeta explicativa de la versión actual con selector desplegable */}
+                    {activeNode?.isCalisthenics && (
+                      <div
+                        onClick={() => setIsVariantSelectorOpen(true)}
+                        className="p-2 border border-black bg-neutral-50 hover:bg-neutral-100 cursor-pointer shadow-[1px_1px_0px_#000000] transition-colors"
+                        title="Haz clic para ver qué hace esta versión y elegir entre subniveles"
+                      >
+                        <div className="flex items-center justify-between text-[10px] font-bold text-neutral-600 mb-0.5">
+                          <span className="flex items-center gap-1.5 min-w-0">
+                            <span className="bg-black text-white px-1 py-0.2 shrink-0">V{currentVariantIndex + 1}</span>
+                            <span className="text-black uppercase truncate font-bold">{currentExerciseDef.title}</span>
+                          </span>
+                          <span className="flex items-center gap-0.5 text-[9px] text-neutral-500 uppercase hover:text-black shrink-0">
+                            <span>Cambiar</span>
+                            <ChevronDown className="w-3 h-3 stroke-[2.5]" />
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-neutral-600 font-sans line-clamp-2 leading-tight">
+                          {currentExerciseDef.desc || currentExerciseDef.instruction}
+                        </p>
+                      </div>
+                    )}
 
                     {/* Botón para más información y selector de nivel desde el mapa de El Camino */}
                     <button
@@ -1876,6 +1912,7 @@ export function App() {
             <LearningPath
               units={units}
               activeModuleId={activeModuleId}
+              nodeVariantIndices={nodeVariantIndices}
               onSelectModule={handleSelectModule}
               onSelectNode={handleSelectNode}
               onOpenGuidebook={(unit) => setGuidebookUnit(unit)}
@@ -1983,6 +2020,23 @@ export function App() {
           }}
         />
       )}
+      {/* Modal Selector Desplegable de Variantes/Subniveles */}
+      <VariantSelectorModal
+        isOpen={isVariantSelectorOpen}
+        onClose={() => setIsVariantSelectorOpen(false)}
+        activeNode={activeNode}
+        activeVariants={activeVariants}
+        currentVariantIndex={currentVariantIndex}
+        onSelectVariant={(variantIdx) => {
+          if (activeNode) {
+            setNodeVariantIndices((prev) => ({ ...prev, [activeNode.id]: variantIdx }));
+            setCalisthenicsSeed(Math.floor(Math.random() * 90000 + 10000));
+            setStrokeEvaluation(null);
+            setCurrentPhase(1);
+            setMasteryStreaks((prev) => ({ ...prev, [activeNode.id]: 0 }));
+          }
+        }}
+      />
       {/* Modal de Sesión de Grabación (Modo Récord) */}
       {isRecordModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 animate-fade-in font-sans">

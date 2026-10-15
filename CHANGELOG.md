@@ -4,6 +4,35 @@ All notable changes, new features, bug fixes, and UX improvements to the Paplitz
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.7] — 2026-10-15
+
+### 🗺️ Expandable Level Details in "El Camino" & Interactive Variant Dropdown
+
+#### 📜 Expandable Level & Version Inspector in "El Camino" (`LearningPath.tsx`)
+- **Interactive Level Expansion Accordion**: Clicking on any unlocked node circle or label in El Camino (e.g. `C1.1`) smoothly unfolds an inline Neo-Brutalist details card directly beneath the level node.
+- **Offset Counter-Translation (`translateX(-offset)`)**: Because El Camino arranges nodes in a Duolingo-style zigzag wave ($\pm 40\text{px}$, $\pm 80\text{px}$), children inside the translated container would normally be shifted off-screen. By applying `translateX(-nodeOffset)` to the expanded card, the net translation relative to the viewport is exactly $0\text{px}$, ensuring the card is perfectly centered horizontally on phones, tablets, and desktops without clipping or causing horizontal page scroll.
+- **Sub-level / Variant Switcher Pills (`V1` to `VN`)**:
+  - Displays all available versions in a horizontal wrapped pill strip.
+  - Tapping any version pill instantly updates the card preview to show what that specific version does.
+- **Pedagogical Biomechanical Preview**:
+  - Version title and full didactic instruction/description (e.g., freehand stroke without visual guide, continuous guide line, multi-line challenge).
+  - Guide mode badge (`getVariantGuideBadge`: `Guía Gris Continua`, `Sin Guía (Solo Dianas)`, `Multi-Línea`, etc.).
+  - Difficulty pill (`Fácil`, `Media`, `Avanzada`) and objective target metrics.
+  - Kinematic progression reminder badge (`F1 (≥80%) → F2 (≥85%) → F3 (≥90%)`).
+- **One-Tap Practice Button**:
+  - Provides a direct `[ ▶ PRACTICAR {node.code} (V{x}) ]` call-to-action button that loads the selected level and variant into the practice canvas, sets phase to 1, resets streaks, and navigates seamlessly to the practice workspace.
+- **Cube Level Support**: Unfolding 3D cube nodes displays the perspective mode (1PF, 2PF, Isométrica, Caballera) and axes features with direct practice launch.
+
+#### 🎛️ Interactive Variant Dropdown & Info Card in Practice Sidebar (`App.tsx`, `VariantSelectorModal.tsx`)
+- **Variant Selector Modal (`VariantSelectorModal.tsx`)**:
+  - Created a dedicated neo-brutalist modal dialog opened from the practice sidebar.
+  - Features the active level header, spotlight card of the current variant in progress, biomechanical progression guide, and a list of all sub-levels with full descriptions, difficulty pills, guide mode tags, and 1-tap version switching.
+- **Practice Sidebar Variant Info Card**:
+  - In the left sidebar of the practice tab, clicking the `V{x}/{n}` badge or tapping the new sub-level summary card below the level header opens `VariantSelectorModal`.
+  - The summary card displays the active variant title, version number (`V6`), and a 2-line preview of what the current sub-level requires so the user always knows what exercise they are practicing without guesswork.
+
+---
+
 ## [0.2.6] — 2026-10-14
 
 ### 🎯 Biomechanical Stroke Evaluation Calibration & Quality Engine Overhaul

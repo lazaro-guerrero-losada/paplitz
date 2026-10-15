@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Unit, LessonNode } from '../lib/curriculumData';
-import { Check, Lock, BookOpen, FastForward, Sparkles, PenTool, Box } from 'lucide-react';
+import { Check, Lock, BookOpen, FastForward, Sparkles, PenTool, Box, Play, X, Layers, Target, ChevronDown } from 'lucide-react';
+import { getVariantGuideBadge } from './VariantSelectorModal';
 
 interface LearningPathProps {
   units: Unit[];
   activeModuleId?: string;
+  nodeVariantIndices?: Record<string, number>;
   onSelectModule?: (moduleId: string) => void;
-  onSelectNode: (node: LessonNode) => void;
+  onSelectNode: (node: LessonNode, variantIndex?: number) => void;
   onOpenGuidebook: (unit: Unit) => void;
   onOpenPlacementModal?: () => void;
 }
@@ -14,15 +16,23 @@ interface LearningPathProps {
 export const LearningPath: React.FC<LearningPathProps> = ({
   units,
   activeModuleId = 'module-calisthenics',
+  nodeVariantIndices,
   onSelectModule,
   onSelectNode,
   onOpenGuidebook,
   onOpenPlacementModal,
 }) => {
+  const [expandedNodeId, setExpandedNodeId] = useState<string | null>(null);
+  const [selectedVariants, setSelectedVariants] = useState<Record<string, number>>({});
+
   // Desplazamiento horizontal en zigzag tipo Duolingo
-  const getOffsetClass = (index: number) => {
+  const getOffset = (index: number) => {
     const pattern = [0, 40, 80, 40, 0, -40, -80, -40];
-    const offset = pattern[index % pattern.length];
+    return pattern[index % pattern.length];
+  };
+
+  const getOffsetClass = (index: number) => {
+    const offset = getOffset(index);
     return { transform: `translateX(${offset}px)` };
   };
 
@@ -121,6 +131,16 @@ export const LearningPath: React.FC<LearningPathProps> = ({
               const isCurrent = node.status === 'current';
               const isCompleted = node.status === 'completed';
               const isLocked = node.status === 'locked';
+              const isExpanded = expandedNodeId === node.id;
+              const nodeOffset = getOffset(nodeIdx);
+
+              const activeVariantIdx =
+                selectedVariants[node.id] ??
+                ((nodeVariantIndices?.[node.id] || 0) % (node.variants?.length || 1));
+              const activeVariant =
+                node.variants && node.variants.length > 0
+                  ? node.variants[activeVariantIdx] || node.variants[0]
+                  : node.exerciseDef;
 
               return (
                 <div
@@ -128,16 +148,19 @@ export const LearningPath: React.FC<LearningPathProps> = ({
                   className="flex flex-col items-center relative z-10 transition-all duration-200"
                   style={getOffsetClass(nodeIdx)}
                 >
-                    <button
-                    onClick={() => !isLocked && onSelectNode(node)}
+                  <button
+                    onClick={() => !isLocked && setExpandedNodeId(isExpanded ? null : node.id)}
                     disabled={isLocked}
                     className={`w-18 h-18 rounded-2xl relative flex flex-col items-center justify-center transition-all cursor-pointer select-none ${
                       isCompleted
                         ? 'bg-black text-white border-4 border-black shadow-[4px_4px_0px_#000000] hover:scale-105'
                         : isCurrent
-                        ? 'bg-white text-black border-4 border-black shadow-[6px_6px_0px_#000000] hover:scale-105 ring-4 ring-black/15 animate-pulse'
+                        ? `bg-white text-black border-4 border-black shadow-[6px_6px_0px_#000000] hover:scale-105 ring-4 ${
+                            isExpanded ? 'ring-black' : 'ring-black/15 animate-pulse'
+                          }`
                         : 'bg-neutral-100 text-neutral-400 border-2 border-neutral-300 cursor-not-allowed'
                     }`}
+                    title={isLocked ? 'Nivel bloqueado' : isExpanded ? 'Plegar detalles' : 'Ver qué hace este nivel y sus versiones'}
                   >
                     {/* Badge de nivel disponible / actual */}
                     {isCurrent && (
@@ -162,17 +185,27 @@ export const LearningPath: React.FC<LearningPathProps> = ({
                     {isLocked && (
                       <Lock className="w-3.5 h-3.5 opacity-50 mt-1" />
                     )}
+
+                    {/* Indicador de desplegado */}
+                    {!isLocked && (
+                      <div className="absolute -bottom-2 bg-black text-white rounded-full p-0.5 border border-white shadow-[1px_1px_0px_#000000]">
+                        <ChevronDown className={`w-2.5 h-2.5 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+                      </div>
+                    )}
                   </button>
 
                   {/* Etiqueta con el número y nombre del ejercicio */}
-                  <div className="mt-2 text-center max-w-[160px]">
-                    <div className="text-xs font-bold font-display leading-tight">
-                      {node.code} · {node.title}
+                  <div
+                    onClick={() => !isLocked && setExpandedNodeId(isExpanded ? null : node.id)}
+                    className={`mt-2.5 text-center max-w-[160px] ${!isLocked ? 'cursor-pointer' : ''}`}
+                  >
+                    <div className="text-xs font-bold font-display leading-tight flex items-center justify-center gap-1">
+                      <span>{node.code} · {node.title}</span>
                     </div>
                     {node.variants && node.variants.length > 1 && (
                       <div className="mt-1">
                         <span className="text-[9px] font-mono uppercase bg-neutral-100 border border-black px-1.5 py-0.5 font-bold shadow-[1px_1px_0px_#000000] inline-block">
-                          {node.variants.length} versiones
+                          {node.variants.length} versiones {nodeVariantIndices?.[node.id] !== undefined ? `(V${((nodeVariantIndices[node.id] || 0) % node.variants.length) + 1})` : ''}
                         </span>
                       </div>
                     )}
@@ -185,6 +218,169 @@ export const LearningPath: React.FC<LearningPathProps> = ({
                       </span>
                     )}
                   </div>
+
+                  {/* Tarjeta Desplegada / Unfolded con la estética de Paplitz */}
+                  {isExpanded && (
+                    <div
+                      style={{ transform: `translateX(${-nodeOffset}px)` }}
+                      className="w-[calc(100vw-32px)] max-w-md bg-white border-2 border-black p-3.5 shadow-[4px_4px_0px_#000000] text-left font-mono my-3 animate-in fade-in zoom-in-95 duration-150 relative z-30"
+                    >
+                      {/* Cabecera del nivel desplegado */}
+                      <div className="flex items-center justify-between gap-2 pb-2 mb-2.5 border-b-2 border-black bg-neutral-50 -mx-3.5 -mt-3.5 p-3">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="bg-black text-white px-2 py-0.5 text-xs font-bold shrink-0">
+                            {node.code}
+                          </span>
+                          <div className="min-w-0">
+                            <h4 className="text-xs sm:text-sm font-black font-display text-black truncate uppercase">
+                              {node.title}
+                            </h4>
+                            <p className="text-[10px] text-neutral-500 font-sans truncate">
+                              {node.subtitle}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setExpandedNodeId(null);
+                          }}
+                          className="p-1 border border-black bg-white hover:bg-neutral-200 cursor-pointer shadow-[1px_1px_0px_#000000] shrink-0"
+                          title="Plegar detalles"
+                        >
+                          <X className="w-3.5 h-3.5 stroke-[2.5]" />
+                        </button>
+                      </div>
+
+                      {/* Si tiene variantes (calistenia): Selector de versión y qué hace cada una */}
+                      {node.variants && node.variants.length > 0 && activeVariant ? (
+                        (() => {
+                          const guideInfo = getVariantGuideBadge(activeVariant);
+
+                          return (
+                            <div className="space-y-3">
+                              {/* Carrusel / Lista de pills de versiones */}
+                              <div>
+                                <div className="flex items-center justify-between text-[10px] font-bold uppercase text-neutral-600 mb-1.5">
+                                  <span className="flex items-center gap-1">
+                                    <Layers className="w-3 h-3 stroke-[2.5]" />
+                                    <span>Subniveles ({node.variants.length} versiones):</span>
+                                  </span>
+                                  <span className="text-neutral-400 font-normal">Toca para inspeccionar</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  {node.variants.map((v, vIdx) => {
+                                    const isCurrentVar = vIdx === activeVariantIdx;
+                                    return (
+                                      <button
+                                        key={v.code || vIdx}
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSelectedVariants((prev) => ({ ...prev, [node.id]: vIdx }));
+                                        }}
+                                        className={`px-2 py-1 text-[11px] font-bold border border-black cursor-pointer transition-all ${
+                                          isCurrentVar
+                                            ? 'bg-black text-white shadow-[2px_2px_0px_#000000] scale-105'
+                                            : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-800'
+                                        }`}
+                                        title={v.title}
+                                      >
+                                        V{vIdx + 1}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+
+                              {/* Tarjeta explicativa de la versión seleccionada: QUÉ HACE */}
+                              <div className="p-2.5 border-2 border-black bg-neutral-100 shadow-[2px_2px_0px_#000000] space-y-1.5">
+                                <div className="flex items-center justify-between text-[10px]">
+                                  <span className="bg-black text-white px-1.5 py-0.2 font-bold flex items-center gap-1">
+                                    <Sparkles className="w-2.5 h-2.5 fill-white" />
+                                    <span>VERSIÓN {activeVariantIdx + 1}</span>
+                                  </span>
+                                  <span className="font-bold text-neutral-600 uppercase">
+                                    {activeVariant.difficulty || 'Media'}
+                                  </span>
+                                </div>
+
+                                <div className="text-xs font-bold text-black font-display leading-tight">
+                                  {activeVariant.title}
+                                </div>
+
+                                <p className="text-[11px] text-neutral-700 font-sans leading-relaxed">
+                                  {activeVariant.desc || activeVariant.instruction}
+                                </p>
+
+                                {activeVariant.metrics && (
+                                  <div className="flex items-center gap-1 text-[10px] text-neutral-600 bg-white border border-neutral-300 px-1.5 py-1">
+                                    <Target className="w-3 h-3 text-black shrink-0" />
+                                    <span><strong>Objetivo:</strong> {activeVariant.metrics}</span>
+                                  </div>
+                                )}
+
+                                <div className="flex items-center gap-2 pt-1 border-t border-neutral-200 text-[10px]">
+                                  <span className={`px-1 py-0.2 border ${guideInfo.isPointsOnly ? 'border-black bg-neutral-200 font-bold' : 'border-neutral-300 bg-white'}`}>
+                                    {guideInfo.label}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Aviso de Fases de Motricidad */}
+                              <div className="text-[10px] text-neutral-500 font-mono bg-neutral-50 border border-neutral-300 p-1.5 flex items-center justify-between">
+                                <span>Progresión:</span>
+                                <span className="font-bold text-neutral-700">F1 (≥80%) → F2 (≥85%) → F3 (≥90%)</span>
+                              </div>
+
+                              {/* Botón de acción principal: Lanzar práctica */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onSelectNode(node, activeVariantIdx);
+                                }}
+                                className="w-full btn-ink py-2 text-xs font-mono font-bold flex items-center justify-center gap-2 cursor-pointer shadow-[3px_3px_0px_#000000] active:scale-98 transition-transform"
+                              >
+                                <Play className="w-3.5 h-3.5 fill-white stroke-none" />
+                                <span>PRACTICAR {node.code} (V{activeVariantIdx + 1})</span>
+                              </button>
+                            </div>
+                          );
+                        })()
+                      ) : (
+                        /* Para lecciones de cubo o sin variantes */
+                        <div className="space-y-3">
+                          <div className="p-2.5 border-2 border-black bg-neutral-100 shadow-[2px_2px_0px_#000000] space-y-1">
+                            <div className="text-xs font-bold text-black font-display">
+                              {node.title}
+                            </div>
+                            <p className="text-[11px] text-neutral-700 font-sans leading-relaxed">
+                              {node.subtitle}
+                            </p>
+                            {node.perspectiveMode && (
+                              <div className="text-[10px] text-neutral-600 bg-white border border-neutral-300 p-1 mt-1">
+                                <strong>Perspectiva:</strong> {node.perspectiveMode}
+                              </div>
+                            )}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSelectNode(node);
+                            }}
+                            className="w-full btn-ink py-2 text-xs font-mono font-bold flex items-center justify-center gap-2 cursor-pointer shadow-[3px_3px_0px_#000000] active:scale-98 transition-transform"
+                          >
+                            <Play className="w-3.5 h-3.5 fill-white stroke-none" />
+                            <span>PRACTICAR ESTE NIVEL</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
