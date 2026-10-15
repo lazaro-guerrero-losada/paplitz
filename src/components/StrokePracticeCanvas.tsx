@@ -473,7 +473,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
       }
 
       // B. Curva S generatriz
-      if (challenge.waveParams && showSolution) {
+      if (challenge.waveParams && challenge.guideMode !== 'points_only') {
         const wp = challenge.waveParams;
         ctx.strokeStyle = '#888888';
         ctx.lineWidth = 1.8;
@@ -802,7 +802,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
       }
 
       // D. Líneas guía punteadas
-      if (!challenge.spacingTrackParams && showSolution && challenge.guideLines) {
+      if (!challenge.spacingTrackParams && challenge.guideLines && challenge.guideMode !== 'points_only') {
         for (const line of challenge.guideLines) {
           ctx.strokeStyle = line.dashed ? '#888888' : '#CCCCCC';
           ctx.lineWidth = 1.5;
@@ -818,7 +818,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
       }
 
       // E. SOLUCIÓN FANTASMA (Antes de empezar a dibujar)
-      if (showSolution && strokes.length === 0 && !isDrawing && challenge.ghostSolutionStrokes) {
+      if (challenge.guideMode !== 'points_only' && strokes.length === 0 && !isDrawing && challenge.ghostSolutionStrokes) {
         ctx.save();
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.22)';
         ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
@@ -954,8 +954,8 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
         ctx.stroke();
       }
 
-      // H. SUPERPOSICIÓN DE SOLUCIÓN TRAS CORRECCIÓN (RESPETA SHOWSOLUTION, SIN BORRAR EL TRAZO)
-      if (evaluation && evaluation.solutionOverlay && showSolution) {
+      // H. SUPERPOSICIÓN DE SOLUCIÓN TRAS CORRECCIÓN (SIN BORRAR EL TRAZO)
+      if (evaluation && evaluation.solutionOverlay) {
         const linesToDraw: { x: number; y: number }[][] =
           evaluation.solutionOverlay.multiLines && evaluation.solutionOverlay.multiLines.length > 0
             ? evaluation.solutionOverlay.multiLines.map((l) => l.points)

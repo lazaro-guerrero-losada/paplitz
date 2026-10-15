@@ -4,6 +4,23 @@ All notable changes, new features, bug fixes, and UX improvements to the Paplitz
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.9] — 2026-10-15
+
+### 🔒 Locked Pedagogical Guide Visibility in Calisthenics
+
+Eliminates manual guide toggling in Calisthenics mode and ensures guide lines and ghost lines strictly follow the curriculum level/variant definition ("Con Guía" vs "Sin Guía").
+
+#### 🛑 Deactivated Manual Guide Toggle in Calisthenics (`StrokePracticeCanvas.tsx`, `App.tsx`)
+- **Problem**: Calisthenics variants are explicitly designed either as guided practice (`gray_line` / "Guía Gris Continua") or unguided freehand practice (`points_only` / "Sin Guía (Solo Dianas)"). A global `showSolution` toggle button ("Guía") was previously available in the toolbar. If the user toggled it off, guided levels lost their guide lines; conversely, if toggled on, unguided levels rendered dashed ghost lines.
+- **Deactivation**: Deactivated the manual show/hide guide toggle in Calisthenics mode (`onToggleSolution={undefined}`), removing the toggle button from both mobile and desktop headers.
+- **Strict Level-Driven Rendering**:
+  - **Levels with Guide (`gray_line`)**: Always render the continuous gray guide line regardless of any global state.
+  - **Levels without Guide (`points_only`)**: Strictly render only target dianas ① and ②. No guide lines, dashed paths, or ghost solution strokes are drawn before drawing.
+  - **Post-Evaluation Overlay**: The ideal solution comparison overlay is always displayed after evaluation to provide visual feedback on stroke deviation.
+
+#### 🎯 Generator Cleanup (`strokeProceduralGenerator.ts`)
+- Fixed `ghostSolutionStrokes` generation in `generateSingleStrokeProceduralChallenge`, `generateMultiLineSingleStrokeChallenge`, and `generateRadialRosetteChallenge` to only populate ghost strokes when `cfg.guideType === 'gray_line'`, preventing unguided (`points_only`) levels from inadvertently receiving dashed pre-drawing paths.
+
 ## [0.2.8] — 2026-10-15
 
 ### 🎯 Strict Target Arrival Calibration & Adaptive Speed Ceiling

@@ -1818,9 +1818,9 @@ export function App() {
                     ref={strokeCanvasRef}
                     exerciseDef={currentExerciseDef}
                     currentPhase={currentPhase}
-                    showSolution={showSolution}
+                    showSolution={true}
                     showUserStrokes={showUserStrokes}
-                    onToggleSolution={() => setShowSolution((prev) => !prev)}
+                    onToggleSolution={undefined}
                     onToggleUserStrokes={() => setShowUserStrokes((prev) => !prev)}
                     seed={calisthenicsSeed}
                     onNewSeed={setCalisthenicsSeed}

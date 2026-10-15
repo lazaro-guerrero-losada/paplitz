@@ -292,9 +292,8 @@ export function generateMultiLineChallenge(
       endKeyPointOrder: endOrder,
     });
 
-    ghostSolutionStrokes.push({ points: idealPath });
-
     if (cfg.guideType === 'gray_line') {
+      ghostSolutionStrokes.push({ points: idealPath });
       guideLines.push({ x1: pStart.x, y1: pStart.y, x2: pEnd.x, y2: pEnd.y, dashed: false });
     }
   }
@@ -453,9 +452,8 @@ export function generateRadialRosetteChallenge(
       endKeyPointOrder: isOutward ? outerOrder : centerOrder,
     });
 
-    ghostSolutionStrokes.push({ points: idealPath });
-
     if (cfg.guideType === 'gray_line') {
+      ghostSolutionStrokes.push({ points: idealPath });
       guideLines.push({ x1: startPt.x, y1: startPt.y, x2: endPt.x, y2: endPt.y, dashed: false });
     }
   }
@@ -1681,7 +1679,7 @@ export function generateSingleStrokeChallenge(
     directionKey: cfg.direction,
     guideMode: cfg.guideType,
     keyPoints,
-    ghostSolutionStrokes: [{ points: idealPoints }],
+    ghostSolutionStrokes: cfg.guideType === 'gray_line' ? [{ points: idealPoints }] : [],
     idealPath: idealPoints,
     expectedDirectionAngleDeg: angleDeg,
     guideLines:
