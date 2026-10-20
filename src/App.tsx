@@ -99,7 +99,7 @@ function loadAndSanitizeUnits(savedKey: string, defaultUnits: Unit[]): Unit[] {
                 (defaultNode.id === 'cal_u5_s' && n.id === 'cal_u4_s')
             );
             return savedNode
-              ? { ...defaultNode, status: savedNode.status, score: savedNode.score }
+              ? { ...defaultNode, status: savedNode.status, score: savedNode.score, masteryLevel: savedNode.masteryLevel }
               : defaultNode;
           }),
         };
@@ -188,11 +188,34 @@ export function App() {
     localStorage.setItem('paplitz_node_phases', JSON.stringify(nodePhases));
   }, [nodePhases]);
 
+  // Nivel de maestría alcanzado por nodo (1: ★☆☆ Bronce/Precisión, 2: ★★☆ Plata/Fluidez, 3: ★★★ Oro/Corona)
+  const [nodeMastery, setNodeMastery] = useState<Record<string, 1 | 2 | 3>>(() => {
+    const saved = localStorage.getItem('paplitz_node_mastery');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        // Fallback
+      }
+    }
+    return {};
+  });
+
+  useEffect(() => {
+    localStorage.setItem('paplitz_node_mastery', JSON.stringify(nodeMastery));
+  }, [nodeMastery]);
+
   const currentPhase: 1 | 2 | 3 = activeNode ? (nodePhases[activeNode.id] || 1) : 1;
   const setCurrentPhase = (phase: 1 | 2 | 3) => {
     if (activeNode) {
       setNodePhases((prev) => ({ ...prev, [activeNode.id]: phase }));
     }
+  };
+
+  // Cálculo de estrellas de la Unidad 1 para la compuerta de acceso a Unidad 2 (Diagonales)
+  const unit1NodeIds = ['cal_u1_d5', 'cal_u1_d6', 'cal_u1_d7', 'cal_u1_d8'];
+  const getUnit1Stars = (masteryMap: Record<string, 1 | 2 | 3>) => {
+    return unit1NodeIds.reduce((sum, id) => sum + (masteryMap[id] || 0), 0);
   };
 
   // Estados visuales y modales pedagógicos de maestría y fases de motricidad
@@ -213,11 +236,15 @@ export function App() {
     completedNode: LessonNode | null;
     nextNode: LessonNode | null;
     score: number;
+    masteryLevel?: 1 | 2 | 3;
+    unitGateNotice?: string | null;
   }>({
     isOpen: false,
     completedNode: null,
     nextNode: null,
     score: 0,
+    masteryLevel: 1,
+    unitGateNotice: null,
   });
 
   // Modo de práctica en la barra lateral: 'camino' (por defecto), 'daily' (reto diario), o 'record' (modo récord de sesión)
@@ -584,16 +611,16 @@ export function App() {
   const handleDismissPhaseTransition = () => {
     if (phaseTransitionNotice && activeNode) {
       if (phaseTransitionNotice.isVersionAdvance && phaseTransitionNotice.toVersion) {
-        // Avanzar a la siguiente versión / variante del nivel
+        // Avanzar a la siguiente versión / variante del nivel en la fase indicada
         const nextVariantIdx = phaseTransitionNotice.toVersion - 1;
         setNodeVariantIndices((prev) => ({
           ...prev,
           [activeNode.id]: nextVariantIdx,
         }));
-        setCurrentPhase(1);
+        setCurrentPhase(phaseTransitionNotice.toPhase);
         setMasteryStreaks((prev) => ({ ...prev, [activeNode.id]: 0 }));
       } else {
-        // Avanzar a la siguiente fase de motricidad dentro de la misma versión
+        // Avanzar a la siguiente fase de motricidad
         setCurrentPhase(phaseTransitionNotice.toPhase);
         setMasteryStreaks((prev) => ({ ...prev, [activeNode.id]: 0 }));
       }
@@ -715,7 +742,7 @@ export function App() {
       return;
     }
 
-    const targetThreshold = currentPhase === 1 ? 80 : currentPhase === 2 ? 85 : 90;
+    const targetThreshold = 80;
 
     if (evalResult.passed && evalResult.phasePassed !== false && recordedScore >= targetThreshold) {
       setAvatarMood('success-stars');
@@ -730,86 +757,109 @@ export function App() {
       setTimeout(() => setJustEarnedMastery(false), 900);
 
       if (newStreak < 3) {
-        // Aún no ha completado la fase actual: incrementar racha (sin toast intrusivo)
+        // Aún no ha completado la fase actual en esta versión: incrementar racha (sin toast intrusivo)
         setMasteryStreaks((prev) => ({ ...prev, [activeNode.id]: newStreak }));
       } else {
-        // ¡HA CONSEGUIDO 3 SEGUIDOS DE MAESTRÍA EN LA FASE ACTUAL!
-        // Dejarlo visible como 3/3 para que se vea completo en el HUD
+        // ¡HA CONSEGUIDO 3 ACIERTOS SEGUIDOS EN ESTA VERSIÓN Y FASE!
         setMasteryStreaks((prev) => ({ ...prev, [activeNode.id]: 3 }));
 
-        if (currentPhase < 3) {
-          // PASA DE FASE DE MOTRICIDAD (Fase 1 -> Fase 2, o Fase 2 -> Fase 3) DENTRO DE LA MISMA VERSIÓN
-          const nextPhase = (currentPhase + 1) as 1 | 2 | 3;
-          // Mostramos la ventana de paso de fase pero dejamos el trazo y nota visibles.
-          // El cambio a nextPhase y reseteo de racha a 0 ocurre al pulsar "Continuar a Fase X".
+        const hasMoreVariants = activeVariants.length > 1 && currentVariantIndex < activeVariants.length - 1;
+
+        if (hasMoreVariants) {
+          // PASA A LA SIGUIENTE VERSIÓN DENTRO DE LA MISMA FASE (ej: V1 -> V2 en Fase 1)
+          const nextVariantNum = currentVariantIndex + 2; // 1-indexed
           setPhaseTransitionNotice({
             fromPhase: currentPhase,
-            toPhase: nextPhase,
+            toPhase: currentPhase,
             nodeCode: activeNode.code,
             nodeTitle: activeNode.title,
-            isVersionAdvance: false,
+            isVersionAdvance: true,
+            fromVersion: currentVariantIndex + 1,
+            toVersion: nextVariantNum,
+            totalVersions: activeVariants.length,
           });
         } else {
-          // ¡HA ACABADO LA FASE DE VELOCIDAD (FASE 3)!
-          // Se han completado las 3 fases (Precisión, Fluidez, Velocidad) de esta versión.
-          const hasMoreVariants = activeVariants.length > 1 && currentVariantIndex < activeVariants.length - 1;
+          // ¡HA COMPLETADO TODAS LAS VERSIONES EN LA FASE ACTUAL!
+          // Se adjudica la maestría de esta fase (1: Bronce, 2: Plata, 3: Oro)
+          const oldMastery = nodeMastery[activeNode.id] || 0;
+          const newMastery = Math.max(oldMastery, currentPhase) as 1 | 2 | 3;
+          const updatedMastery = { ...nodeMastery, [activeNode.id]: newMastery };
+          setNodeMastery(updatedMastery);
 
-          if (hasMoreVariants) {
-            // PASA A LA SIGUIENTE VERSIÓN (ej: V1 -> V2) EMPEZANDO EN FASE 1
-            const nextVariantNum = currentVariantIndex + 2; // 1-indexed
-            setPhaseTransitionNotice({
-              fromPhase: 3,
-              toPhase: 1,
-              nodeCode: activeNode.code,
-              nodeTitle: activeNode.title,
-              isVersionAdvance: true,
-              fromVersion: currentVariantIndex + 1,
-              toVersion: nextVariantNum,
-              totalVersions: activeVariants.length,
-            });
-          } else {
-            // ¡HA ACABADO LA ÚLTIMA VERSIÓN Y LA FASE 3!
-            // ¡EL NIVEL ESTÁ TOTALMENTE SUPERADO! (3 fases x 3 maestrías x N versiones)
-            const currentIndexInAll = allNodes.findIndex((n) => n.id === activeNode.id);
-            const immediateNextNode =
-              currentIndexInAll >= 0 && currentIndexInAll < allNodes.length - 1
-                ? allNodes[currentIndexInAll + 1]
-                : null;
+          // Buscar el siguiente nivel en el plan
+          const currentIndexInAll = allNodes.findIndex((n) => n.id === activeNode.id);
+          const immediateNextNode =
+            currentIndexInAll >= 0 && currentIndexInAll < allNodes.length - 1
+              ? allNodes[currentIndexInAll + 1]
+              : null;
 
-            const nextUnits = units.map((unit) => ({
-              ...unit,
-              nodes: unit.nodes.map((n) => {
-                if (n.id === activeNode.id) {
-                  return { ...n, status: 'completed' as const, score: Math.max(n.score || 0, recordedScore) };
-                }
-                if (immediateNextNode && n.id === immediateNextNode.id && n.status === 'locked') {
+          // Comprobar barrera de la Unidad 2 (Diagonales)
+          const updatedUnit1Stars = getUnit1Stars(updatedMastery);
+          const isEnteringUnit2 = immediateNextNode && immediateNextNode.id === 'cal_u2_d1';
+          const isUnit2Blocked = isEnteringUnit2 && updatedUnit1Stars < 6;
+
+          let unitGateNotice: string | null = null;
+          if (isUnit2Blocked) {
+            unitGateNotice = `Has completado la Unidad 1 con ${updatedUnit1Stars}/6★ de maestría. Para acceder a la Unidad 2 (Diagonales), necesitas al menos 6★. ¡Perfecciona niveles anteriores a Fase 2 (Fluidez)!`;
+          }
+
+          const nextUnits = units.map((unit) => ({
+            ...unit,
+            nodes: unit.nodes.map((n) => {
+              if (n.id === activeNode.id) {
+                return {
+                  ...n,
+                  status: 'completed' as const,
+                  score: Math.max(n.score || 0, recordedScore),
+                  masteryLevel: newMastery,
+                };
+              }
+              if (immediateNextNode && n.id === immediateNextNode.id && n.status === 'locked') {
+                if (!isUnit2Blocked) {
                   return { ...n, status: 'current' as const };
                 }
-                return n;
-              }),
-            }));
+              }
+              return n;
+            }),
+          }));
 
-            setUnits(nextUnits);
-            setActiveNode((prev) =>
-              prev ? { ...prev, status: 'completed', score: Math.max(prev.score || 0, recordedScore) } : prev
-            );
+          setUnits(nextUnits);
+          setActiveNode((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  status: 'completed',
+                  score: Math.max(prev.score || 0, recordedScore),
+                  masteryLevel: newMastery,
+                }
+              : prev
+          );
 
-            // Mostrar modal de nivel superado al acabar todas las versiones y fases
-            setLevelCompletionModal({
-              isOpen: true,
-              completedNode: activeNode,
-              nextNode: immediateNextNode,
-              score: recordedScore,
-            });
-          }
+          // Mostrar modal de nivel superado con nivel de maestría alcanzado
+          setLevelCompletionModal({
+            isOpen: true,
+            completedNode: activeNode,
+            nextNode: isUnit2Blocked ? null : immediateNextNode,
+            score: recordedScore,
+            masteryLevel: newMastery,
+            unitGateNotice,
+          });
         }
       }
     } else {
       setAvatarMood('fail-spiral');
       setTimeout(() => setAvatarMood('neutral'), 3000);
 
-      // Reiniciar racha al fallar (sin toast intrusivo)
-      setMasteryStreaks((prev) => ({ ...prev, [activeNode.id]: 0 }));
+      // Penalización suave de racha (Banked checkmarks):
+      // Si la dirección fue invertida o el fallo fue severo (<70%), la racha se reinicia a 0.
+      // Si fue un fallo cercano (≥70%), solo se pierde 1 acierto en lugar de borrar toda la racha.
+      const currentStreak = masteryStreaks[activeNode.id] || 0;
+      const isReversed = evalResult.feedbackTitle?.includes('Invertida') || evalResult.isReversed;
+      if (isReversed || recordedScore < 70) {
+        setMasteryStreaks((prev) => ({ ...prev, [activeNode.id]: 0 }));
+      } else if (currentStreak > 0) {
+        setMasteryStreaks((prev) => ({ ...prev, [activeNode.id]: Math.max(0, currentStreak - 1) }));
+      }
     }
   };
 
@@ -1913,6 +1963,7 @@ export function App() {
               units={units}
               activeModuleId={activeModuleId}
               nodeVariantIndices={nodeVariantIndices}
+              nodeMastery={nodeMastery}
               onSelectModule={handleSelectModule}
               onSelectNode={handleSelectNode}
               onOpenGuidebook={(unit) => setGuidebookUnit(unit)}
@@ -2004,6 +2055,8 @@ export function App() {
           completedNode={levelCompletionModal.completedNode}
           nextNode={levelCompletionModal.nextNode}
           score={levelCompletionModal.score}
+          masteryLevel={levelCompletionModal.masteryLevel || 1}
+          unitGateNotice={levelCompletionModal.unitGateNotice}
           onGoToNextNode={() => {
             if (levelCompletionModal.nextNode) {
               handleSelectNode(levelCompletionModal.nextNode);
@@ -2013,6 +2066,16 @@ export function App() {
           onStayAndPractice={() => {
             setLevelCompletionModal({ isOpen: false, completedNode: null, nextNode: null, score: 0 });
             setCalisthenicsSeed(Math.floor(Math.random() * 90000 + 10000));
+          }}
+          onAdvanceToNextPhase={() => {
+            if (levelCompletionModal.completedNode && (levelCompletionModal.masteryLevel || 1) < 3) {
+              const nextPhase = ((levelCompletionModal.masteryLevel || 1) + 1) as 1 | 2 | 3;
+              setCurrentPhase(nextPhase);
+              setNodeVariantIndices((prev) => ({ ...prev, [levelCompletionModal.completedNode!.id]: 0 }));
+              setMasteryStreaks((prev) => ({ ...prev, [levelCompletionModal.completedNode!.id]: 0 }));
+              setCalisthenicsSeed(Math.floor(Math.random() * 90000 + 10000));
+            }
+            setLevelCompletionModal({ isOpen: false, completedNode: null, nextNode: null, score: 0 });
           }}
           onGoToCamino={() => {
             setActiveTab('path');

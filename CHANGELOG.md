@@ -4,6 +4,27 @@ All notable changes, new features, bug fixes, and UX improvements to the Paplitz
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-10-20
+
+### 🌟 3-Tier Mastery System (★☆☆, ★★☆, ★★★), Unit 2 Progression Gate & Stylus Biomechanics
+
+Addresses telemetry feedback from real-world testing (eliminating the "Dark Souls" barrier where users got stuck at 79% for 120+ attempts on C1.1):
+
+#### 🏆 3-Tier Mastery Architecture (`App.tsx`, `LearningPath.tsx`, `LevelCompletionModal.tsx`)
+- **Mastery 1 (★☆☆ Bronce / Precisión)**: Completing Phase 1 across all variants of a level marks the level as **Completed** and **immediately unlocks the next level** (e.g. C1.1 → C1.2). Users are no longer trapped on level 1!
+- **Mastery 2 (★★☆ Plata / Fluidez)**: Earned by completing Phase 2 across all variants of that level.
+- **Mastery 3 (★★★ Oro / Corona / Velocidad)**: Earned by completing Phase 3 across all variants (crown icon on map and modal).
+- **Unit 2 Gate (Access to Diagonals C2.1)**: Unlocking Unit 2 requires at least **6★ of Mastery** in Unit 1 (meaning the user must achieve Mastery 2 on at least 2 levels). Rendered with an amber gate banner on the path and in the level completion modal.
+- **Banked Checkmarks (Soft Streak Drop)**: Near-misses (score ≥ 70%) only deduct 1 checkmark instead of wiping out the entire 3-strike streak.
+
+#### ✏️ Stylus Micro-Touch Rejection (`StrokePracticeCanvas.tsx`)
+- Discards accidental contacts shorter than 16px or faster than 55ms caused by Apple Pencil tilt or contact bounce, preventing immediate 0% streak-wiping failures.
+
+#### ⚡ Biomechanical Calibration (`strokeEvaluator.ts`, `strokeKinematics.ts`)
+- Standardized passing threshold to 80% across all phases (Phase 2 and Phase 3 incorporate fluency and speed directly into the score).
+- Removed `kinematics_failed` as an artificial 79% kill-switch; speed is a proportional 20% contributor.
+- Recalibrated Phase 3 target speed floor from 340 px/s to 260 px/s and increased duration ceiling to 900ms+.
+
 ## [0.2.9] — 2026-10-15
 
 ### 🔒 Locked Pedagogical Guide Visibility in Calisthenics

@@ -19,6 +19,7 @@ export interface LessonNode {
   isCalisthenics?: boolean;
   exerciseDef?: LabExerciseDef;
   variants?: LabExerciseDef[];
+  masteryLevel?: 1 | 2 | 3;
 }
 
 export interface Unit {

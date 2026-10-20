@@ -286,11 +286,11 @@ export function calculateOpticalDensity(
 /**
  * Obtiene el umbral numérico de aprobación según la fase de motricidad activa:
  * Fase 1 (Precisión): ≥80%
- * Fase 2 (Fluidez): ≥85%
- * Fase 3 (Velocidad): ≥90%
+ * Fase 2 (Fluidez): ≥80% (exige velocidad continua integrada en la nota)
+ * Fase 3 (Velocidad): ≥80% (exige impulso balístico integrado en la nota)
  */
-export function getPhasePassingThreshold(phase: 1 | 2 | 3 = 1): number {
-  return phase === 1 ? 80 : phase === 2 ? 85 : 90;
+export function getPhasePassingThreshold(_phase: 1 | 2 | 3 = 1): number {
+  return 80;
 }
 
 /**
@@ -456,16 +456,16 @@ export function evaluateSingleStrokeSubmission(
     // Fase 2: Fluidez (75% Geometría + 25% Fluidez cinemática, umbral ≥85%)
     overallScore = Math.round(geometricScore * 0.75 + kinematics.fluencyScore * 0.25);
   } else {
-    // Fase 3: Velocidad Balística (80% Geometría + 20% Velocidad Balística, umbral ≥90%)
-    const targetFastSpeed = Math.min(520, Math.max(340, Math.round(kinematics.userBaselineSpeedPxPerSec * 0.85)));
+    // Fase 3: Velocidad Balística (80% Geometría + 20% Velocidad Balística, umbral ≥80%)
+    const targetFastSpeed = Math.min(480, Math.max(260, Math.round(kinematics.userBaselineSpeedPxPerSec * 0.75)));
     const speedRatio = kinematics.avgSpeedPxPerSec / targetFastSpeed;
     const speedScore = Math.min(100, Math.round(Math.max(0, speedRatio * 100)));
 
     overallScore = Math.round(geometricScore * 0.80 + speedScore * 0.20);
 
     // La velocidad no puede rescatar una geometría insuficiente para la Fase 3
-    if (geometricScore < 86) {
-      overallScore = Math.min(overallScore, 87);
+    if (geometricScore < 75) {
+      overallScore = Math.min(overallScore, 78);
     }
   }
 
@@ -486,8 +486,6 @@ export function evaluateSingleStrokeSubmission(
     failedGateReason = 'angle_error';
   } else if (!isCurve && straightnessScore < 60) {
     failedGateReason = 'straightness_error';
-  } else if (!kinematics.phasePassed) {
-    failedGateReason = 'kinematics_failed';
   }
 
   let phasePassed = !failedGateReason && overallScore >= targetThreshold;

@@ -1109,6 +1109,21 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
       }
 
       if (currentStrokeRef.current.length > 1) {
+        // Filtro de rechazo de micro-toques accidentales (inclinación de Apple Pencil / rebote táctil)
+        let strokeLength = 0;
+        const pts = currentStrokeRef.current;
+        for (let i = 1; i < pts.length; i++) {
+          strokeLength += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+        }
+        const strokeDuration = (pts[pts.length - 1]?.time || 0) - (pts[0]?.time || 0);
+
+        // Si el trazo es microscópico (< 16px) o dura menos de 55ms, descartarlo como roce involuntario
+        if (strokeLength < 16 || strokeDuration < 55) {
+          currentStrokeRef.current = [];
+          renderCanvas();
+          return;
+        }
+
         const newStrokes = [...strokes, { points: [...currentStrokeRef.current] }];
         setStrokes(newStrokes);
 
@@ -1141,7 +1156,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
       renderCanvas();
     };
 
-    const targetMasteryScore = currentPhase === 1 ? 80 : currentPhase === 2 ? 85 : 90;
+    const targetMasteryScore = 80;
     const isMasterySuccess = Boolean(
       evaluation && evaluation.passed && evaluation.phasePassed !== false && evaluation.overallScore >= targetMasteryScore
     );
@@ -1238,7 +1253,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                                 ? 'bg-black text-white shadow-[1px_1px_0px_#000000]'
                                 : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
                             }`}
-                            title={`Fase ${ph}: ${ph === 1 ? 'Precisión (extremos, ≥80%)' : ph === 2 ? 'Fluidez (velocidad constante, ≥85%)' : 'Velocidad (inercia ágil, ≥90%)'}`}
+                            title={`Fase ${ph}: ${ph === 1 ? 'Precisión (extremos, ≥80%)' : ph === 2 ? 'Fluidez (velocidad constante, ≥80%)' : 'Velocidad (inercia ágil, ≥80%)'}`}
                           >
                             {ph}
                           </button>
@@ -1587,7 +1602,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                             ? 'bg-black text-white shadow-[1px_1px_0px_#000000]'
                             : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
                         }`}
-                        title={`Fase ${ph}: ${ph === 1 ? 'Precisión (extremos, ≥80%)' : ph === 2 ? 'Fluidez (velocidad constante, ≥85%)' : 'Velocidad (inercia ágil, ≥90%)'}`}
+                        title={`Fase ${ph}: ${ph === 1 ? 'Precisión (extremos, ≥80%)' : ph === 2 ? 'Fluidez (velocidad constante, ≥80%)' : 'Velocidad (inercia ágil, ≥80%)'}`}
                       >
                         {ph}
                       </button>
@@ -1992,7 +2007,7 @@ export const StrokePracticeCanvas = forwardRef<StrokePracticeCanvasRef, StrokePr
                         {evaluation.phasePassed ? 'Cumplida' : 'No alcanzada'}
                       </span>
                       <span className="text-[10px] text-neutral-400 block">
-                        {currentPhase === 1 ? 'Ritmo libre (≥80%)' : currentPhase === 2 ? 'Fluidez continua (≥85%)' : 'Velocidad ágil (≥90%)'}
+                        {currentPhase === 1 ? 'Ritmo libre (≥80%)' : currentPhase === 2 ? 'Fluidez continua (≥80%)' : 'Velocidad ágil (≥80%)'}
                       </span>
                     </div>
                   </div>

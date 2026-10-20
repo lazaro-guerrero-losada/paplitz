@@ -7,6 +7,7 @@ interface LearningPathProps {
   units: Unit[];
   activeModuleId?: string;
   nodeVariantIndices?: Record<string, number>;
+  nodeMastery?: Record<string, 1 | 2 | 3>;
   onSelectModule?: (moduleId: string) => void;
   onSelectNode: (node: LessonNode, variantIndex?: number) => void;
   onOpenGuidebook: (unit: Unit) => void;
@@ -17,6 +18,7 @@ export const LearningPath: React.FC<LearningPathProps> = ({
   units,
   activeModuleId = 'module-calisthenics',
   nodeVariantIndices,
+  nodeMastery,
   onSelectModule,
   onSelectNode,
   onOpenGuidebook,
@@ -89,38 +91,74 @@ export const LearningPath: React.FC<LearningPathProps> = ({
         </div>
       )}
 
-      {units.map((unit) => (
-        <div key={unit.id} className="w-full mb-16">
-          {/* Cabecera de la Unidad con estética de caja entintada */}
-          <div className="card-ink p-5 mb-10 relative bg-white">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <span className="text-[11px] font-mono uppercase tracking-widest bg-black text-white px-2 py-0.5 font-bold">
-                  UNIDAD {unit.number}
-                </span>
-                <h3 className="text-xl font-bold font-display mt-2 leading-tight">
-                  {unit.title}
-                </h3>
-                <p className="text-xs text-neutral-600 mt-1 font-sans">
-                  {unit.description}
-                </p>
-                <div className="text-[10px] font-mono text-neutral-500 mt-2 flex items-center gap-1.5">
-                  <BookOpen className="w-3 h-3 stroke-[2]" />
-                  <span>{unit.bookChapter}</span>
+      {/* Cálculo de estrellas de la Unidad 1 para la compuerta de acceso a Unidad 2 */}
+      {(() => {
+        const unit1 = units.find((u) => u.number === 1);
+        const unit1Stars = unit1
+          ? unit1.nodes.reduce((acc, n) => {
+              const m = nodeMastery?.[n.id] ?? (n.status === 'completed' ? (n.masteryLevel || 1) : 0);
+              return acc + m;
+            }, 0)
+          : 0;
+
+        return units.map((unit) => {
+          const unitStars = unit.nodes.reduce((acc, n) => {
+            const m = nodeMastery?.[n.id] ?? (n.status === 'completed' ? (n.masteryLevel || 1) : 0);
+            return acc + m;
+          }, 0);
+          const maxUnitStars = unit.nodes.length * 3;
+
+          return (
+            <div key={unit.id} className="w-full mb-16">
+              {/* Barrera de Acceso a Unidad 2 si la Unidad 1 tiene menos de 6 estrellas */}
+              {unit.number === 2 && activeModuleId === 'module-calisthenics' && unit1Stars < 6 && (
+                <div className="w-full mb-6 p-3.5 border-2 border-amber-600 bg-amber-50 text-amber-900 shadow-[3px_3px_0px_#b45309] flex items-start gap-2.5 font-mono text-xs">
+                  <Lock className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                  <div>
+                    <div className="font-bold uppercase tracking-wider text-amber-900">Barrera de Acceso a Unidad 2</div>
+                    <div className="text-[11px] font-sans mt-0.5 text-amber-800">
+                      Requiere al menos <strong>6★ de Maestría</strong> en la Unidad 1 (actualmente tienes <strong>{unit1Stars}/6★</strong>). Consigue Maestría 2 (Fase 2: Fluidez) en al menos 2 niveles para desbloquear las Diagonales.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Cabecera de la Unidad con estética de caja entintada */}
+              <div className="card-ink p-5 mb-10 relative bg-white">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-mono uppercase tracking-widest bg-black text-white px-2 py-0.5 font-bold">
+                        UNIDAD {unit.number}
+                      </span>
+                      <span className="text-[10px] font-mono bg-neutral-100 border border-black px-1.5 py-0.5 font-bold shadow-[1px_1px_0px_#000000] flex items-center gap-1">
+                        <span className="text-amber-500 font-black">★</span>
+                        <span>{unitStars}/{maxUnitStars} Maestría</span>
+                      </span>
+                    </div>
+                    <h3 className="text-xl font-bold font-display mt-2 leading-tight">
+                      {unit.title}
+                    </h3>
+                    <p className="text-xs text-neutral-600 mt-1 font-sans">
+                      {unit.description}
+                    </p>
+                    <div className="text-[10px] font-mono text-neutral-500 mt-2 flex items-center gap-1.5">
+                      <BookOpen className="w-3 h-3 stroke-[2]" />
+                      <span>{unit.bookChapter}</span>
+                    </div>
+                  </div>
+
+                  {/* Botón de Guía de Unidad (Guidebook) */}
+                  <button
+                    onClick={() => onOpenGuidebook(unit)}
+                    className="btn-ink-outline px-3 py-2 text-xs flex items-center gap-1.5 shrink-0 cursor-pointer"
+                    title="Ver teoría y reglas de Koos Eissen"
+                  >
+                    <BookOpen className="w-4 h-4" />
+                    <span>GUÍA</span>
+                  </button>
                 </div>
               </div>
-
-              {/* Botón de Guía de Unidad (Guidebook) */}
-              <button
-                onClick={() => onOpenGuidebook(unit)}
-                className="btn-ink-outline px-3 py-2 text-xs flex items-center gap-1.5 shrink-0 cursor-pointer"
-                title="Ver teoría y reglas de Koos Eissen"
-              >
-                <BookOpen className="w-4 h-4" />
-                <span>GUÍA</span>
-              </button>
-            </div>
-          </div>
 
           {/* Nodos de la Unidad en el Camino */}
           <div className="flex flex-col items-center gap-6 relative">
@@ -133,6 +171,7 @@ export const LearningPath: React.FC<LearningPathProps> = ({
               const isLocked = node.status === 'locked';
               const isExpanded = expandedNodeId === node.id;
               const nodeOffset = getOffset(nodeIdx);
+              const mastery = nodeMastery?.[node.id] ?? (isCompleted ? (node.masteryLevel || 1) : 0);
 
               const activeVariantIdx =
                 selectedVariants[node.id] ??
@@ -174,10 +213,23 @@ export const LearningPath: React.FC<LearningPathProps> = ({
                       {node.code}
                     </span>
 
-                    {/* Badge de completado en la esquina superior derecha */}
+                    {/* Estrellas de maestría en el botón */}
+                    {isCompleted && (
+                      <div className="flex items-center gap-0.5 mt-1">
+                        <span className={`text-[10px] leading-none ${mastery >= 1 ? 'text-amber-400' : 'text-neutral-500'}`}>★</span>
+                        <span className={`text-[10px] leading-none ${mastery >= 2 ? 'text-amber-400' : 'text-neutral-500'}`}>★</span>
+                        <span className={`text-[10px] leading-none ${mastery >= 3 ? 'text-amber-400' : 'text-neutral-500'}`}>★</span>
+                      </div>
+                    )}
+
+                    {/* Badge de completado o corona en la esquina superior derecha */}
                     {isCompleted && (
                       <div className="absolute -top-2 -right-2 w-6 h-6 bg-white text-black border-2 border-black rounded-full flex items-center justify-center shadow-[1px_1px_0px_#000000]">
-                        <Check className="w-3.5 h-3.5 stroke-[3]" />
+                        {mastery === 3 ? (
+                          <span className="text-[11px] leading-none" title="Corona de Maestría 3">👑</span>
+                        ) : (
+                          <Check className="w-3.5 h-3.5 stroke-[3]" />
+                        )}
                       </div>
                     )}
 
@@ -212,10 +264,13 @@ export const LearningPath: React.FC<LearningPathProps> = ({
                     <div className="text-[10px] text-neutral-500 font-sans mt-0.5 leading-snug">
                       {node.subtitle}
                     </div>
-                    {isCompleted && node.score && (
-                      <span className="text-[10px] font-mono bg-neutral-100 border border-black px-1.5 py-0.2 mt-1 inline-block font-bold">
-                        {node.score}% precisión
-                      </span>
+                    {isCompleted && (
+                      <div className="mt-1 flex items-center justify-center gap-1">
+                        <span className="text-[9px] font-mono bg-neutral-100 border border-black px-1.5 py-0.2 font-bold inline-flex items-center gap-1 shadow-[1px_1px_0px_#000000]">
+                          <span className="text-amber-500 font-bold">{'★'.repeat(mastery)}{'☆'.repeat(3 - mastery)}</span>
+                          {node.score ? `· ${node.score}%` : ''}
+                        </span>
+                      </div>
                     )}
                   </div>
 
@@ -328,10 +383,29 @@ export const LearningPath: React.FC<LearningPathProps> = ({
                                 </div>
                               </div>
 
+                              {/* Tarjeta de Maestría del Nivel */}
+                              <div className="text-[10px] text-neutral-600 font-mono bg-neutral-50 border border-neutral-300 p-2 space-y-1">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-bold text-black flex items-center gap-1">
+                                    <span>Maestría:</span>
+                                    <span className="text-amber-500 text-xs">
+                                      {mastery === 3 ? '★★★ (Oro 👑)' : mastery === 2 ? '★★☆ (Plata)' : mastery === 1 ? '★☆☆ (Bronce)' : '☆☆☆'}
+                                    </span>
+                                  </span>
+                                  <span className="text-neutral-500 font-bold">{mastery}/3★</span>
+                                </div>
+                                <div className="text-[10px] text-neutral-500 font-sans leading-tight">
+                                  {mastery === 0 && 'Completa la Fase 1 en todas las versiones para superar el nivel y conseguir ★☆☆.'}
+                                  {mastery === 1 && '¡Nivel superado! Completa la Fase 2 (Fluidez) en todas las versiones para ganar ★★☆.'}
+                                  {mastery === 2 && '¡Gran fluidez! Completa la Fase 3 (Velocidad) para ganar la Corona ★★★.'}
+                                  {mastery === 3 && '¡Maestría máxima alcanzada con Corona de Oro en todas las fases!'}
+                                </div>
+                              </div>
+
                               {/* Aviso de Fases de Motricidad */}
                               <div className="text-[10px] text-neutral-500 font-mono bg-neutral-50 border border-neutral-300 p-1.5 flex items-center justify-between">
-                                <span>Progresión:</span>
-                                <span className="font-bold text-neutral-700">F1 (≥80%) → F2 (≥85%) → F3 (≥90%)</span>
+                                <span>Fases:</span>
+                                <span className="font-bold text-neutral-700">F1 (Precisión) → F2 (Fluidez) → F3 (Velocidad)</span>
                               </div>
 
                               {/* Botón de acción principal: Lanzar práctica */}
@@ -386,7 +460,9 @@ export const LearningPath: React.FC<LearningPathProps> = ({
             })}
           </div>
         </div>
-      ))}
+      );
+    });
+  })()}
     </div>
   );
 };
