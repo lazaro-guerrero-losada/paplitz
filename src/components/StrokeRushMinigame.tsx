@@ -27,6 +27,7 @@ export interface StrokeRushMinigameProps {
   onAwardXP: (amount: number) => void;
   onAvatarMoodChange?: (mood: AvatarMood) => void;
   onDrawingStateChange?: (isDrawing: boolean) => void;
+  onToggleSidebar?: () => void;
 }
 
 interface Point {
@@ -147,6 +148,70 @@ function evaluateUserStrokeAgainstLine(userPts: Point[], linePts: Point[]): { sc
   };
 }
 
+// --- FUNCIONES GEOMÉTRICAS DE COLISIÓN Y DISTANCIA ENTRE TRAZOS ---
+function ccw(p1: Point, p2: Point, p3: Point): number {
+  return (p3.y - p1.y) * (p2.x - p1.x) - (p2.y - p1.y) * (p3.x - p1.x);
+}
+
+function doSegmentsIntersect(p1: Point, p2: Point, p3: Point, p4: Point): boolean {
+  if (
+    Math.max(p1.x, p2.x) < Math.min(p3.x, p4.x) ||
+    Math.max(p3.x, p4.x) < Math.min(p1.x, p2.x) ||
+    Math.max(p1.y, p2.y) < Math.min(p3.y, p4.y) ||
+    Math.max(p3.y, p4.y) < Math.min(p1.y, p2.y)
+  ) {
+    return false;
+  }
+  const d1 = ccw(p1, p2, p3);
+  const d2 = ccw(p1, p2, p4);
+  const d3 = ccw(p3, p4, p1);
+  const d4 = ccw(p3, p4, p2);
+
+  return (
+    ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
+    ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))
+  );
+}
+
+function doPolylinesIntersect(ptsA: Point[], ptsB: Point[]): boolean {
+  for (let i = 0; i < ptsA.length - 1; i++) {
+    for (let j = 0; j < ptsB.length - 1; j++) {
+      if (doSegmentsIntersect(ptsA[i], ptsA[i + 1], ptsB[j], ptsB[j + 1])) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function pointToSegmentDistance(p: Point, a: Point, b: Point): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const l2 = dx * dx + dy * dy;
+  if (l2 === 0) return Math.hypot(p.x - a.x, p.y - a.y);
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2));
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
+function minDistanceBetweenPolylines(ptsA: Point[], ptsB: Point[]): number {
+  let minDist = Infinity;
+  const stepA = Math.max(1, Math.floor((ptsA.length - 1) / 10));
+  for (let i = 0; i < ptsA.length; i += stepA) {
+    for (let j = 0; j < ptsB.length - 1; j++) {
+      const d = pointToSegmentDistance(ptsA[i], ptsB[j], ptsB[j + 1]);
+      if (d < minDist) minDist = d;
+    }
+  }
+  const stepB = Math.max(1, Math.floor((ptsB.length - 1) / 10));
+  for (let j = 0; j < ptsB.length; j += stepB) {
+    for (let i = 0; i < ptsA.length - 1; i++) {
+      const d = pointToSegmentDistance(ptsB[j], ptsA[i], ptsA[i + 1]);
+      if (d < minDist) minDist = d;
+    }
+  }
+  return minDist;
+}
+
 export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
   unlockedNodes,
   activeNode,
@@ -154,6 +219,7 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
   onAwardXP,
   onAvatarMoodChange,
   onDrawingStateChange,
+  onToggleSidebar,
 }) => {
   // Todos los nodos de calistenia para el modo aleatorio completo (18 niveles con 237 variantes)
   const allCalNodes = MODULE_CALISTHENICS.units.flatMap((u) => u.nodes);
@@ -245,7 +311,45 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
     return baseInterval;
   }, []);
 
-  // Genera una nueva línea basada en un nodo de calistenia
+// Zona de juego ampliada al máximo aprovechando los laterales, superior e inferior
+const RUSH_SAFE_ZONE = {
+  minX: 32,
+  maxX: 568,
+  minY: 72,
+  maxY: 508,
+};
+
+// Cuadrantes y sectores distribuidos uniformemente por todo el lienzo (laterales, centro, extremos)
+const RUSH_CANDIDATE_SECTORS = [
+  // Lateral izquierdo
+  { x: 110, y: 140 },
+  { x: 110, y: 240 },
+  { x: 110, y: 340 },
+  { x: 110, y: 440 },
+  // Cuadrante intermedio izquierdo
+  { x: 210, y: 150 },
+  { x: 210, y: 260 },
+  { x: 210, y: 370 },
+  { x: 210, y: 450 },
+  // Eje central
+  { x: 300, y: 160 },
+  { x: 300, y: 280 },
+  { x: 300, y: 390 },
+  { x: 300, y: 460 },
+  // Cuadrante intermedio derecho
+  { x: 390, y: 150 },
+  { x: 390, y: 260 },
+  { x: 390, y: 370 },
+  { x: 390, y: 450 },
+  // Lateral derecho (evitando la esquina superior reservada para la tarjeta de nota si x > 470 && y < 120)
+  { x: 490, y: 190 },
+  { x: 490, y: 280 },
+  { x: 490, y: 370 },
+  { x: 490, y: 440 },
+];
+
+  // Genera una nueva línea basada en un nodo de calistenia garantizando que quede en zona 100% visible,
+  // con mayor tamaño y variedad, sin intersecar con líneas existentes
   const spawnLineForNode = useCallback(
     (node: LessonNode, existingLines: ActiveRushLine[]): ActiveRushLine => {
       const rng = new SeededRNG(Math.floor(Math.random() * 900000 + 10000));
@@ -260,7 +364,10 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
         if (challenge.idealPath && challenge.idealPath.length > 1) {
           rawPoints = challenge.idealPath;
         } else if (challenge.targetLines && challenge.targetLines.length > 0) {
-          const tLine = challenge.targetLines[0];
+          const tLine =
+            challenge.targetLines.length > 1
+              ? challenge.targetLines[rng.rangeInt(0, challenge.targetLines.length - 1)]
+              : challenge.targetLines[0];
           rawPoints = tLine.idealPath && tLine.idealPath.length > 1 ? tLine.idealPath : [tLine.start, tLine.end];
         } else if (challenge.keyPoints && challenge.keyPoints.length >= 2) {
           const k0 = challenge.keyPoints[0];
@@ -269,67 +376,180 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
         }
       }
 
-      // Si no hay puntos generados, fallback a línea horizontal
+      // Si no hay puntos generados, fallback a línea horizontal en la zona segura central
       if (rawPoints.length < 2) {
         rawPoints = [
-          { x: 120, y: 270 },
-          { x: 480, y: 270 },
+          { x: 160, y: 285 },
+          { x: 440, y: 285 },
         ];
       }
 
-      // Calcular centroide actual de los puntos
-      let cx = 0;
-      let cy = 0;
+      // Calcular bounding box y centroide del trazo original
+      let rMinX = Infinity;
+      let rMaxX = -Infinity;
+      let rMinY = Infinity;
+      let rMaxY = -Infinity;
       for (const p of rawPoints) {
-        cx += p.x;
-        cy += p.y;
+        if (p.x < rMinX) rMinX = p.x;
+        if (p.x > rMaxX) rMaxX = p.x;
+        if (p.y < rMinY) rMinY = p.y;
+        if (p.y > rMaxY) rMaxY = p.y;
       }
-      cx /= rawPoints.length;
-      cy /= rawPoints.length;
+      const rawW = Math.max(1, rMaxX - rMinX);
+      const rawH = Math.max(1, rMaxY - rMinY);
+      const cx = (rMinX + rMaxX) / 2;
+      const cy = (rMinY + rMaxY) / 2;
+      const rawDim = Math.max(rawW, rawH, 1);
 
-      // Buscar un cuadrante / sector disponible para no colisionar totalmente con líneas previas
-      const candidateSectors = [
-        { x: 180, y: 150 },
-        { x: 420, y: 150 },
-        { x: 180, y: 270 },
-        { x: 420, y: 270 },
-        { x: 180, y: 390 },
-        { x: 420, y: 390 },
-        { x: 300, y: 220 },
-        { x: 300, y: 340 },
-      ];
+      // Detectar si es una forma 2D (polígono, cuadrado, círculo, zigzag, etc.) o una línea/arco simple
+      const is2DForm = rawPoints.length > 2 && rawW > 25 && rawH > 25;
 
-      // Orden aleatorio de sectores
-      const shuffled = [...candidateSectors].sort(() => Math.random() - 0.5);
-      let bestTarget = shuffled[0];
-      let maxMinDist = -1;
-
-      for (const cand of shuffled) {
-        let minDist = 9999;
-        for (const exLine of existingLines) {
-          const d = Math.hypot(cand.x - exLine.startPoint.x, cand.y - exLine.startPoint.y);
-          if (d < minDist) minDist = d;
-        }
-        if (minDist > maxMinDist) {
-          maxMinDist = minDist;
-          bestTarget = cand;
-        }
+      // Escala base: dar mayor tamaño y variedad aleatoria
+      let baseScale = 1.0;
+      if (is2DForm) {
+        // Formas: variedad entre 160px y 280px (sustancialmente más grandes que antes)
+        const targetDim = rng.range(160, 280);
+        let s = targetDim / rawDim;
+        // Límites holgados dentro de la zona de juego
+        s = Math.min(s, 440 / rawW, 340 / rawH);
+        baseScale = Math.max(0.65, s);
+      } else {
+        // Líneas y curvas simples: variedad entre trazos rápidos y trazos largos de hombro
+        const lineScaleFactor = rng.range(0.9, 1.45);
+        let s = lineScaleFactor;
+        s = Math.min(s, 500 / Math.max(rawW, 1), 400 / Math.max(rawH, 1));
+        baseScale = Math.max(0.75, s);
       }
 
-      // Desplazar puntos al nuevo centro objetivo
-      const dx = bestTarget.x - cx + rng.range(-20, 20);
-      const dy = bestTarget.y - cy + rng.range(-20, 20);
+      // Función auxiliar para generar y ajustar puntos candidatos dado un sector y escala
+      const tryPlacement = (
+        sector: { x: number; y: number },
+        scale: number
+      ): Point[] | null => {
+        const jitterX = rng.range(-15, 15);
+        const jitterY = rng.range(-15, 15);
+        const targetX = sector.x + jitterX;
+        const targetY = sector.y + jitterY;
+        const dx = targetX - cx;
+        const dy = targetY - cy;
 
-      const placedPoints: Point[] = rawPoints.map((p) => ({
-        x: Math.max(40, Math.min(560, Math.round(p.x + dx))),
-        y: Math.max(40, Math.min(500, Math.round(p.y + dy))),
-      }));
+        const candidate = rawPoints.map((p) => ({
+          x: cx + (p.x - cx) * scale + dx,
+          y: cy + (p.y - cy) * scale + dy,
+          pressure: p.pressure,
+        }));
+
+        let cMinX = Infinity;
+        let cMaxX = -Infinity;
+        let cMinY = Infinity;
+        let cMaxY = -Infinity;
+        for (const p of candidate) {
+          if (p.x < cMinX) cMinX = p.x;
+          if (p.x > cMaxX) cMaxX = p.x;
+          if (p.y < cMinY) cMinY = p.y;
+          if (p.y > cMaxY) cMaxY = p.y;
+        }
+
+        // Clamp dentro de la zona de juego segura
+        let offX = 0;
+        let offY = 0;
+        if (cMinX < RUSH_SAFE_ZONE.minX) offX = RUSH_SAFE_ZONE.minX - cMinX;
+        else if (cMaxX > RUSH_SAFE_ZONE.maxX) offX = RUSH_SAFE_ZONE.maxX - cMaxX;
+
+        if (cMinY < RUSH_SAFE_ZONE.minY) offY = RUSH_SAFE_ZONE.minY - cMinY;
+        else if (cMaxY > RUSH_SAFE_ZONE.maxY) offY = RUSH_SAFE_ZONE.maxY - cMaxY;
+
+        // Evitar el área de la tarjeta de nota en la esquina superior derecha (x > 470 && y < 120)
+        if (cMaxX + offX > 470 && cMinY + offY < 120) {
+          if (cMaxY + offY + (120 - (cMinY + offY)) <= RUSH_SAFE_ZONE.maxY) {
+            offY += (120 - (cMinY + offY));
+          } else {
+            offX -= (cMaxX + offX - 470);
+          }
+        }
+
+        const placed = candidate.map((p) => ({
+          x: Math.round(Math.max(RUSH_SAFE_ZONE.minX, Math.min(RUSH_SAFE_ZONE.maxX, p.x + offX))),
+          y: Math.round(Math.max(RUSH_SAFE_ZONE.minY, Math.min(RUSH_SAFE_ZONE.maxY, p.y + offY))),
+          pressure: p.pressure,
+        }));
+
+        return placed;
+      };
+
+      // Si no hay líneas previas, colocamos directamente en un sector aleatorio
+      if (existingLines.length === 0) {
+        const shuffled = [...RUSH_CANDIDATE_SECTORS].sort(() => Math.random() - 0.5);
+        const placedPoints = tryPlacement(shuffled[0], baseScale) || rawPoints;
+        return {
+          id: `rush-line-${Date.now()}-${Math.random()}`,
+          points: placedPoints,
+          startPoint: placedPoints[0],
+          endPoint: placedPoints[placedPoints.length - 1],
+          spawnTime: Date.now(),
+          label,
+        };
+      }
+
+      // Con líneas existentes: buscar ubicación que NO corte ninguna línea y maximice la distancia/despeje
+      const scaleCandidates = [baseScale, baseScale * 0.85, baseScale * 0.72];
+      let bestPlacedPoints: Point[] | null = null;
+      let bestClearance = -1;
+      let fallbackCandidate: { points: Point[]; clearance: number; intersections: number } | null = null;
+
+      for (const scale of scaleCandidates) {
+        const shuffled = [...RUSH_CANDIDATE_SECTORS].sort(() => Math.random() - 0.5);
+
+        for (const sector of shuffled) {
+          const cand = tryPlacement(sector, scale);
+          if (!cand) continue;
+
+          let intersectionCount = 0;
+          let minClearance = Infinity;
+
+          for (const exLine of existingLines) {
+            if (doPolylinesIntersect(cand, exLine.points)) {
+              intersectionCount++;
+            }
+            const d = minDistanceBetweenPolylines(cand, exLine.points);
+            if (d < minClearance) minClearance = d;
+          }
+
+          // Criterio ideal: 0 intersecciones y margen >= 24px
+          if (intersectionCount === 0 && minClearance >= 24) {
+            if (minClearance > bestClearance) {
+              bestClearance = minClearance;
+              bestPlacedPoints = cand;
+            }
+          }
+
+          // Guardar el mejor fallback posible (mínimas intersecciones y máximo despeje)
+          if (
+            !fallbackCandidate ||
+            intersectionCount < fallbackCandidate.intersections ||
+            (intersectionCount === fallbackCandidate.intersections && minClearance > fallbackCandidate.clearance)
+          ) {
+            fallbackCandidate = { points: cand, clearance: minClearance, intersections: intersectionCount };
+          }
+        }
+
+        // Si ya encontramos un candidato limpio en esta escala, no necesitamos reducir más
+        if (bestPlacedPoints && bestClearance >= 30) {
+          break;
+        }
+      }
+
+      const finalPoints =
+        bestPlacedPoints ||
+        fallbackCandidate?.points ||
+        tryPlacement(RUSH_CANDIDATE_SECTORS[0], baseScale) ||
+        rawPoints;
 
       return {
         id: `rush-line-${Date.now()}-${Math.random()}`,
-        points: placedPoints,
-        startPoint: placedPoints[0],
-        endPoint: placedPoints[placedPoints.length - 1],
+        points: finalPoints,
+        startPoint: finalPoints[0],
+        endPoint: finalPoints[finalPoints.length - 1],
         spawnTime: Date.now(),
         label,
       };
@@ -572,36 +792,29 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
     return () => clearInterval(interval);
   }, [gameState, gameMode, finishGame, handleStageClear, STAGE_DURATION]);
 
-  // Renderizado del lienzo
+  // Renderizado del lienzo de alta definición (HiDPI / Retina responsive)
   const renderCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
     const W = 600;
     const H = 540;
+    const targetW = Math.round(W * dpr);
+    const targetH = Math.round(H * dpr);
+
+    if (canvas.width !== targetW || canvas.height !== targetH) {
+      canvas.width = targetW;
+      canvas.height = targetH;
+    }
 
     ctx.save();
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, W, H);
+    ctx.scale(dpr, dpr);
 
-    // Trama milimétrica sutil
-    ctx.strokeStyle = '#F0F0F0';
-    ctx.lineWidth = 1;
-    const step = 20;
-    for (let x = 0; x < W; x += step) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, H);
-      ctx.stroke();
-    }
-    for (let y = 0; y < H; y += step) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(W, y);
-      ctx.stroke();
-    }
+    // Fondo transparente para dejar ver la cuadrícula continua técnica (pattern-grid-paper)
+    ctx.clearRect(0, 0, W, H);
 
     const now = Date.now();
 
@@ -659,18 +872,21 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
       ctx.textBaseline = 'middle';
       ctx.fillText('1', p0.x, p0.y);
 
-      // Nodo de fin ②
+      // Nodo de fin ② (solo si no coincide con el de inicio, e.g. formas cerradas)
       const p1 = line.endPoint;
-      ctx.fillStyle = '#FFFFFF';
-      ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(p1.x, p1.y, 6.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
+      const isClosed = Math.hypot(p1.x - p0.x, p1.y - p0.y) < 14;
+      if (!isClosed) {
+        ctx.fillStyle = '#FFFFFF';
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(p1.x, p1.y, 6.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
 
-      ctx.fillStyle = strokeColor;
-      ctx.fillText('2', p1.x, p1.y);
+        ctx.fillStyle = strokeColor;
+        ctx.fillText('2', p1.x, p1.y);
+      }
 
       // Etiqueta tenue de orden
       ctx.fillStyle = '#A1A1AA';
@@ -713,6 +929,14 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
 
   useEffect(() => {
     renderCanvas();
+  }, [renderCanvas]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      renderCanvas();
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, [renderCanvas]);
 
   // Coordenadas normalizadas perfectamente al canvas 600x540
@@ -777,28 +1001,50 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
 
     setUserStroke(recorded);
 
-    // 1. Identificar a cuál de las líneas activas apuntaba el usuario
-    const uMid = recorded[Math.floor(recorded.length / 2)];
+    // 1. Identificar con precisión a cuál de las líneas activas apuntaba el usuario
+    // Evaluamos el trazo del usuario contra TODAS las líneas activas para evitar
+    // que una línea cercana o en otra capa intercepte erróneamente la calificación.
     let bestLineIndex = -1;
-    let minMidDist = 9999;
+    let bestEvalResult: { score: number; avgDist: number; passed: boolean } | null = null;
+    let highestPassingScore = -1;
+    let highestOverallScore = -1;
+    let bestOverallIdx = -1;
+    let bestOverallEval: { score: number; avgDist: number; passed: boolean } | null = null;
 
     for (let i = 0; i < activeLines.length; i++) {
       const line = activeLines[i];
-      const lMid = line.points[Math.floor(line.points.length / 2)];
-      const d = Math.hypot(uMid.x - lMid.x, uMid.y - lMid.y);
-      if (d < minMidDist) {
-        minMidDist = d;
-        bestLineIndex = i;
+      const evalRes = evaluateUserStrokeAgainstLine(recorded, line.points);
+
+      // Si supera el umbral de aprobación (>= 70%), es un candidato prioritario
+      if (evalRes.passed) {
+        if (evalRes.score > highestPassingScore) {
+          highestPassingScore = evalRes.score;
+          bestLineIndex = i;
+          bestEvalResult = evalRes;
+        }
+      }
+
+      // Seguimiento del mejor score global por si ninguna llega al 70%
+      if (evalRes.score > highestOverallScore) {
+        highestOverallScore = evalRes.score;
+        bestOverallIdx = i;
+        bestOverallEval = evalRes;
       }
     }
 
+    // Si ninguna línea aprobó, usamos la que obtuvo mayor coincidencia geométrica
     if (bestLineIndex === -1) {
+      bestLineIndex = bestOverallIdx;
+      bestEvalResult = bestOverallEval;
+    }
+
+    if (bestLineIndex === -1 || !bestEvalResult) {
       renderCanvas();
       return;
     }
 
     const targetLine = activeLines[bestLineIndex];
-    const evalResult = evaluateUserStrokeAgainstLine(recorded, targetLine.points);
+    const evalResult = bestEvalResult;
 
     setLastEval({
       score: evalResult.score,
@@ -870,45 +1116,101 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
       : 0;
 
   return (
-    <div className="w-full flex-1 flex flex-col items-center justify-center overflow-hidden relative h-[calc(100vh-64px)] max-h-[calc(100vh-64px)] bg-neutral-100 font-sans select-none">
-      {/* BOTÓN FLOTANTE TOGGLE DEL PANEL (COMO EN EL PANEL DE PRÁCTICA) */}
+    <div className="relative w-full h-full overflow-hidden flex items-center justify-center select-none bg-white pattern-grid-paper">
+      {/* 1. BOTÓN TOGGLE PANEL DEDICADO A LA IZQUIERDA DE LA PANTALLA */}
       <button
         type="button"
-        onClick={() => setIsSidebarOpen((prev) => !prev)}
-        className="absolute top-3 left-3 z-30 bg-white hover:bg-neutral-100 text-black px-2.5 py-1.5 border-2 border-black shadow-[2px_2px_0px_#000000] text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer transition-transform hover:scale-105 active:scale-95"
-        title={isSidebarOpen ? "Ocultar panel" : "Abrir panel de opciones y estadísticas"}
+        onClick={() => (onToggleSidebar ? onToggleSidebar() : setIsSidebarOpen((prev) => !prev))}
+        className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3 z-30 bg-white hover:bg-neutral-100 text-black px-2.5 py-1.5 border-2 border-black shadow-[3px_3px_0px_#000000] text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer active:scale-95 transition-transform"
+        title="Abrir / cerrar panel de opciones y estadísticas"
       >
         <PanelLeft className="w-4 h-4 stroke-[2.5]" />
         <span>Panel</span>
       </button>
 
-      {/* BOTÓN RÁPIDO DE FINALIZAR DURANTE LA PARTIDA (DIRECTO EN EL LIENZO) */}
-      {gameState === 'playing' && (
-        <button
-          type="button"
-          onClick={() => finishGame('manual')}
-          className="absolute top-3 right-3 z-30 bg-white hover:bg-neutral-100 text-black px-2.5 py-1.5 border-2 border-black shadow-[2px_2px_0px_#000000] text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer transition-transform hover:scale-105 active:scale-95"
-          title="Finalizar partida y registrar tu progreso actual"
+      {/* 2. HUD SUPERIOR: A LA MISMA ALTURA QUE EL BOTÓN PANEL ALINEADO CON EL LIENZO (SOLO EN PARTIDA) */}
+      {gameState !== 'idle' && (
+        <div
+          className="absolute top-2.5 sm:top-3 z-20 flex items-start justify-between pointer-events-none px-2 sm:px-0"
+          style={{
+            width: 'min(calc(100% - 130px), 600px, calc((100dvh - 180px) * (600 / 540)))',
+          }}
         >
-          <Flag className="w-3.5 h-3.5 stroke-[2.5]" />
-          <span>Finalizar</span>
-        </button>
+          {/* Tira compacta a la izquierda */}
+          <div className="pointer-events-auto self-start font-mono text-xs select-none bg-white border-2 border-black p-1 sm:p-1.5 shadow-[3px_3px_0px_#000000] flex items-center gap-1.5 sm:gap-2">
+            <span className="text-[10px] font-mono bg-black text-white px-1.5 py-0.5 font-bold uppercase shrink-0 shadow-[1px_1px_0px_#000]">
+              {gameMode === 'survival' ? `ACTO ${currentStage}` : 'BLITZ 60s'}
+            </span>
+            <div className="flex items-center gap-1 bg-neutral-100 border border-black px-1.5 py-0.5">
+              <Clock className="w-3 h-3 stroke-[2.5]" />
+              <span className="text-[11px] font-bold tabular-nums">
+                {gameMode === 'survival' ? `${stageSecondsLeft}s` : `${blitzTimer}s`}
+              </span>
+            </div>
+            {/* 6 cuadritos visuales de saturación */}
+            <div className="flex items-center gap-0.5 px-1 py-0.5 bg-neutral-100 border border-black" title={`Líneas en pantalla: ${activeLines.length}/${MAX_LINES_OVERFLOW}`}>
+              {[0, 1, 2, 3, 4, 5].map((idx) => (
+                <span
+                  key={idx}
+                  className={`w-2 h-2 border border-black transition-colors ${
+                    idx < activeLines.length
+                      ? idx >= 4
+                        ? 'bg-red-600'
+                        : 'bg-black'
+                      : 'bg-white'
+                  }`}
+                />
+              ))}
+            </div>
+            <div className="flex items-center gap-1 bg-neutral-100 border border-black px-1.5 py-0.5">
+              <Flame className="w-3 h-3 fill-black text-black" />
+              <span className="text-[11px] font-bold tabular-nums">{clearedScores.length} ({comboStreak}x)</span>
+            </div>
+            {averageGrade > 0 && (
+              <span className="text-[10px] font-mono font-bold text-neutral-600 hidden sm:inline">
+                Media: {averageGrade}%
+              </span>
+            )}
+          </div>
+
+          {/* A la derecha del dibujo: Cuadradito compacto con la nota (a la misma altura) */}
+          {lastEval && gameState === 'playing' ? (
+            <div className="pointer-events-auto self-start bg-white border-2 border-black p-2 sm:p-2.5 shadow-[4px_4px_0px_#000000] font-mono flex flex-col items-center justify-center min-w-[88px] sm:min-w-[100px] aspect-square animate-in fade-in zoom-in-95 duration-150">
+              <span className="text-[10px] sm:text-xs font-bold uppercase text-neutral-500 tracking-wider">
+                Nota
+              </span>
+              <span className="text-2xl sm:text-3xl font-black leading-none my-1">
+                {lastEval.score}%
+              </span>
+              <span
+                className={`text-[9px] sm:text-[10px] font-bold uppercase px-1.5 py-0.5 border border-black ${
+                  lastEval.passed ? 'bg-black text-white' : 'bg-red-600 text-white'
+                }`}
+              >
+                {lastEval.passed ? 'Eliminada' : 'Fallo'}
+              </span>
+            </div>
+          ) : (
+            <div />
+          )}
+        </div>
       )}
 
-      {/* BACKDROP FLOTANTE CUANDO EL PANEL ESTÁ ABIERTO */}
-      {isSidebarOpen && (
+      {/* BACKDROP FLOTANTE CUANDO EL PANEL LOCAL ESTÁ ABIERTO */}
+      {!onToggleSidebar && isSidebarOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px]"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
 
-      {/* 1. BARRA LATERAL IZQUIERDA EN MODO OVERLAY (COMO EN PANEL DE PRÁCTICA) */}
-      <aside
-        className={`fixed md:absolute top-0 bottom-0 left-0 z-50 bg-white border-r-2 border-black shadow-[6px_0px_0px_#000000] flex flex-col select-none transition-transform duration-200 ease-in-out ${
-          isSidebarOpen ? 'translate-x-0 pointer-events-auto' : '-translate-x-full pointer-events-none'
-        } w-full sm:w-85 md:w-80 h-full overflow-hidden`}
-      >
+      {/* 1. BARRA LATERAL IZQUIERDA EN MODO OVERLAY (SI NO SE USA EL SIDEBAR PRINCIPAL) */}
+      {!onToggleSidebar && (
+        <aside
+          className={`fixed md:absolute top-0 bottom-0 left-0 z-50 bg-white border-r-2 border-black shadow-[6px_0px_0px_#000000] flex flex-col select-none transition-transform duration-200 ease-in-out ${
+            isSidebarOpen ? 'translate-x-0 pointer-events-auto' : '-translate-x-full pointer-events-none'
+          } w-full sm:w-85 md:w-80 h-full overflow-hidden`}
+        >
         <div className="w-full flex flex-col h-full overflow-y-auto p-3.5 space-y-3 font-mono">
           {/* CABECERA CON BOTÓN CERRAR PANEL Y BOTÓN SALIR */}
           <div className="flex items-center justify-between pb-2 border-b-2 border-black">
@@ -1213,270 +1515,335 @@ export const StrokeRushMinigame: React.FC<StrokeRushMinigameProps> = ({
         </div>
         </div>
       </aside>
+      )}
 
-      {/* 2. ÁREA CENTRAL: LIENZO 100% CENTRADO Y SIN SCROLL */}
-      <div className="flex-1 w-full flex flex-col items-center justify-center p-2 sm:p-4 overflow-hidden min-h-0 relative z-10">
-        <div className="relative flex items-center justify-center select-none touch-none max-w-full">
-          {/* Banner de Feedback instantáneo */}
-          {flashBanner && (
-            <div
-              className={`absolute top-3 z-30 px-3 py-1.5 font-mono text-xs font-bold border-2 shadow-[3px_3px_0px_#000000] animate-bounce ${
-                flashBanner.positive ? 'bg-black text-white border-white' : 'bg-red-600 text-white border-black'
-              }`}
-            >
-              {flashBanner.text}
-            </div>
-          )}
+      {/* 3. ÁREA CENTRAL: LIENZO 100% INTEGRADO CON EL FONDO */}
+      <div
+        className="relative aspect-[600/540] max-w-[min(calc(100%-24px),600px)] max-h-[calc(100%-125px)] flex items-center justify-center pointer-events-none"
+        style={{
+          width: 'min(calc(100% - 24px), 600px, calc((100dvh - 180px) * (600 / 540)))',
+          height: 'auto',
+          aspectRatio: '600 / 540',
+        }}
+      >
+        <canvas
+          ref={canvasRef}
+          width={600}
+          height={540}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          className="block w-full h-full cursor-crosshair touch-none select-none z-10 pointer-events-auto"
+        />
 
-          {/* HUD de Acto en vivo en el lienzo */}
-          {gameState === 'playing' && gameMode === 'survival' && (
-            <div className="absolute top-2.5 right-2.5 z-20 flex items-center gap-1.5 px-2.5 py-1 bg-white/95 border-2 border-black font-mono text-[10px] font-bold shadow-[2px_2px_0px_#000000] pointer-events-none">
-              <span className="bg-black text-white px-1.5 py-0.2">ACTO {currentStage}</span>
-              <span className="text-neutral-600">Descanso en: {stageSecondsLeft}s</span>
-            </div>
-          )}
+        {/* Banner de Feedback instantáneo */}
+        {flashBanner && (
+          <div
+            className={`absolute top-3 z-30 px-3 py-1.5 font-mono text-xs font-bold border-2 shadow-[3px_3px_0px_#000000] animate-bounce pointer-events-none ${
+              flashBanner.positive ? 'bg-black text-white border-white' : 'bg-red-600 text-white border-black'
+            }`}
+          >
+            {flashBanner.text}
+          </div>
+        )}
 
-          {/* Pantalla de inicio previa sobre el lienzo */}
-          {gameState === 'idle' && (
-            <div className="absolute inset-0 bg-white/95 backdrop-blur-xs flex flex-col items-center justify-center p-6 border-2 border-black z-20 text-center font-mono">
-              <Zap className="w-12 h-12 text-black mb-2 animate-bounce stroke-[2.5]" />
-              <h3 className="text-2xl font-bold font-display uppercase tracking-tight">
-                Avalancha de Trazos
-              </h3>
-              <p className="text-xs text-neutral-600 mt-1 max-w-md">
-                {isRandomMode ? (
-                  <>Modo Aleatorio activado: traza cada línea diferente de <strong>① a ②</strong> con nota <strong>≥70%</strong> para eliminarla.</>
-                ) : (
-                  <>Las líneas aparecen según <strong>{selectedNode.code} · {selectedNode.title}</strong>. Traza de <strong>① a ②</strong> con nota <strong>≥70%</strong>.</>
-                )}
-                <br />
-                {gameMode === 'survival' ? (
-                  <><strong>Supervivencia por Actos:</strong> Resiste oleadas de {STAGE_DURATION}s. Entre actos tendrás pausas de descanso con estadísticas y cada vez mayor dificultad.</>
-                ) : (
-                  <><strong>Blitz 60s:</strong> Elimina todas las líneas posibles antes de que termine el tiempo.</>
-                )}
-              </p>
+        {/* Pantalla de inicio previa sobre el lienzo */}
+        {gameState === 'idle' && (
+          <div className="absolute inset-0 bg-white/95 backdrop-blur-xs flex flex-col items-center justify-center p-3 sm:p-5 border-2 border-black z-20 text-center font-mono pointer-events-auto select-none overflow-y-auto max-h-full">
+            <Zap className="w-8 h-8 sm:w-10 sm:h-10 text-black mb-1 animate-bounce stroke-[2.5]" />
+            <h3 className="text-lg sm:text-2xl font-bold font-display uppercase tracking-tight">
+              Avalancha de Trazos
+            </h3>
+            <p className="text-[11px] sm:text-xs text-neutral-600 mt-0.5 sm:mt-1 max-w-sm sm:max-w-md leading-relaxed">
+              {isRandomMode ? (
+                <>Modo Aleatorio activado: traza cada línea diferente de <strong>① a ②</strong> con nota <strong>≥70%</strong> para eliminarla.</>
+              ) : (
+                <>Las líneas aparecen según <strong>{selectedNode.code} · {selectedNode.title}</strong>. Traza de <strong>① a ②</strong> con nota <strong>≥70%</strong>.</>
+              )}
+              <br />
+              {gameMode === 'survival' ? (
+                <><strong>Supervivencia por Actos:</strong> Resiste oleadas de {STAGE_DURATION}s. Entre actos tendrás pausas de descanso con estadísticas y cada vez mayor dificultad.</>
+              ) : (
+                <><strong>Blitz 60s:</strong> Elimina todas las líneas posibles antes de que termine el tiempo.</>
+              )}
+            </p>
 
-              <div className="my-4 p-3 border-2 border-black bg-neutral-50 text-xs w-64 space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-neutral-500">Récord Supervivencia:</span>
-                  <span className="font-bold">{highScores.survival} líneas</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-neutral-500">Mejor Acto Alcanzado:</span>
-                  <span className="font-bold">Acto {bestStage}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-neutral-500">Récord Blitz (60s):</span>
-                  <span className="font-bold">{highScores.blitz} líneas</span>
-                </div>
+            <div className="my-2 sm:my-3 p-2 sm:p-3 border-2 border-black bg-neutral-50 text-[11px] sm:text-xs w-56 sm:w-64 space-y-1 shadow-[2px_2px_0px_#000000] sm:shadow-[3px_3px_0px_#000000]">
+              <div className="flex justify-between">
+                <span className="text-neutral-500">Récord Supervivencia:</span>
+                <span className="font-bold">{highScores.survival} líneas</span>
               </div>
+              <div className="flex justify-between">
+                <span className="text-neutral-500">Mejor Acto Alcanzado:</span>
+                <span className="font-bold">Acto {bestStage}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-neutral-500">Récord Blitz (60s):</span>
+                <span className="font-bold">{highScores.blitz} líneas</span>
+              </div>
+            </div>
 
+            <button
+              type="button"
+              onClick={() => startGame(gameMode)}
+              className="btn-ink px-4 sm:px-6 py-2 sm:py-2.5 text-[11px] sm:text-xs uppercase font-bold flex items-center gap-2 cursor-pointer shadow-[3px_3px_0px_#000000] hover:bg-neutral-900 active:scale-95 transition-transform"
+            >
+              <Sparkles className="w-4 h-4 fill-white stroke-none" />
+              <span>Empezar Partida ({gameMode === 'survival' ? 'Supervivencia por Actos' : 'Blitz 60s'})</span>
+            </button>
+          </div>
+        )}
+
+        {/* Modal de Descanso entre Actos / Stages */}
+        {gameState === 'stage_break' && (
+          <div className="absolute inset-0 bg-white/95 backdrop-blur-xs flex flex-col items-center justify-center p-3 sm:p-5 border-2 border-black z-20 text-center font-mono animate-fade-in select-none pointer-events-auto overflow-y-auto max-h-full">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 sm:px-3 sm:py-1 bg-black text-white text-[10px] sm:text-[11px] font-bold uppercase tracking-wider mb-1.5 sm:mb-2 border border-black shadow-[2px_2px_0px_#000000]">
+              <Check className="w-3.5 h-3.5 stroke-[3]" />
+              <span>¡ACTO {currentStage} SUPERADO!</span>
+              <Sparkles className="w-3.5 h-3.5" />
+            </div>
+
+            <h3 className="text-lg sm:text-2xl font-black font-display uppercase tracking-tight text-black">
+              DESCANSO ENTRE ACTOS
+            </h3>
+            <p className="text-[11px] sm:text-xs text-neutral-600 mt-0.5 max-w-sm">
+              ¡Lienzo despejado! Has resistido los {STAGE_DURATION}s del Acto {currentStage} sin saturar la pantalla.
+            </p>
+
+            {/* Resumen de estadísticas del Acto */}
+            <div className="my-2 sm:my-3 p-2.5 sm:p-3.5 border-2 border-black bg-neutral-50 w-full max-w-xs space-y-1.5 sm:space-y-2 text-[11px] sm:text-xs shadow-[3px_3px_0px_#000000]">
+              <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
+                <span className="text-neutral-500 font-bold uppercase text-[10px]">Trazos en Acto {currentStage}:</span>
+                <span className="font-bold text-sm bg-black text-white px-1.5 py-0.2">
+                  {stageClearedCount} líneas
+                </span>
+              </div>
+              <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
+                <span className="text-neutral-500 font-bold uppercase text-[10px]">Precisión Media del Acto:</span>
+                <span className="font-bold text-sm">
+                  {stageScores.length > 0 ? Math.round(stageScores.reduce((a, b) => a + b, 0) / stageScores.length) : 0}%
+                </span>
+              </div>
+              <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
+                <span className="text-neutral-500 font-bold uppercase text-[10px]">Racha en este Acto:</span>
+                <span className="font-bold text-sm">{stageBestCombo} seguidas</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-neutral-500 font-bold uppercase text-[10px]">Total Acumulado:</span>
+                <span className="font-bold text-sm">{clearedScores.length} líneas ({stagesCompleted} actos)</span>
+              </div>
+            </div>
+
+            {/* Previa técnica del siguiente Acto */}
+            <div className="mb-2.5 sm:mb-3.5 p-2 bg-neutral-100 border border-black text-left w-full max-w-xs text-[10px] sm:text-[11px] space-y-1">
+              <div className="font-bold text-black flex items-center gap-1">
+                <Zap className="w-3.5 h-3.5 text-black stroke-[2.5]" />
+                <span>Próximo Reto: Acto {currentStage + 1}</span>
+              </div>
+              <p className="text-neutral-600 text-[9px] sm:text-[10px] leading-snug">
+                La avalancha acelera su cadencia a <strong>{(getStageSpawnInterval(currentStage + 1, 2) / 1000).toFixed(1)}s</strong> por trazo
+                {currentStage + 1 >= 2 ? ' con posibles ráfagas continuas' : ''}. Mantén la fluidez y velocidad sin dudar.
+              </p>
+            </div>
+
+            {/* Botones de acción */}
+            <div className="flex flex-col sm:flex-row gap-2 w-full max-w-xs">
+              <button
+                type="button"
+                onClick={handleNextStage}
+                className="flex-1 btn-ink py-2 sm:py-2.5 px-3 text-xs uppercase font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-[3px_3px_0px_#000000] hover:bg-neutral-900"
+              >
+                <Play className="w-3.5 h-3.5 fill-white stroke-none" />
+                <span>Comenzar Acto {currentStage + 1}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => finishGame('manual')}
+                className="btn-ink-outline py-2 sm:py-2.5 px-3 text-xs uppercase font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] hover:bg-neutral-100"
+              >
+                <Flag className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>Finalizar y Guardar</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Fin de Partida */}
+        {gameState === 'gameover' && (
+          <div className="absolute inset-0 bg-white/95 backdrop-blur-xs flex flex-col items-center justify-center p-3 sm:p-5 border-2 border-black z-20 text-center font-mono animate-fade-in pointer-events-auto select-none overflow-y-auto max-h-full">
+            <Trophy className="w-8 h-8 sm:w-12 sm:h-12 text-black mb-1.5 animate-bounce stroke-[2.5]" />
+            <h3 className="text-lg sm:text-2xl font-bold font-display uppercase tracking-tight">
+              {gameOverReason === 'manual'
+                ? '¡Partida Guardada!'
+                : gameOverReason === 'overflow'
+                ? '¡Desbordamiento de Pantalla!'
+                : '¡Tiempo Finalizado!'}
+            </h3>
+            <p className="text-[11px] sm:text-xs text-neutral-600 mt-0.5 sm:mt-1 max-w-sm">
+              {gameOverReason === 'manual'
+                ? 'Has finalizado la partida voluntariamente y tu progreso ha quedado guardado.'
+                : gameOverReason === 'overflow'
+                ? 'Las líneas se acumularon hasta saturar el lienzo (6 líneas).'
+                : 'Completaste los 60 segundos de alta velocidad.'}
+            </p>
+
+            {/* TABLA DE RESULTADOS */}
+            <div className="my-2.5 sm:my-4 p-2.5 sm:p-3.5 border-2 border-black bg-neutral-50 w-64 sm:w-72 space-y-1.5 sm:space-y-2 text-[11px] sm:text-xs shadow-[3px_3px_0px_#000000]">
+              {gameMode === 'survival' && (
+                <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
+                  <span className="text-neutral-500 font-bold uppercase text-[10px]">Actos Superados:</span>
+                  <span className="font-bold text-sm bg-black text-white px-1.5 py-0.2">
+                    {stagesCompleted} {stagesCompleted === 1 ? 'acto' : 'actos'} (Acto {currentStage})
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
+                <span className="text-neutral-500 font-bold uppercase text-[10px]">Líneas Eliminadas:</span>
+                <span className="font-bold text-sm bg-black text-white px-1.5 py-0.2">
+                  {clearedScores.length} líneas
+                </span>
+              </div>
+              <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
+                <span className="text-neutral-500 font-bold uppercase text-[10px]">Nota Media:</span>
+                <span className="font-bold text-sm">
+                  {averageGrade}%
+                </span>
+              </div>
+              <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
+                <span className="text-neutral-500 font-bold uppercase text-[10px]">Mejor Precisión:</span>
+                <span className="font-bold text-sm">
+                  {clearedScores.length > 0 ? `${Math.max(...clearedScores)}%` : '0%'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
+                <span className="text-neutral-500 font-bold uppercase text-[10px]">Racha Máxima:</span>
+                <span className="font-bold text-sm">{bestCombo} seguidas</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-neutral-500 font-bold uppercase text-[10px]">Modo:</span>
+                <span className="font-bold truncate max-w-[140px] text-right">
+                  {isRandomMode ? 'Aleatorio' : selectedNode.code}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => startGame(gameMode)}
-                className="btn-ink px-6 py-2.5 text-xs uppercase font-bold flex items-center gap-2 cursor-pointer shadow-[3px_3px_0px_#000000] hover:bg-neutral-900"
+                className="btn-ink px-3 sm:px-4 py-1.5 sm:py-2 text-xs uppercase font-bold flex items-center gap-1.5 cursor-pointer shadow-[3px_3px_0px_#000000]"
               >
-                <Sparkles className="w-4 h-4 fill-white stroke-none" />
-                <span>Empezar Partida ({gameMode === 'survival' ? 'Supervivencia por Actos' : 'Blitz 60s'})</span>
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Jugar de Nuevo</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setGameState('idle')}
+                className="btn-ink-outline px-3 sm:px-4 py-1.5 sm:py-2 text-xs uppercase font-bold flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
+              >
+                <span>Configuración</span>
               </button>
             </div>
-          )}
-
-          {/* Modal de Descanso entre Actos / Stages */}
-          {gameState === 'stage_break' && (
-            <div className="absolute inset-0 bg-white/95 backdrop-blur-xs flex flex-col items-center justify-center p-4 sm:p-6 border-2 border-black z-20 text-center font-mono animate-fade-in select-none">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-black text-white text-[11px] font-bold uppercase tracking-wider mb-2 border border-black shadow-[2px_2px_0px_#000000]">
-                <Check className="w-3.5 h-3.5 stroke-[3]" />
-                <span>¡ACTO {currentStage} SUPERADO!</span>
-                <Sparkles className="w-3.5 h-3.5" />
-              </div>
-
-              <h3 className="text-2xl font-black font-display uppercase tracking-tight text-black">
-                DESCANSO ENTRE ACTOS
-              </h3>
-              <p className="text-xs text-neutral-600 mt-0.5 max-w-sm">
-                ¡Lienzo despejado! Has resistido los {STAGE_DURATION}s del Acto {currentStage} sin saturar la pantalla.
-              </p>
-
-              {/* Resumen de estadísticas del Acto */}
-              <div className="my-3 p-3.5 border-2 border-black bg-neutral-50 w-full max-w-xs space-y-2 text-xs shadow-[3px_3px_0px_#000000]">
-                <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
-                  <span className="text-neutral-500 font-bold uppercase text-[10px]">Trazos en Acto {currentStage}:</span>
-                  <span className="font-bold text-sm bg-black text-white px-1.5 py-0.2">
-                    {stageClearedCount} líneas
-                  </span>
-                </div>
-                <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
-                  <span className="text-neutral-500 font-bold uppercase text-[10px]">Precisión Media del Acto:</span>
-                  <span className="font-bold text-sm">
-                    {stageScores.length > 0 ? Math.round(stageScores.reduce((a, b) => a + b, 0) / stageScores.length) : 0}%
-                  </span>
-                </div>
-                <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
-                  <span className="text-neutral-500 font-bold uppercase text-[10px]">Racha en este Acto:</span>
-                  <span className="font-bold text-sm">{stageBestCombo} seguidas</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-neutral-500 font-bold uppercase text-[10px]">Total Acumulado:</span>
-                  <span className="font-bold text-sm">{clearedScores.length} líneas ({stagesCompleted} actos)</span>
-                </div>
-              </div>
-
-              {/* Previa técnica del siguiente Acto */}
-              <div className="mb-3.5 p-2 bg-neutral-100 border border-black text-left w-full max-w-xs text-[11px] space-y-1">
-                <div className="font-bold text-black flex items-center gap-1">
-                  <Zap className="w-3.5 h-3.5 text-black stroke-[2.5]" />
-                  <span>Próximo Reto: Acto {currentStage + 1}</span>
-                </div>
-                <p className="text-neutral-600 text-[10px] leading-snug">
-                  La avalancha acelera su cadencia a <strong>{(getStageSpawnInterval(currentStage + 1, 2) / 1000).toFixed(1)}s</strong> por trazo
-                  {currentStage + 1 >= 2 ? ' con posibles ráfagas continuas' : ''}. Mantén la fluidez y velocidad sin dudar.
-                </p>
-              </div>
-
-              {/* Botones de acción */}
-              <div className="flex flex-col sm:flex-row gap-2 w-full max-w-xs">
-                <button
-                  type="button"
-                  onClick={handleNextStage}
-                  className="flex-1 btn-ink py-2.5 px-3 text-xs uppercase font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-[3px_3px_0px_#000000] hover:bg-neutral-900"
-                >
-                  <Play className="w-3.5 h-3.5 fill-white stroke-none" />
-                  <span>Comenzar Acto {currentStage + 1}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => finishGame('manual')}
-                  className="btn-ink-outline py-2.5 px-3 text-xs uppercase font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] hover:bg-neutral-100"
-                >
-                  <Flag className="w-3.5 h-3.5 stroke-[2.5]" />
-                  <span>Finalizar y Guardar</span>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Modal de Fin de Partida */}
-          {gameState === 'gameover' && (
-            <div className="absolute inset-0 bg-white/95 backdrop-blur-xs flex flex-col items-center justify-center p-6 border-2 border-black z-20 text-center font-mono animate-fade-in">
-              <Trophy className="w-12 h-12 text-black mb-2 animate-bounce stroke-[2.5]" />
-              <h3 className="text-2xl font-bold font-display uppercase tracking-tight">
-                {gameOverReason === 'manual'
-                  ? '¡Partida Guardada!'
-                  : gameOverReason === 'overflow'
-                  ? '¡Desbordamiento de Pantalla!'
-                  : '¡Tiempo Finalizado!'}
-              </h3>
-              <p className="text-xs text-neutral-600 mt-1 max-w-sm">
-                {gameOverReason === 'manual'
-                  ? 'Has finalizado la partida voluntariamente y tu progreso ha quedado guardado.'
-                  : gameOverReason === 'overflow'
-                  ? 'Las líneas se acumularon hasta saturar el lienzo (6 líneas).'
-                  : 'Completaste los 60 segundos de alta velocidad.'}
-              </p>
-
-              {/* TABLA DE RESULTADOS */}
-              <div className="my-4 p-3.5 border-2 border-black bg-neutral-50 w-72 space-y-2 text-xs shadow-[3px_3px_0px_#000000]">
-                {gameMode === 'survival' && (
-                  <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
-                    <span className="text-neutral-500 font-bold uppercase text-[10px]">Actos Superados:</span>
-                    <span className="font-bold text-sm bg-black text-white px-1.5 py-0.2">
-                      {stagesCompleted} {stagesCompleted === 1 ? 'acto' : 'actos'} (Acto {currentStage})
-                    </span>
-                  </div>
-                )}
-                <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
-                  <span className="text-neutral-500 font-bold uppercase text-[10px]">Líneas Eliminadas:</span>
-                  <span className="font-bold text-sm bg-black text-white px-1.5 py-0.2">
-                    {clearedScores.length} líneas
-                  </span>
-                </div>
-                <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
-                  <span className="text-neutral-500 font-bold uppercase text-[10px]">Nota Media:</span>
-                  <span className="font-bold text-sm">
-                    {averageGrade}%
-                  </span>
-                </div>
-                <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
-                  <span className="text-neutral-500 font-bold uppercase text-[10px]">Mejor Precisión:</span>
-                  <span className="font-bold text-sm">
-                    {clearedScores.length > 0 ? `${Math.max(...clearedScores)}%` : '0%'}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
-                  <span className="text-neutral-500 font-bold uppercase text-[10px]">Racha Máxima:</span>
-                  <span className="font-bold text-sm">{bestCombo} seguidas</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-neutral-500 font-bold uppercase text-[10px]">Modo:</span>
-                  <span className="font-bold truncate max-w-[140px] text-right">
-                    {isRandomMode ? 'Aleatorio' : selectedNode.code}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => startGame(gameMode)}
-                  className="btn-ink px-4 py-2 text-xs uppercase font-bold flex items-center gap-1.5 cursor-pointer shadow-[3px_3px_0px_#000000]"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span>Jugar de Nuevo</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setGameState('idle')}
-                  className="btn-ink-outline px-4 py-2 text-xs uppercase font-bold flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
-                >
-                  <span>Configuración</span>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* LIENZO: PROPORCIÓN EXACTA 600x540 (NUNCA ESTIRADO) */}
-          <canvas
-            ref={canvasRef}
-            width={600}
-            height={540}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerUp}
-            className="border-2 border-black bg-white shadow-[4px_4px_0px_#000000] cursor-crosshair touch-none select-none max-w-full"
-            style={{
-              width: 'min(100%, min(600px, calc((100vh - 165px) * (600 / 540))))',
-              height: 'auto',
-              aspectRatio: '600 / 540',
-            }}
-          />
-        </div>
-
-        {/* FEEDBACK DEL ÚLTIMO INTENTO AL PIE DEL LIENZO */}
-        {lastEval && gameState === 'playing' && (
-          <div className="mt-2 w-full max-w-xl p-2 border-2 border-black bg-white shadow-[2px_2px_0px_#000000] font-mono text-xs flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span
-                className={`px-2 py-0.5 font-bold border border-black ${
-                  lastEval.passed ? 'bg-black text-white' : 'bg-red-100 text-red-800'
-                }`}
-              >
-                {lastEval.passed ? '✓' : '✗'} {lastEval.score}%
-              </span>
-              <span className="text-[11px] text-neutral-600 font-sans">
-                {lastEval.passed
-                  ? '¡Línea eliminada!'
-                  : `Precisión insuficiente (${lastEval.avgDistPx}px). Requiere ≥70%.`}
-              </span>
-            </div>
-
-            <span className="text-[10px] text-neutral-500 font-mono">
-              Objetivo: ≥70%
-            </span>
           </div>
         )}
+      </div>
+
+      {/* 4. BARRA DE HERRAMIENTAS FLOTANTE INFERIOR (NEOBRUTALISTA PAPLITZ) */}
+      <div className="absolute bottom-3 sm:bottom-5 left-1/2 -translate-x-1/2 z-30 pointer-events-auto font-mono text-xs">
+        <div className="bg-white border-2 border-black p-1.5 sm:p-2 shadow-[4px_4px_0px_#000000] flex items-center gap-1.5 sm:gap-2 max-w-[calc(100vw-24px)] overflow-x-auto">
+          {/* Modalidad toggle */}
+          <div className="flex items-center gap-1 border-r border-neutral-300 pr-1.5 sm:pr-2">
+            <button
+              type="button"
+              onClick={() => {
+                setGameMode('survival');
+                if (gameState === 'playing') startGame('survival');
+              }}
+              className={`px-2 py-1 text-[10px] font-bold border border-black cursor-pointer transition-colors whitespace-nowrap ${
+                gameMode === 'survival'
+                  ? 'bg-black text-white shadow-[1px_1px_0px_#000000]'
+                  : 'bg-white text-black hover:bg-neutral-100'
+              }`}
+            >
+              Supervivencia
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setGameMode('blitz');
+                if (gameState === 'playing') startGame('blitz');
+              }}
+              className={`px-2 py-1 text-[10px] font-bold border border-black cursor-pointer transition-colors whitespace-nowrap ${
+                gameMode === 'blitz'
+                  ? 'bg-black text-white shadow-[1px_1px_0px_#000000]'
+                  : 'bg-white text-black hover:bg-neutral-100'
+              }`}
+            >
+              Blitz 60s
+            </button>
+          </div>
+
+          {/* Aleatorio toggle */}
+          <button
+            type="button"
+            onClick={() => {
+              setIsRandomMode((prev) => !prev);
+              if (gameState === 'playing') startGame(gameMode);
+            }}
+            className={`px-2 py-1 text-[10px] font-bold border border-black cursor-pointer transition-colors flex items-center gap-1 whitespace-nowrap ${
+              isRandomMode
+                ? 'bg-black text-white shadow-[1px_1px_0px_#000000]'
+                : 'bg-neutral-100 text-neutral-800 hover:bg-neutral-200'
+            }`}
+            title={isRandomMode ? "Modo Dinámico Aleatorio" : `Nivel ${selectedNode.code}`}
+          >
+            <Shuffle className="w-3 h-3" />
+            <span>{isRandomMode ? 'Aleatorio' : selectedNode.code}</span>
+          </button>
+
+          {/* Controles de partida */}
+          {gameState === 'playing' ? (
+            <>
+              <button
+                type="button"
+                onClick={() => startGame(gameMode)}
+                className="btn-ink-outline px-2 py-1 text-xs font-bold flex items-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000000] whitespace-nowrap"
+                title="Reiniciar partida"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline text-[11px]">Reiniciar</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => finishGame('manual')}
+                className="btn-ink px-3 py-1 text-xs font-bold uppercase flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] whitespace-nowrap"
+                title="Finalizar partida y registrar tu progreso actual"
+              >
+                <Flag className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>Finalizar</span>
+              </button>
+            </>
+          ) : gameState === 'idle' ? (
+            <button
+              type="button"
+              onClick={() => startGame(gameMode)}
+              className="btn-ink px-3 py-1 text-xs font-bold uppercase flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] whitespace-nowrap"
+            >
+              <Sparkles className="w-3.5 h-3.5 fill-white stroke-none" />
+              <span>Empezar</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => startGame(gameMode)}
+              className="btn-ink px-3 py-1 text-xs font-bold uppercase flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] whitespace-nowrap"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Reiniciar</span>
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
