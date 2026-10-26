@@ -18,6 +18,7 @@ export interface GhostLineMinigameProps {
   onAwardXP: (amount: number) => void;
   onAvatarMoodChange?: (mood: AvatarMood) => void;
   onDrawingStateChange?: (isDrawing: boolean) => void;
+  onToggleSidebar?: () => void;
 }
 
 interface Point {
@@ -174,62 +175,131 @@ function evaluateGhostStroke(userPts: Point[], ghostPts: Point[]): GhostEvaluati
   };
 }
 
-// Plantillas predeterminadas de trazos
-export type GhostPreset = 'custom' | 'horizontal' | 'diagonal' | 'arc_c' | 'wave_s' | 'chevron';
+// Plantillas predeterminadas de trazos ampliadas por todo el lienzo
+export type GhostPreset =
+  | 'custom'
+  | 'horizontal'
+  | 'vertical'
+  | 'diagonal'
+  | 'arc_c'
+  | 'wave_s'
+  | 'chevron'
+  | 'circle'
+  | 'box';
 
 function generatePresetGhost(type: GhostPreset): Point[] {
   const pts: Point[] = [];
-  const H = 540;
 
   if (type === 'horizontal') {
-    const y = H * 0.5;
-    for (let x = 100; x <= 500; x += 10) {
+    // Trazo horizontal completo de hombro de lado a lado (528px)
+    const y = 270;
+    for (let x = 36; x <= 564; x += 10) {
+      pts.push({ x, y, pressure: 0.5 });
+    }
+  } else if (type === 'vertical') {
+    // Trazo vertical ascendente completo (390px)
+    const x = 300;
+    for (let y = 475; y >= 85; y -= 10) {
       pts.push({ x, y, pressure: 0.5 });
     }
   } else if (type === 'diagonal') {
-    const startX = 130;
-    const startY = 410;
-    const endX = 470;
-    const endY = 130;
-    for (let i = 0; i <= 40; i++) {
-      const t = i / 40;
+    // Gran diagonal ascendente de esquina a esquina (510px x 380px)
+    const startX = 45;
+    const startY = 475;
+    const endX = 555;
+    const endY = 95;
+    for (let i = 0; i <= 50; i++) {
+      const t = i / 50;
       pts.push({
-        x: startX + (endX - startX) * t,
-        y: startY + (endY - startY) * t,
+        x: Math.round(startX + (endX - startX) * t),
+        y: Math.round(startY + (endY - startY) * t),
         pressure: 0.5,
       });
     }
   } else if (type === 'arc_c') {
-    const startX = 120;
-    const endX = 480;
-    const baseY = 360;
-    const apexY = 170;
-    for (let i = 0; i <= 50; i++) {
-      const t = i / 50;
-      const x = startX + (endX - startX) * t;
+    // Gran arco parabólico en bóveda aprovechando la anchura y altura (510px x 365px)
+    const startX = 45;
+    const endX = 555;
+    const baseY = 460;
+    const apexY = 95;
+    for (let i = 0; i <= 60; i++) {
+      const t = i / 60;
+      const x = Math.round(startX + (endX - startX) * t);
       const arch = 4 * t * (1 - t);
-      const y = baseY - (baseY - apexY) * arch;
+      const y = Math.round(baseY - (baseY - apexY) * arch);
       pts.push({ x, y, pressure: 0.5 });
     }
   } else if (type === 'wave_s') {
-    const startX = 100;
-    const endX = 500;
-    const centerY = 270;
-    const amp = 85;
-    for (let i = 0; i <= 60; i++) {
-      const t = i / 60;
-      const x = startX + (endX - startX) * t;
-      const y = centerY - Math.sin(t * Math.PI * 2) * amp;
+    // Gran onda en S biomecánica de extremo a extremo (510px x 290px)
+    const startX = 45;
+    const endX = 555;
+    const centerY = 285;
+    const amp = 145;
+    for (let i = 0; i <= 70; i++) {
+      const t = i / 70;
+      const x = Math.round(startX + (endX - startX) * t);
+      const y = Math.round(centerY - Math.sin(t * Math.PI * 2) * amp);
       pts.push({ x, y, pressure: 0.5 });
     }
   } else if (type === 'chevron') {
-    for (let i = 0; i <= 25; i++) {
-      const t = i / 25;
-      pts.push({ x: 120 + t * 180, y: 190 + t * 160, pressure: 0.5 });
+    // Quiebro angular amplio en V aprovechando toda la anchura y altura
+    const leftX = 45;
+    const midX = 300;
+    const rightX = 555;
+    const topY = 120;
+    const bottomY = 475;
+    for (let i = 0; i <= 30; i++) {
+      const t = i / 30;
+      pts.push({
+        x: Math.round(leftX + (midX - leftX) * t),
+        y: Math.round(topY + (bottomY - topY) * t),
+        pressure: 0.5,
+      });
     }
-    for (let i = 1; i <= 25; i++) {
-      const t = i / 25;
-      pts.push({ x: 300 + t * 180, y: 350 - t * 160, pressure: 0.5 });
+    for (let i = 1; i <= 30; i++) {
+      const t = i / 30;
+      pts.push({
+        x: Math.round(midX + (rightX - midX) * t),
+        y: Math.round(bottomY - (bottomY - topY) * t),
+        pressure: 0.5,
+      });
+    }
+  } else if (type === 'circle') {
+    // Gran forma oval / elíptica suave continua (450px x 350px)
+    const cx = 300;
+    const cy = 290;
+    const rx = 225;
+    const ry = 175;
+    const N = 72;
+    for (let i = 0; i <= N; i++) {
+      const angle = (i / N) * Math.PI * 2 - Math.PI / 2;
+      pts.push({
+        x: Math.round(cx + Math.cos(angle) * rx),
+        y: Math.round(cy + Math.sin(angle) * ry),
+        pressure: 0.5,
+      });
+    }
+  } else if (type === 'box') {
+    // Gran marco rectangular cerrado (500px x 370px)
+    const minX = 50;
+    const maxX = 550;
+    const minY = 105;
+    const maxY = 475;
+    for (let i = 0; i <= 20; i++) {
+      const t = i / 20;
+      pts.push({ x: Math.round(minX + (maxX - minX) * t), y: minY, pressure: 0.5 });
+    }
+    for (let i = 1; i <= 16; i++) {
+      const t = i / 16;
+      pts.push({ x: maxX, y: Math.round(minY + (maxY - minY) * t), pressure: 0.5 });
+    }
+    for (let i = 1; i <= 20; i++) {
+      const t = i / 20;
+      pts.push({ x: Math.round(maxX - (maxX - minX) * t), y: maxY, pressure: 0.5 });
+    }
+    for (let i = 1; i <= 16; i++) {
+      const t = i / 16;
+      pts.push({ x: minX, y: Math.round(maxY - (maxY - minY) * t), pressure: 0.5 });
     }
   }
 
@@ -241,6 +311,7 @@ export const GhostLineMinigame: React.FC<GhostLineMinigameProps> = ({
   onAwardXP,
   onAvatarMoodChange,
   onDrawingStateChange,
+  onToggleSidebar,
 }) => {
   // Estado general de la partida
   const [gameState, setGameState] = useState<'playing' | 'gameover'>('playing');
@@ -250,6 +321,7 @@ export const GhostLineMinigame: React.FC<GhostLineMinigameProps> = ({
   // Estado del Fantasma actual
   const [ghostStroke, setGhostStroke] = useState<Point[] | null>(() => generatePresetGhost('horizontal'));
   const [isSettingCustomGhost, setIsSettingCustomGhost] = useState<boolean>(false);
+  const [mutateGhost, setMutateGhost] = useState<boolean>(true);
 
   // Trazos actuales del usuario
   const [userStroke, setUserStroke] = useState<Point[] | null>(null);
@@ -384,38 +456,29 @@ export const GhostLineMinigame: React.FC<GhostLineMinigameProps> = ({
     }
   };
 
-  // Renderizado del lienzo técnico Paplitz
+  // Renderizado del lienzo técnico Paplitz de alta definición (HiDPI / Retina responsive)
   const renderCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
     const W = 600;
     const H = 540;
+    const targetW = Math.round(W * dpr);
+    const targetH = Math.round(H * dpr);
+
+    if (canvas.width !== targetW || canvas.height !== targetH) {
+      canvas.width = targetW;
+      canvas.height = targetH;
+    }
 
     ctx.save();
+    ctx.scale(dpr, dpr);
 
-    // 1. Fondo blanco técnico
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, W, H);
-
-    // 2. Trama milimétrica sutil Paplitz
-    ctx.strokeStyle = '#F0F0F0';
-    ctx.lineWidth = 1;
-    const gridStep = 20;
-    for (let x = 0; x < W; x += gridStep) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, H);
-      ctx.stroke();
-    }
-    for (let y = 0; y < H; y += gridStep) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(W, y);
-      ctx.stroke();
-    }
+    // Fondo transparente para dejar ver la cuadrícula continua técnica (pattern-grid-paper)
+    ctx.clearRect(0, 0, W, H);
 
     // 3. RENDERIZADO DEL FANTASMA EN "GRIS CLARITO" (#D4D4D8 / #E4E4E7)
     if (ghostStroke && ghostStroke.length > 1) {
@@ -463,18 +526,21 @@ export const GhostLineMinigame: React.FC<GhostLineMinigameProps> = ({
       ctx.textBaseline = 'middle';
       ctx.fillText('1', startP.x, startP.y);
 
-      // Nodo de fin ② del fantasma
+      // Nodo de fin ② del fantasma (solo si no coincide prácticamente con el de inicio, e.g. formas cerradas)
       const endP = ghostStroke[ghostStroke.length - 1];
-      ctx.fillStyle = '#FFFFFF';
-      ctx.strokeStyle = '#A1A1AA';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(endP.x, endP.y, 6.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
+      const isClosed = Math.hypot(endP.x - startP.x, endP.y - startP.y) < 14;
+      if (!isClosed) {
+        ctx.fillStyle = '#FFFFFF';
+        ctx.strokeStyle = '#A1A1AA';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(endP.x, endP.y, 6.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
 
-      ctx.fillStyle = '#71717A';
-      ctx.fillText('2', endP.x, endP.y);
+        ctx.fillStyle = '#71717A';
+        ctx.fillText('2', endP.x, endP.y);
+      }
 
       // Etiqueta tenue FANTASMA
       const midP = ghostStroke[Math.floor(ghostStroke.length / 2)];
@@ -534,6 +600,14 @@ export const GhostLineMinigame: React.FC<GhostLineMinigameProps> = ({
 
   useEffect(() => {
     renderCanvas();
+  }, [renderCanvas]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      renderCanvas();
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, [renderCanvas]);
 
   // Captura y normalización de coordenadas
@@ -649,326 +723,446 @@ export const GhostLineMinigame: React.FC<GhostLineMinigameProps> = ({
     }
     setTimeout(() => setFlashMessage(null), 1500);
 
-    // MECÁNICA CLAVE: La línea que el usuario acaba de dibujar SE CONVIERTE EN EL NUEVO FANTASMA
-    // Así el usuario puede trazar sucesivamente la siguiente línea de forma rápida y fluida
-    setGhostStroke(recorded);
+    // MECÁNICA: Si está activada la mutación, el trazo del usuario se convierte en el nuevo fantasma
+    // Si la plantilla es fija, se conserva intacta para permitir calcos repetidos
+    if (mutateGhost) {
+      setGhostStroke(recorded);
+    }
     setUserStroke(null);
     renderCanvas();
   };
 
   return (
-    <div className="w-full flex-1 flex flex-col items-center justify-center overflow-hidden relative h-[calc(100vh-64px)] max-h-[calc(100vh-64px)] bg-neutral-100 font-sans select-none">
-      {/* BOTÓN FLOTANTE TOGGLE DEL PANEL (COMO EN EL PANEL DE PRÁCTICA) */}
+    <div className="relative w-full h-full overflow-hidden flex items-center justify-center select-none bg-white pattern-grid-paper">
+      {/* 1. BOTÓN TOGGLE PANEL DEDICADO A LA IZQUIERDA DE LA PANTALLA */}
       <button
         type="button"
-        onClick={() => setIsSidebarOpen((prev) => !prev)}
-        className="absolute top-3 left-3 z-30 bg-white hover:bg-neutral-100 text-black px-2.5 py-1.5 border-2 border-black shadow-[2px_2px_0px_#000000] text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer transition-transform hover:scale-105 active:scale-95"
-        title={isSidebarOpen ? "Ocultar panel" : "Abrir panel de opciones y estadísticas"}
+        onClick={() => (onToggleSidebar ? onToggleSidebar() : setIsSidebarOpen((prev) => !prev))}
+        className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3 z-30 bg-white hover:bg-neutral-100 text-black px-2.5 py-1.5 border-2 border-black shadow-[3px_3px_0px_#000000] text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer active:scale-95 transition-transform"
+        title="Abrir / cerrar panel de opciones y estadísticas"
       >
         <PanelLeft className="w-4 h-4 stroke-[2.5]" />
         <span>Panel</span>
       </button>
 
-      {/* BOTÓN RÁPIDO DE FINALIZAR DURANTE LA PARTIDA (DIRECTO EN EL LIENZO) */}
-      {gameState === 'playing' && (
-        <button
-          type="button"
-          onClick={finishGame}
-          className="absolute top-3 right-3 z-30 bg-white hover:bg-neutral-100 text-black px-2.5 py-1.5 border-2 border-black shadow-[2px_2px_0px_#000000] text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer transition-transform hover:scale-105 active:scale-95"
-          title="Finalizar partida y ver el resumen de estadísticas"
-        >
-          <Flag className="w-3.5 h-3.5 stroke-[2.5]" />
-          <span>Finalizar</span>
-        </button>
-      )}
+      {/* 2. HUD SUPERIOR: A LA MISMA ALTURA QUE EL BOTÓN PANEL ALINEADO CON EL LIENZO */}
+      <div
+        className="absolute top-2.5 sm:top-3 z-20 flex items-start justify-between pointer-events-none px-2 sm:px-0"
+        style={{
+          width: 'min(calc(100% - 130px), 840px, calc((100dvh - 90px) * (600 / 540)))',
+        }}
+      >
+        {/* Tira compacta a la izquierda */}
+        <div className="pointer-events-auto self-start font-mono text-xs select-none bg-white border-2 border-black p-1 sm:p-1.5 shadow-[3px_3px_0px_#000000] flex items-center gap-1.5 sm:gap-2">
+          <span className="text-[10px] font-mono bg-black text-white px-1.5 py-0.5 font-bold uppercase shrink-0 shadow-[1px_1px_0px_#000]">
+            FANTASMA
+          </span>
+          <div className="flex items-center gap-1 bg-neutral-100 border border-black px-1.5 py-0.5">
+            <Check className="w-3 h-3 stroke-[3]" />
+            <span className="text-[11px] font-bold tabular-nums">{scores.length} calcos</span>
+          </div>
+          <div className="flex items-center gap-1 bg-neutral-100 border border-black px-1.5 py-0.5">
+            <Flame className="w-3 h-3 fill-black text-black" />
+            <span className="text-[11px] font-bold tabular-nums">{comboStreak} racha</span>
+          </div>
+          {averageScore > 0 && (
+            <span className="text-[10px] font-mono font-bold text-neutral-600 hidden sm:inline">
+              Media: {averageScore}%
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => restartGame(selectedPreset)}
+            className="p-1 border border-black hover:bg-neutral-100 cursor-pointer shadow-[1px_1px_0px_#000000] active:scale-95 transition-transform"
+            title="Reiniciar plantilla fantasma"
+          >
+            <RotateCcw className="w-3 h-3 stroke-[2.5]" />
+          </button>
+        </div>
 
-      {/* BACKDROP FLOTANTE CUANDO EL PANEL ESTÁ ABIERTO */}
-      {isSidebarOpen && (
+        {/* A la derecha del dibujo: Cuadradito compacto con la nota (a la misma altura) */}
+        {lastEval ? (
+          <div className="pointer-events-auto self-start bg-white border-2 border-black p-2 sm:p-2.5 shadow-[4px_4px_0px_#000000] font-mono flex flex-col items-center justify-center min-w-[88px] sm:min-w-[100px] aspect-square animate-in fade-in zoom-in-95 duration-150">
+            <span className="text-[10px] sm:text-xs font-bold uppercase text-neutral-500 tracking-wider">
+              Nota
+            </span>
+            <span className="text-2xl sm:text-3xl font-black leading-none my-1">
+              {lastEval.score}%
+            </span>
+            <span
+              className={`text-[9px] sm:text-[10px] font-bold uppercase px-1.5 py-0.5 border border-black ${
+                lastEval.perfect
+                  ? 'bg-black text-white'
+                  : lastEval.passed
+                  ? 'bg-neutral-200 text-black'
+                  : 'bg-white text-neutral-700'
+              }`}
+            >
+              {lastEval.perfect ? 'Perfecto' : lastEval.passed ? 'Aprobado' : 'Reintentar'}
+            </span>
+          </div>
+        ) : (
+          <div />
+        )}
+      </div>
+
+      {/* BACKDROP FLOTANTE CUANDO EL PANEL LOCAL ESTÁ ABIERTO */}
+      {!onToggleSidebar && isSidebarOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px]"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
 
-      {/* 1. BARRA LATERAL IZQUIERDA EN MODO OVERLAY */}
-      <aside
-        className={`fixed md:absolute top-0 bottom-0 left-0 z-50 bg-white border-r-2 border-black shadow-[6px_0px_0px_#000000] flex flex-col select-none transition-transform duration-200 ease-in-out ${
-          isSidebarOpen ? 'translate-x-0 pointer-events-auto' : '-translate-x-full pointer-events-none'
-        } w-full sm:w-85 md:w-80 h-full overflow-hidden`}
-      >
-        <div className="w-full flex flex-col h-full overflow-y-auto p-3.5 space-y-3 font-mono">
-          {/* CABECERA CON BOTÓN CERRAR PANEL Y BOTÓN SALIR */}
-          <div className="flex items-center justify-between pb-2 border-b-2 border-black">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 bg-black text-white flex items-center justify-center shadow-[1px_1px_0px_#000000]">
-                <Ghost className="w-4 h-4 stroke-[2.5]" />
+      {/* 1. BARRA LATERAL IZQUIERDA EN MODO OVERLAY (SI NO SE USA EL SIDEBAR PRINCIPAL) */}
+      {!onToggleSidebar && (
+        <aside
+          className={`fixed md:absolute top-0 bottom-0 left-0 z-50 bg-white border-r-2 border-black shadow-[6px_0px_0px_#000000] flex flex-col select-none transition-transform duration-200 ease-in-out ${
+            isSidebarOpen ? 'translate-x-0 pointer-events-auto' : '-translate-x-full pointer-events-none'
+          } w-full sm:w-85 md:w-80 h-full overflow-hidden`}
+        >
+          <div className="w-full flex flex-col h-full overflow-y-auto p-3.5 space-y-3 font-mono">
+            {/* CABECERA CON BOTÓN CERRAR PANEL Y BOTÓN SALIR */}
+            <div className="flex items-center justify-between pb-2 border-b-2 border-black">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 bg-black text-white flex items-center justify-center shadow-[1px_1px_0px_#000000]">
+                  <Ghost className="w-4 h-4 stroke-[2.5]" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-neutral-500 uppercase block leading-none">
+                    Minijuego
+                  </span>
+                  <span className="text-xs font-bold font-display uppercase tracking-wider text-black">
+                    Línea Fantasma
+                  </span>
+                </div>
               </div>
-              <div>
-                <span className="text-[10px] font-bold text-neutral-500 uppercase block leading-none">
-                  Minijuego
-                </span>
-                <span className="text-xs font-bold font-display uppercase tracking-wider text-black">
-                  Línea Fantasma
-                </span>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={onExit}
+                  className="btn-ink-outline px-2 py-1 text-xs font-bold flex items-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000000]"
+                  title="Volver al menú de minijuegos"
+                >
+                  <Undo2 className="w-3.5 h-3.5" />
+                  <span>Salir</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsSidebarOpen(false)}
+                  className="p-1 border border-black hover:bg-neutral-100 cursor-pointer shadow-[1px_1px_0px_#000000]"
+                  title="Cerrar panel y volver al lienzo"
+                >
+                  <X className="w-4 h-4 stroke-[2.5]" />
+                </button>
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5">
+            {/* SELECTOR DE PLANTILLA FANTASMA */}
+            <div className="space-y-1">
+              <span className="text-[10px] uppercase font-bold text-neutral-500">Plantilla Fantasma:</span>
+              <div className="grid grid-cols-2 gap-1 p-1 border-2 border-black bg-neutral-100 shadow-[2px_2px_0px_#000000]">
+                {[
+                  { id: 'horizontal' as const, label: 'Horizontal (→)' },
+                  { id: 'vertical' as const, label: 'Vertical (↑)' },
+                  { id: 'diagonal' as const, label: 'Diagonal (↗)' },
+                  { id: 'arc_c' as const, label: 'Arco C (⌒)' },
+                  { id: 'wave_s' as const, label: 'Onda S (〜)' },
+                  { id: 'chevron' as const, label: 'Quiebro V (✓)' },
+                  { id: 'circle' as const, label: 'Óvalo (◯)' },
+                  { id: 'box' as const, label: 'Caja (▢)' },
+                  { id: 'custom' as const, label: 'Dibujar Libre' },
+                ].map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => handleSelectPreset(p.id)}
+                    className={`py-1 px-1.5 text-[10px] font-bold border border-black cursor-pointer transition-colors ${
+                      selectedPreset === p.id && !isSettingCustomGhost
+                        ? 'bg-black text-white shadow-[1px_1px_0px_#000000]'
+                        : selectedPreset === p.id && isSettingCustomGhost
+                        ? 'bg-neutral-800 text-white animate-pulse'
+                        : 'bg-white text-black hover:bg-neutral-200'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* MODO DE COMPORTAMIENTO TRAS EL CALCO */}
+            <div className="space-y-1">
+              <span className="text-[10px] uppercase font-bold text-neutral-500">Dinámica de Calco:</span>
+              <div className="grid grid-cols-2 gap-1 p-1 border-2 border-black bg-neutral-100 shadow-[2px_2px_0px_#000000]">
+                <button
+                  type="button"
+                  onClick={() => setMutateGhost(true)}
+                  className={`py-1 px-1.5 text-[10px] font-bold border border-black cursor-pointer transition-colors ${
+                    mutateGhost
+                      ? 'bg-black text-white shadow-[1px_1px_0px_#000000]'
+                      : 'bg-white text-black hover:bg-neutral-200'
+                  }`}
+                  title="El último trazo que dibujes se convierte en el nuevo fantasma continuo"
+                >
+                  Mutación
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMutateGhost(false);
+                    if (selectedPreset !== 'custom') {
+                      setGhostStroke(generatePresetGhost(selectedPreset));
+                    }
+                  }}
+                  className={`py-1 px-1.5 text-[10px] font-bold border border-black cursor-pointer transition-colors ${
+                    !mutateGhost
+                      ? 'bg-black text-white shadow-[1px_1px_0px_#000000]'
+                      : 'bg-white text-black hover:bg-neutral-200'
+                  }`}
+                  title="Conserva la plantilla fija en pantalla para calcar una y otra vez"
+                >
+                  Plantilla Fija
+                </button>
+              </div>
+            </div>
+
+            {/* PANEL DE ESTADÍSTICAS EN VIVO */}
+            <div className="space-y-2 pt-1 border-t-2 border-black">
+              {/* Calcos Realizados & Nota Media */}
+              <div className="grid grid-cols-2 gap-1.5">
+                <div className="border-2 border-black p-2 bg-neutral-50 shadow-[1px_1px_0px_#000000]">
+                  <div className="text-[9px] uppercase font-bold text-neutral-500">Calcos Hechos</div>
+                  <div className="text-base font-black tabular-nums flex items-center gap-1">
+                    <Check className="w-3.5 h-3.5 stroke-[3]" />
+                    {scores.length}
+                  </div>
+                </div>
+                <div className="border-2 border-black p-2 bg-neutral-50 shadow-[1px_1px_0px_#000000]">
+                  <div className="text-[9px] uppercase font-bold text-neutral-500">Nota Media</div>
+                  <div className="text-base font-black tabular-nums">
+                    {averageScore > 0 ? `${averageScore}%` : '-'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Racha & Desviación Media */}
+              <div className="grid grid-cols-2 gap-1.5">
+                <div className="border-2 border-black p-2 bg-neutral-50 shadow-[1px_1px_0px_#000000]">
+                  <div className="text-[9px] uppercase font-bold text-neutral-500 flex items-center gap-0.5">
+                    <Flame className="w-3 h-3 text-black fill-black" />
+                    <span>Racha (≥75%)</span>
+                  </div>
+                  <div className="text-base font-black tabular-nums">{comboStreak}</div>
+                </div>
+                <div className="border-2 border-black p-2 bg-neutral-50 shadow-[1px_1px_0px_#000000]">
+                  <div className="text-[9px] uppercase font-bold text-neutral-500">Desv. Media</div>
+                  <div className="text-base font-black tabular-nums">
+                    {averageDeviation > 0 ? `${averageDeviation}px` : '-'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* RÉCORDS HISTÓRICOS */}
+            <div className="border-2 border-black p-2 bg-neutral-50 text-[10px] space-y-1 shadow-[1px_1px_0px_#000000]">
+              <div className="font-bold text-neutral-700 uppercase pb-0.5 border-b border-neutral-200">
+                Mejores Récords:
+              </div>
+              <div className="flex justify-between">
+                <span className="text-neutral-500">Mejor Racha:</span>
+                <span className="font-bold">{Math.max(savedRecords.bestStreak, bestStreak)} seguidos</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-neutral-500">Mejor Calco:</span>
+                <span className="font-bold">{Math.max(savedRecords.bestScore, maxScore)}%</span>
+              </div>
+            </div>
+
+            {/* INSTRUCCIÓN DEL BUCLE RÁPIDO */}
+            <div className="p-2 bg-neutral-50 border border-black text-[10px] text-neutral-600 leading-snug space-y-1">
+              <div className="font-bold text-black uppercase flex items-center gap-1">
+                <Zap className="w-3 h-3 text-black stroke-[2.5]" />
+                <span>Mecánica de Mutación:</span>
+              </div>
+              <p>
+                Traza sobre la línea fantasma. Tu calco se evalúa de inmediato y <strong>se convierte en el nuevo fantasma</strong> para trazar de nuevo sin pausas.
+              </p>
+            </div>
+
+            {/* BOTONES DE ACCIÓN: FINALIZAR Y REINICIAR */}
+            <div className="pt-2 mt-auto space-y-1.5">
               <button
                 type="button"
-                onClick={onExit}
-                className="btn-ink-outline px-2 py-1 text-xs font-bold flex items-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000000]"
-                title="Volver al menú de minijuegos"
+                onClick={finishGame}
+                className="w-full btn-ink py-2 px-3 text-xs font-bold uppercase flex items-center justify-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] hover:bg-neutral-900"
+                title="Finalizar partida y ver el resumen completo de estadísticas"
               >
-                <Undo2 className="w-3.5 h-3.5" />
-                <span>Salir</span>
+                <Flag className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>Finalizar Partida</span>
               </button>
+
               <button
                 type="button"
-                onClick={() => setIsSidebarOpen(false)}
-                className="p-1 border border-black hover:bg-neutral-100 cursor-pointer shadow-[1px_1px_0px_#000000]"
-                title="Cerrar panel y volver al lienzo"
+                onClick={() => restartGame(selectedPreset)}
+                className="w-full btn-ink-outline py-1.5 px-3 text-[11px] font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-[1px_1px_0px_#000000] hover:bg-neutral-100"
+                title="Reiniciar y comenzar de nuevo el fantasma"
               >
-                <X className="w-4 h-4 stroke-[2.5]" />
+                <RotateCcw className="w-3 h-3" />
+                <span>Reiniciar Fantasma</span>
               </button>
             </div>
           </div>
+        </aside>
+      )}
 
-        {/* SELECTOR DE PLANTILLA FANTASMA INICIAL */}
-        <div className="space-y-1">
-          <span className="text-[10px] uppercase font-bold text-neutral-500">Fantasma Inicial:</span>
-          <div className="grid grid-cols-2 gap-1 p-1 border-2 border-black bg-neutral-100 shadow-[2px_2px_0px_#000000]">
+      {/* 3. ÁREA CENTRAL: LIENZO 100% INTEGRADO CON EL FONDO */}
+      <div
+        className="relative aspect-[600/540] max-w-[min(calc(100%-24px),840px)] max-h-[calc(100%-70px)] flex items-center justify-center pointer-events-none"
+        style={{
+          width: 'min(calc(100% - 24px), 840px, calc((100dvh - 90px) * (600 / 540)))',
+          height: 'auto',
+          aspectRatio: '600 / 540',
+        }}
+      >
+        <canvas
+          ref={canvasRef}
+          width={600}
+          height={540}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          className="block w-full h-full cursor-crosshair touch-none select-none z-10 pointer-events-auto"
+        />
+
+        {/* Banner de Feedback instantáneo */}
+        {flashMessage && (
+          <div
+            className={`absolute top-3 z-30 px-3 py-1.5 font-mono text-xs font-bold border-2 shadow-[3px_3px_0px_#000000] animate-bounce pointer-events-none ${
+              flashMessage.positive
+                ? 'bg-black text-white border-white'
+                : 'bg-neutral-800 text-white border-white'
+            }`}
+          >
+            {flashMessage.text}
+          </div>
+        )}
+
+        {/* Modal de Fin de Partida */}
+        {gameState === 'gameover' && (
+          <div className="absolute inset-0 bg-white/95 backdrop-blur-xs flex flex-col items-center justify-center p-3 sm:p-5 border-2 border-black z-30 text-center font-mono animate-fade-in select-none pointer-events-auto overflow-y-auto max-h-full">
+            <Trophy className="w-8 h-8 sm:w-12 sm:h-12 text-black mb-1.5 animate-bounce stroke-[2.5]" />
+            <h3 className="text-lg sm:text-2xl font-bold font-display uppercase tracking-tight">
+              ¡Partida Finalizada!
+            </h3>
+            <p className="text-[11px] sm:text-xs text-neutral-600 mt-0.5 sm:mt-1 max-w-sm">
+              Has completado tu sesión de entrenamiento de memoria muscular y sincronía motriz.
+            </p>
+
+            {/* TABLA DE RESULTADOS */}
+            <div className="my-2.5 sm:my-4 p-2.5 sm:p-3.5 border-2 border-black bg-neutral-50 w-64 sm:w-72 space-y-1.5 sm:space-y-2 text-[11px] sm:text-xs shadow-[3px_3px_0px_#000000]">
+              <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
+                <span className="text-neutral-500 font-bold uppercase text-[10px]">Calcos Realizados:</span>
+                <span className="font-bold text-sm bg-black text-white px-1.5 py-0.2">
+                  {scores.length} trazos
+                </span>
+              </div>
+              <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
+                <span className="text-neutral-500 font-bold uppercase text-[10px]">Nota Media:</span>
+                <span className="font-bold text-sm">{averageScore}%</span>
+              </div>
+              <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
+                <span className="text-neutral-500 font-bold uppercase text-[10px]">Mejor Calco:</span>
+                <span className="font-bold text-sm">{maxScore}%</span>
+              </div>
+              <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
+                <span className="text-neutral-500 font-bold uppercase text-[10px]">Racha Máxima:</span>
+                <span className="font-bold text-sm">{Math.max(bestStreak, comboStreak)} seguidos</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-neutral-500 font-bold uppercase text-[10px]">Desviación Media:</span>
+                <span className="font-bold text-sm">{averageDeviation}px</span>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => restartGame(selectedPreset)}
+                className="btn-ink px-3 sm:px-4 py-1.5 sm:py-2 text-xs uppercase font-bold flex items-center gap-1.5 cursor-pointer shadow-[3px_3px_0px_#000000]"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Jugar de Nuevo</span>
+              </button>
+              <button
+                type="button"
+                onClick={onExit}
+                className="btn-ink-outline px-3 sm:px-4 py-1.5 sm:py-2 text-xs uppercase font-bold flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
+              >
+                <Undo2 className="w-3.5 h-3.5" />
+                <span>Volver a Minijuegos</span>
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 4. BARRA DE HERRAMIENTAS FLOTANTE INFERIOR (NEOBRUTALISTA PAPLITZ) */}
+      <div className="absolute bottom-3 sm:bottom-5 left-1/2 -translate-x-1/2 z-30 pointer-events-auto font-mono text-xs">
+        <div className="bg-white border-2 border-black p-1.5 sm:p-2 shadow-[4px_4px_0px_#000000] flex items-center gap-1.5 sm:gap-2 max-w-[calc(100vw-24px)] overflow-x-auto">
+          {/* Selector de Presets */}
+          <div className="flex items-center gap-1 border-r border-neutral-300 pr-1.5 sm:pr-2">
             {[
               { id: 'horizontal' as const, label: 'Horizontal' },
               { id: 'diagonal' as const, label: 'Diagonal' },
-              { id: 'arc_c' as const, label: 'Arco C' },
-              { id: 'wave_s' as const, label: 'Onda S' },
-              { id: 'chevron' as const, label: 'Quiebro V' },
-              { id: 'custom' as const, label: 'Dibujar Libre' },
+              { id: 'arc_c' as const, label: 'Arco' },
+              { id: 'wave_s' as const, label: 'Onda' },
+              { id: 'chevron' as const, label: 'Quiebro' },
+              { id: 'custom' as const, label: 'Libre' },
             ].map((p) => (
               <button
                 key={p.id}
                 type="button"
                 onClick={() => handleSelectPreset(p.id)}
-                className={`py-1 px-1.5 text-[10px] font-bold border border-black cursor-pointer transition-colors ${
+                className={`px-1.5 sm:px-2 py-1 text-[10px] font-bold border border-black cursor-pointer transition-colors whitespace-nowrap ${
                   selectedPreset === p.id && !isSettingCustomGhost
                     ? 'bg-black text-white shadow-[1px_1px_0px_#000000]'
                     : selectedPreset === p.id && isSettingCustomGhost
                     ? 'bg-neutral-800 text-white animate-pulse'
-                    : 'bg-white text-black hover:bg-neutral-200'
+                    : 'bg-white text-black hover:bg-neutral-100'
                 }`}
               >
                 {p.label}
               </button>
             ))}
           </div>
-        </div>
 
-        {/* PANEL DE ESTADÍSTICAS EN VIVO */}
-        <div className="space-y-2 pt-1 border-t-2 border-black">
-          {/* Calcos Realizados & Nota Media */}
-          <div className="grid grid-cols-2 gap-1.5">
-            <div className="border-2 border-black p-2 bg-neutral-50 shadow-[1px_1px_0px_#000000]">
-              <div className="text-[9px] uppercase font-bold text-neutral-500">Calcos Hechos</div>
-              <div className="text-base font-black tabular-nums flex items-center gap-1">
-                <Check className="w-3.5 h-3.5 stroke-[3]" />
-                {scores.length}
-              </div>
-            </div>
-            <div className="border-2 border-black p-2 bg-neutral-50 shadow-[1px_1px_0px_#000000]">
-              <div className="text-[9px] uppercase font-bold text-neutral-500">Nota Media</div>
-              <div className="text-base font-black tabular-nums">
-                {averageScore > 0 ? `${averageScore}%` : '-'}
-              </div>
-            </div>
-          </div>
-
-          {/* Racha & Desviación Media */}
-          <div className="grid grid-cols-2 gap-1.5">
-            <div className="border-2 border-black p-2 bg-neutral-50 shadow-[1px_1px_0px_#000000]">
-              <div className="text-[9px] uppercase font-bold text-neutral-500 flex items-center gap-0.5">
-                <Flame className="w-3 h-3 text-black fill-black" />
-                <span>Racha (≥75%)</span>
-              </div>
-              <div className="text-base font-black tabular-nums">{comboStreak}</div>
-            </div>
-            <div className="border-2 border-black p-2 bg-neutral-50 shadow-[1px_1px_0px_#000000]">
-              <div className="text-[9px] uppercase font-bold text-neutral-500">Desv. Media</div>
-              <div className="text-base font-black tabular-nums">
-                {averageDeviation > 0 ? `${averageDeviation}px` : '-'}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* RÉCORDS HISTÓRICOS */}
-        <div className="border-2 border-black p-2 bg-neutral-50 text-[10px] space-y-1 shadow-[1px_1px_0px_#000000]">
-          <div className="font-bold text-neutral-700 uppercase pb-0.5 border-b border-neutral-200">
-            Mejores Récords:
-          </div>
-          <div className="flex justify-between">
-            <span className="text-neutral-500">Mejor Racha:</span>
-            <span className="font-bold">{Math.max(savedRecords.bestStreak, bestStreak)} seguidos</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-neutral-500">Mejor Calco:</span>
-            <span className="font-bold">{Math.max(savedRecords.bestScore, maxScore)}%</span>
-          </div>
-        </div>
-
-        {/* INSTRUCCIÓN DEL BUCLE RÁPIDO */}
-        <div className="p-2 bg-neutral-50 border border-black text-[10px] text-neutral-600 leading-snug space-y-1">
-          <div className="font-bold text-black uppercase flex items-center gap-1">
-            <Zap className="w-3 h-3 text-black stroke-[2.5]" />
-            <span>Mecánica de Mutación:</span>
-          </div>
-          <p>
-            Traza sobre la línea fantasma. Tu calco se evalúa de inmediato y <strong>se convierte en el nuevo fantasma</strong> para trazar de nuevo sin pausas.
-          </p>
-        </div>
-
-        {/* BOTONES DE ACCIÓN: FINALIZAR Y REINICIAR */}
-        <div className="pt-2 mt-auto space-y-1.5">
-          <button
-            type="button"
-            onClick={finishGame}
-            className="w-full btn-ink py-2 px-3 text-xs font-bold uppercase flex items-center justify-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] hover:bg-neutral-900"
-            title="Finalizar partida y ver el resumen completo de estadísticas"
-          >
-            <Flag className="w-3.5 h-3.5 stroke-[2.5]" />
-            <span>Finalizar Partida</span>
-          </button>
-
+          {/* Reiniciar */}
           <button
             type="button"
             onClick={() => restartGame(selectedPreset)}
-            className="w-full btn-ink-outline py-1.5 px-3 text-[11px] font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-[1px_1px_0px_#000000] hover:bg-neutral-100"
+            className="btn-ink-outline px-2 py-1 text-xs font-bold flex items-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000000] whitespace-nowrap"
             title="Reiniciar y comenzar de nuevo el fantasma"
           >
-            <RotateCcw className="w-3 h-3" />
-            <span>Reiniciar Fantasma</span>
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline text-[11px]">Reiniciar</span>
           </button>
-        </div>
-        </div>
-      </aside>
 
-      {/* 2. ÁREA CENTRAL: LIENZO 100% CENTRADO Y SIN SCROLL */}
-      <div className="flex-1 w-full flex flex-col items-center justify-center p-2 sm:p-4 overflow-hidden min-h-0 relative z-10">
-        <div className="relative flex items-center justify-center select-none touch-none max-w-full">
-          {/* Banner de Feedback instantáneo */}
-          {flashMessage && (
-            <div
-              className={`absolute top-3 z-30 px-3 py-1.5 font-mono text-xs font-bold border-2 shadow-[3px_3px_0px_#000000] animate-bounce ${
-                flashMessage.positive
-                  ? 'bg-black text-white border-white'
-                  : 'bg-neutral-800 text-white border-white'
-              }`}
+          {/* Finalizar Partida */}
+          {gameState === 'playing' && (
+            <button
+              type="button"
+              onClick={finishGame}
+              className="btn-ink px-3 py-1 text-xs font-bold uppercase flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] whitespace-nowrap"
+              title="Finalizar partida y ver el resumen de estadísticas"
             >
-              {flashMessage.text}
-            </div>
+              <Flag className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span>Finalizar</span>
+            </button>
           )}
-
-          {/* Modal de Fin de Partida */}
-          {gameState === 'gameover' && (
-            <div className="absolute inset-0 bg-white/95 backdrop-blur-xs flex flex-col items-center justify-center p-6 border-2 border-black z-30 text-center font-mono animate-fade-in select-none">
-              <Trophy className="w-12 h-12 text-black mb-2 animate-bounce stroke-[2.5]" />
-              <h3 className="text-2xl font-bold font-display uppercase tracking-tight">
-                ¡Partida Finalizada!
-              </h3>
-              <p className="text-xs text-neutral-600 mt-1 max-w-sm">
-                Has completado tu sesión de entrenamiento de memoria muscular y sincronía motriz.
-              </p>
-
-              {/* TABLA DE RESULTADOS */}
-              <div className="my-4 p-3.5 border-2 border-black bg-neutral-50 w-72 space-y-2 text-xs shadow-[3px_3px_0px_#000000]">
-                <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
-                  <span className="text-neutral-500 font-bold uppercase text-[10px]">Calcos Realizados:</span>
-                  <span className="font-bold text-sm bg-black text-white px-1.5 py-0.2">
-                    {scores.length} trazos
-                  </span>
-                </div>
-                <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
-                  <span className="text-neutral-500 font-bold uppercase text-[10px]">Nota Media:</span>
-                  <span className="font-bold text-sm">{averageScore}%</span>
-                </div>
-                <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
-                  <span className="text-neutral-500 font-bold uppercase text-[10px]">Mejor Calco:</span>
-                  <span className="font-bold text-sm">{maxScore}%</span>
-                </div>
-                <div className="flex justify-between items-center pb-1 border-b border-neutral-300">
-                  <span className="text-neutral-500 font-bold uppercase text-[10px]">Racha Máxima:</span>
-                  <span className="font-bold text-sm">{Math.max(bestStreak, comboStreak)} seguidos</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-neutral-500 font-bold uppercase text-[10px]">Desviación Media:</span>
-                  <span className="font-bold text-sm">{averageDeviation}px</span>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => restartGame(selectedPreset)}
-                  className="btn-ink px-4 py-2 text-xs uppercase font-bold flex items-center gap-1.5 cursor-pointer shadow-[3px_3px_0px_#000000]"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span>Jugar de Nuevo</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={onExit}
-                  className="btn-ink-outline px-4 py-2 text-xs uppercase font-bold flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
-                >
-                  <Undo2 className="w-3.5 h-3.5" />
-                  <span>Volver a Minijuegos</span>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* LIENZO: PROPORCIÓN EXACTA 600x540 */}
-          <canvas
-            ref={canvasRef}
-            width={600}
-            height={540}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerUp}
-            className="border-2 border-black bg-white shadow-[4px_4px_0px_#000000] cursor-crosshair touch-none select-none max-w-full"
-            style={{
-              width: 'min(100%, min(600px, calc((100vh - 165px) * (600 / 540))))',
-              height: 'auto',
-              aspectRatio: '600 / 540',
-            }}
-          />
         </div>
-
-        {/* FEEDBACK DEL ÚLTIMO CALCO AL PIE DEL LIENZO */}
-        {lastEval && gameState === 'playing' && (
-          <div className="mt-2 w-full max-w-xl p-2 border-2 border-black bg-white shadow-[2px_2px_0px_#000000] font-mono text-xs flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span
-                className={`px-2 py-0.5 font-bold border border-black ${
-                  lastEval.perfect
-                    ? 'bg-black text-white'
-                    : lastEval.passed
-                    ? 'bg-neutral-100 text-black'
-                    : 'bg-neutral-200 text-black'
-                }`}
-              >
-                {lastEval.passed ? '✓' : '✗'} {lastEval.score}%
-              </span>
-              <span className="text-[11px] text-neutral-600 font-sans">
-                Desviación: <strong>{lastEval.avgDistPx}px</strong> · Longitud: <strong>{lastEval.lengthScore}%</strong>
-              </span>
-            </div>
-
-            <span className="text-[10px] text-neutral-500 font-mono">
-              {lastEval.title}
-            </span>
-          </div>
-        )}
       </div>
     </div>
   );

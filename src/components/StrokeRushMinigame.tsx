@@ -1133,7 +1133,7 @@ const RUSH_CANDIDATE_SECTORS = [
         <div
           className="absolute top-2.5 sm:top-3 z-20 flex items-start justify-between pointer-events-none px-2 sm:px-0"
           style={{
-            width: 'min(calc(100% - 130px), 600px, calc((100dvh - 180px) * (600 / 540)))',
+            width: 'min(calc(100% - 130px), 840px, calc((100dvh - 90px) * (600 / 540)))',
           }}
         >
           {/* Tira compacta a la izquierda */}
@@ -1519,9 +1519,9 @@ const RUSH_CANDIDATE_SECTORS = [
 
       {/* 3. ÁREA CENTRAL: LIENZO 100% INTEGRADO CON EL FONDO */}
       <div
-        className="relative aspect-[600/540] max-w-[min(calc(100%-24px),600px)] max-h-[calc(100%-125px)] flex items-center justify-center pointer-events-none"
+        className="relative aspect-[600/540] max-w-[min(calc(100%-24px),840px)] max-h-[calc(100%-70px)] flex items-center justify-center pointer-events-none"
         style={{
-          width: 'min(calc(100% - 24px), 600px, calc((100dvh - 180px) * (600 / 540)))',
+          width: 'min(calc(100% - 24px), 840px, calc((100dvh - 90px) * (600 / 540)))',
           height: 'auto',
           aspectRatio: '600 / 540',
         }}
