@@ -1119,15 +1119,47 @@ export function App() {
   // Reiniciar todo el progreso
   const handleResetProgress = () => {
     localStorage.clear();
-    setUnits(MODULE_PARALLELEPIPEDS.units);
+    setCalisthenicsUnits(MODULE_CALISTHENICS.units);
+    setCubeUnits(MODULE_PARALLELEPIPEDS.units);
     setStreak(0);
     setXp(0);
     setScoresHistory([]);
     setMasteryStreaks({});
     setNodePhases({});
-    const firstNode = MODULE_PARALLELEPIPEDS.units[0].nodes[0];
+    setNodeMastery({});
+    setNodeVariantIndices({});
+    setDailySetSession(null);
+    setCompletedDailySetForModal(null);
+    setPlacementTestNode(null);
+    setFeedback(null);
+    setShowSolution(false);
+    setStrokes([]);
+    setStrokeEvaluation(null);
+    setPhaseTransitionNotice(null);
+    setLevelCompletionModal({ isOpen: false, completedNode: null, nextNode: null, score: 0 });
+
+    const currentUnits = activeModuleId === 'module-calisthenics'
+      ? MODULE_CALISTHENICS.units
+      : MODULE_PARALLELEPIPEDS.units;
+    const firstNode = currentUnits[0].nodes[0];
     setActiveNode(firstNode);
-    handleNewPracticeCube(firstNode);
+    if (!firstNode.isCalisthenics) {
+      handleNewPracticeCube(firstNode);
+    } else {
+      setCalisthenicsSeed(Math.floor(Math.random() * 90000 + 10000));
+    }
+
+    // Guardar inmediatamente el estado limpio en localStorage
+    localStorage.setItem('paplitz_calisthenics_units', JSON.stringify(MODULE_CALISTHENICS.units));
+    localStorage.setItem('paplitz_units', JSON.stringify(MODULE_PARALLELEPIPEDS.units));
+    localStorage.setItem('paplitz_active_module', activeModuleId);
+    localStorage.setItem('paplitz_streak', '0');
+    localStorage.setItem('paplitz_xp', '0');
+    localStorage.setItem('paplitz_scores', JSON.stringify([]));
+    localStorage.setItem('paplitz_node_phases', JSON.stringify({}));
+    localStorage.setItem('paplitz_node_mastery', JSON.stringify({}));
+    localStorage.setItem('paplitz_node_variant_indices', JSON.stringify({}));
+    localStorage.setItem('paplitz_mastery_streaks', JSON.stringify({}));
   };
 
   // Restaurar progreso desde copia de seguridad o desde la nube
@@ -1139,37 +1171,49 @@ export function App() {
     setScoresHistory(saveData.scoresHistory);
 
     const unlocked = saveData.units.flatMap((u) => u.nodes).filter((n) => n.status !== 'locked');
+    const currentUnits = activeModuleId === 'module-calisthenics'
+      ? calisthenicsUnits
+      : cubeUnits;
     const currentOrLast =
       unlocked.find((n) => n.status === 'current') ||
       unlocked[unlocked.length - 1] ||
       saveData.units[0]?.nodes[0] ||
-      MODULE_PARALLELEPIPEDS.units[0].nodes[0];
+      currentUnits[0]?.nodes[0] ||
+      MODULE_CALISTHENICS.units[0].nodes[0];
 
     setActiveNode(currentOrLast);
-    handleNewPracticeCube(currentOrLast);
+    if (!currentOrLast.isCalisthenics) {
+      handleNewPracticeCube(currentOrLast);
+    } else {
+      setCalisthenicsSeed(Math.floor(Math.random() * 90000 + 10000));
+    }
   };
 
   // Comprobar si todos los nodos están desbloqueados
-  const areAllNodesUnlocked = units.every((u) => u.nodes.every((n) => n.status !== 'locked'));
+  const areAllNodesUnlocked =
+    calisthenicsUnits.every((u) => u.nodes.every((n) => n.status !== 'locked')) &&
+    cubeUnits.every((u) => u.nodes.every((n) => n.status !== 'locked'));
 
   // Desbloquear todos los niveles inmediatamente
   const handleUnlockAllNodes = () => {
-    setUnits((prevUnits) =>
-      prevUnits.map((unit) => ({
+    const unlockUnits = (unitList: Unit[]) =>
+      unitList.map((unit) => ({
         ...unit,
         nodes: unit.nodes.map((n) => ({
           ...n,
           status: 'completed' as const,
           score: n.score || 100,
         })),
-      }))
-    );
+      }));
+
+    setCalisthenicsUnits(unlockUnits);
+    setCubeUnits(unlockUnits);
   };
 
   // Restablecer bloqueo progresivo (solo el primer nivel desbloqueado)
   const handleLockAllExceptFirst = () => {
-    setUnits((prevUnits) =>
-      prevUnits.map((unit, uIdx) => ({
+    const lockUnits = (unitList: Unit[]) =>
+      unitList.map((unit, uIdx) => ({
         ...unit,
         nodes: unit.nodes.map((n, nIdx) => {
           if (uIdx === 0 && nIdx === 0) {
@@ -1177,19 +1221,34 @@ export function App() {
           }
           return { ...n, status: 'locked' as const, score: undefined };
         }),
-      }))
-    );
-    const firstNode = MODULE_PARALLELEPIPEDS.units[0].nodes[0];
-    setActiveNode(firstNode);
-    handleNewPracticeCube(firstNode);
+      }));
+
+    setCalisthenicsUnits(lockUnits);
+    setCubeUnits(lockUnits);
+
+    const currentUnits = activeModuleId === 'module-calisthenics'
+      ? MODULE_CALISTHENICS.units
+      : MODULE_PARALLELEPIPEDS.units;
+    const firstNode = currentUnits[0]?.nodes[0];
+    if (firstNode) {
+      setActiveNode(firstNode);
+      if (!firstNode.isCalisthenics) {
+        handleNewPracticeCube(firstNode);
+      } else {
+        setCalisthenicsSeed(Math.floor(Math.random() * 90000 + 10000));
+      }
+    }
   };
 
   // Estadísticas calculadas
-  const completedNodesCount = units.reduce(
-    (acc, u) => acc + u.nodes.filter((n) => n.status === 'completed').length,
-    0
-  );
-  const totalNodesCount = units.reduce((acc, u) => acc + u.nodes.length, 0);
+  const completedNodesCount =
+    calisthenicsUnits.reduce((acc, u) => acc + u.nodes.filter((n) => n.status === 'completed').length, 0) +
+    cubeUnits.reduce((acc, u) => acc + u.nodes.filter((n) => n.status === 'completed').length, 0);
+
+  const totalNodesCount =
+    calisthenicsUnits.reduce((acc, u) => acc + u.nodes.length, 0) +
+    cubeUnits.reduce((acc, u) => acc + u.nodes.length, 0);
+
   const accuracyAverage =
     scoresHistory.length > 0
       ? Math.round(scoresHistory.reduce((a, b) => a + b, 0) / scoresHistory.length)
