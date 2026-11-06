@@ -37,6 +37,7 @@ interface MinigamesViewProps {
   onAwardXP: (amount: number) => void;
   onAvatarMoodChange?: (mood: AvatarMood) => void;
   onDrawingStateChange?: (isDrawing: boolean) => void;
+  onStartMinigame?: (mode: GameMode, lesson: LessonNode) => void;
 }
 
 type GameMode = 'blitz' | 'fever' | 'survival' | 'sprint' | 'ghost' | 'rush';
@@ -85,6 +86,7 @@ export const MinigamesView: React.FC<MinigamesViewProps> = ({
   onAwardXP,
   onAvatarMoodChange,
   onDrawingStateChange,
+  onStartMinigame,
 }) => {
   // Lección seleccionada para el filtro de dificultad
   const [selectedLessonId, setSelectedLessonId] = useState<string>(activeNode.id);
@@ -193,6 +195,10 @@ export const MinigamesView: React.FC<MinigamesViewProps> = ({
 
   // Iniciar partida
   const startGame = (mode: GameMode) => {
+    if (onStartMinigame) {
+      onStartMinigame(mode, currentLesson);
+      return;
+    }
     setGameMode(mode);
     setGameState('playing');
     if (mode === 'ghost' || mode === 'rush') {
@@ -448,26 +454,8 @@ export const MinigamesView: React.FC<MinigamesViewProps> = ({
     const width = canvas.width;
     const height = canvas.height;
 
-    // Fondo blanco papel puro
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, width, height);
-
-    // Cuadrícula sutil
-    ctx.strokeStyle = '#F3F3F3';
-    ctx.lineWidth = 1;
-    const gridSize = 24;
-    for (let x = 0; x < width; x += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, height);
-      ctx.stroke();
-    }
-    for (let y = 0; y < height; y += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(width, y);
-      ctx.stroke();
-    }
+    // Limpiar lienzo manteniendo transparencia sobre la cuadrícula milimétrica continua
+    ctx.clearRect(0, 0, width, height);
 
     // Cara dada en perspectiva
     const facePoints = challenge.givenFace.vertices.map((idx) => challenge.vertices2D[idx]);
@@ -1117,56 +1105,132 @@ export const MinigamesView: React.FC<MinigamesViewProps> = ({
   // 2. PANTALLA DE JUEGO ACTIVO O GAME OVER
   // ==========================================
   return (
-    <div className="flex-1 w-full practice-grid px-4 py-2 select-none overflow-x-hidden">
-      {/* Columna izquierda espaciadora para centrar matemáticamente el lienzo en el centro de la pantalla */}
-      <div className="hidden lg:block w-full min-w-0" aria-hidden="true" />
+    <div className="relative w-full h-[calc(100vh-56px)] sm:h-[calc(100vh-64px)] min-h-[500px] bg-white pattern-grid-paper flex flex-col overflow-hidden select-none">
+      {/* Barra superior de progreso de tiempo según modo */}
+      {gameMode === 'fever' && (
+        <div className="absolute top-0 left-0 right-0 h-1.5 bg-neutral-200 pointer-events-none z-30">
+          <div
+            className={`h-full transition-all duration-100 ${
+              feverTime <= 6 ? 'bg-black animate-pulse' : 'bg-neutral-800'
+            }`}
+            style={{ width: `${Math.min(100, (feverTime / 40) * 100)}%` }}
+          />
+        </div>
+      )}
+      {gameMode === 'blitz' && (
+        <div className="absolute top-0 left-0 right-0 h-1.5 bg-neutral-200 pointer-events-none z-30">
+          <div
+            className={`h-full transition-all duration-100 ${
+              blitzTime <= 10 ? 'bg-black animate-pulse' : 'bg-neutral-800'
+            }`}
+            style={{ width: `${(blitzTime / 60) * 100}%` }}
+          />
+        </div>
+      )}
+      {gameMode === 'survival' && (
+        <div className="absolute top-0 left-0 right-0 h-1.5 bg-neutral-200 pointer-events-none z-30">
+          <div
+            className={`h-full transition-all duration-100 ${
+              survivalTime <= 5 ? 'bg-black animate-pulse' : 'bg-neutral-800'
+            }`}
+            style={{ width: `${(survivalTime / 20) * 100}%` }}
+          />
+        </div>
+      )}
 
+      {/* CONTENEDOR ANCLADO AL JUEGO (Mantiene aspecto exacto 600x540 y centra los HUDs junto al lienzo) */}
       <div
-        className="w-full min-w-0 flex flex-col items-center relative shrink-0 justify-self-center"
+        className="relative aspect-[600/540] max-w-[min(calc(100%-24px),600px)] max-h-[calc(100%-125px)] flex items-center justify-center pointer-events-none"
         style={{
-          width: 'min(100%, 600px, max(280px, calc((100vh - 330px) * 600 / 540)))',
+          width: 'min(calc(100% - 24px), 600px, calc((100dvh - 180px) * (600 / 540)))',
+          height: 'auto',
+          aspectRatio: '600 / 540',
         }}
       >
-        {/* BARRA SUPERIOR DE ESTADO ARCADE (HUD) */}
-        <div className="w-full mb-2 flex items-center justify-between gap-2 border-2 border-black bg-white p-2 shadow-[2px_2px_0px_#000000]">
-          {/* Botón Salir / Abortar */}
-          <button
-            onClick={exitGame}
-            className="btn-ink-outline px-2 py-1 text-xs font-mono uppercase font-bold flex items-center gap-1 cursor-pointer"
-            title="Volver a la selección de minijuegos"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Menú</span>
-          </button>
+        <canvas
+          ref={canvasRef}
+          width={600}
+          height={540}
+          className={`block w-full h-full z-10 pointer-events-auto ${
+            touchMode === 'scroll' ? 'touch-pan-y cursor-grab' : 'touch-none cursor-crosshair'
+          }`}
+          style={{ touchAction: touchMode === 'scroll' ? 'pan-y' : 'none' }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+        />
 
-          {/* Título de Modo y Nivel */}
-          <div className="flex items-center gap-1.5 truncate">
-            <span className="text-[10px] font-mono bg-black text-white px-1.5 py-0.2 font-bold uppercase shrink-0">
+        {/* 1. HUD SUPERIOR IZQUIERDO: ANCLADO AL CUBO (MENÚ, MODO, NIVEL Y MODO TÁCTIL) */}
+        <div className="absolute top-2 left-2 sm:top-2.5 sm:left-2.5 z-20 flex flex-col gap-1.5 pointer-events-auto font-mono text-xs select-none">
+          <div className="bg-white border-2 border-black p-1 sm:p-1.5 shadow-[3px_3px_0px_#000000] flex items-center gap-1.5">
+            <button
+              onClick={exitGame}
+              className="btn-ink-outline px-2 py-0.5 text-xs font-mono uppercase font-bold flex items-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000000]"
+              title="Volver a la selección de minijuegos"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Menú</span>
+            </button>
+            <span className="text-[10px] font-mono bg-black text-white px-1.5 py-0.5 font-bold uppercase shrink-0 shadow-[1px_1px_0px_#000]">
               {gameMode === 'fever'
-                ? 'FIEBRE DE TIEMPO'
+                ? 'FIEBRE'
                 : gameMode === 'blitz'
                 ? 'BLITZ 60s'
                 : gameMode === 'survival'
                 ? 'SUPERVIVENCIA'
                 : 'SPRINT 5'}
             </span>
-            <span className="text-xs font-mono font-bold truncate">Nivel {currentLesson.code}</span>
+            <span className="text-xs font-mono font-bold truncate max-w-[100px] sm:max-w-[140px] bg-neutral-100 border border-black px-1.5 py-0.5">
+              Nivel {currentLesson.code}
+            </span>
+            <span className="text-[9px] font-mono font-bold text-neutral-500 uppercase">
+              #{challenge.seed}
+            </span>
           </div>
 
-          {/* Estadísticas de juego en vivo */}
-          <div className="flex items-center gap-2 font-mono text-xs font-bold shrink-0">
+          {/* Toggle de Modo Táctil (Trazo vs Mover) */}
+          <div className="bg-white border-2 border-black p-1 shadow-[3px_3px_0px_#000000] flex items-center gap-1 w-fit">
+            <button
+              type="button"
+              onClick={() => setTouchMode('draw')}
+              className={`px-1.5 py-0.5 text-[9px] font-bold cursor-pointer transition-colors ${
+                touchMode === 'draw' ? 'bg-black text-white' : 'bg-neutral-100 text-neutral-700'
+              }`}
+              title="Modo Trazo: dibuja aristas"
+            >
+              <Pen className="w-2.5 h-2.5 inline mr-0.5" />
+              Trazo
+            </button>
+            <button
+              type="button"
+              onClick={() => setTouchMode('scroll')}
+              className={`px-1.5 py-0.5 text-[9px] font-bold cursor-pointer transition-colors ${
+                touchMode === 'scroll' ? 'bg-black text-white' : 'bg-neutral-100 text-neutral-700'
+              }`}
+              title="Modo Mover: desplazar con 1 dedo"
+            >
+              <Hand className="w-2.5 h-2.5 inline mr-0.5" />
+              Mover
+            </button>
+          </div>
+        </div>
+
+        {/* 2. HUD SUPERIOR DERECHO: ANCLADO AL CUBO (ESTADÍSTICAS ARCADE EN VIVO) */}
+        <div className="absolute top-2 right-2 sm:top-2.5 sm:right-2.5 z-20 flex items-center gap-1.5 font-mono text-xs font-bold pointer-events-auto select-none">
+          <div className="bg-white border-2 border-black p-1.5 sm:p-2 shadow-[3px_3px_0px_#000000] flex items-center gap-2">
             {gameMode === 'fever' && (
               <>
                 <div
-                  className={`border-2 border-black px-2 py-0.5 flex items-center gap-1 ${
+                  className={`px-2 py-0.5 border border-black flex items-center gap-1 ${
                     feverTime <= 6 ? 'bg-black text-white animate-pulse' : 'bg-white text-black'
                   }`}
                 >
                   <Hourglass className="w-3.5 h-3.5 stroke-[2.5]" />
                   <span className="tabular-nums">{feverTime.toFixed(1)}s</span>
                 </div>
-                <div className="border-2 border-black bg-neutral-100 px-2 py-0.5 flex items-center gap-1">
-                  <span>{cubesCompleted}</span>
+                <div className="bg-neutral-100 border border-black px-2 py-0.5 flex items-center gap-1">
+                  <span>{cubesCompleted} cubos</span>
                   {specialCubesCount > 0 && (
                     <span className="text-[10px] flex items-center">
                       (<Star className="w-2.5 h-2.5 fill-black text-black inline" />
@@ -1180,14 +1244,14 @@ export const MinigamesView: React.FC<MinigamesViewProps> = ({
             {gameMode === 'blitz' && (
               <>
                 <div
-                  className={`border-2 border-black px-2 py-0.5 flex items-center gap-1 ${
+                  className={`px-2 py-0.5 border border-black flex items-center gap-1 ${
                     blitzTime <= 10 ? 'bg-black text-white animate-pulse' : 'bg-white text-black'
                   }`}
                 >
                   <Clock className="w-3.5 h-3.5 stroke-[2.5]" />
                   <span className="tabular-nums">{blitzTime.toFixed(1)}s</span>
                 </div>
-                <div className="border-2 border-black bg-neutral-100 px-2 py-0.5">
+                <div className="bg-neutral-100 border border-black px-2 py-0.5">
                   <span>{cubesCompleted} cubos</span>
                 </div>
               </>
@@ -1196,7 +1260,7 @@ export const MinigamesView: React.FC<MinigamesViewProps> = ({
             {gameMode === 'survival' && (
               <>
                 {/* Vidas */}
-                <div className="flex items-center gap-0.5 border-2 border-black bg-white px-1.5 py-0.5">
+                <div className="flex items-center gap-0.5 px-1 py-0.5">
                   {[1, 2, 3].map((heartIdx) => (
                     <Heart
                       key={heartIdx}
@@ -1208,16 +1272,16 @@ export const MinigamesView: React.FC<MinigamesViewProps> = ({
                     />
                   ))}
                 </div>
-                {/* Tiempo del cubo actual */}
+                {/* Tiempo */}
                 <div
-                  className={`border-2 border-black px-2 py-0.5 flex items-center gap-1 ${
+                  className={`px-2 py-0.5 border border-black flex items-center gap-1 ${
                     survivalTime <= 5 ? 'bg-black text-white animate-pulse' : 'bg-white text-black'
                   }`}
                 >
                   <Clock className="w-3.5 h-3.5 stroke-[2.5]" />
                   <span className="tabular-nums">{survivalTime.toFixed(1)}s</span>
                 </div>
-                <div className="border-2 border-black bg-neutral-100 px-2 py-0.5">
+                <div className="bg-neutral-100 border border-black px-2 py-0.5">
                   <span>{streakCombo} combo</span>
                 </div>
               </>
@@ -1225,225 +1289,140 @@ export const MinigamesView: React.FC<MinigamesViewProps> = ({
 
             {gameMode === 'sprint' && (
               <>
-                <div className="border-2 border-black bg-white px-2 py-0.5 flex items-center gap-1">
+                <div className="px-2 py-0.5 border border-black flex items-center gap-1">
                   <Clock className="w-3.5 h-3.5 stroke-[2.5]" />
                   <span className="tabular-nums">{sprintTime.toFixed(1)}s</span>
                 </div>
-                <div className="border-2 border-black bg-neutral-100 px-2 py-0.5">
+                <div className="bg-neutral-100 border border-black px-2 py-0.5">
                   <span>{cubesCompleted}/5 cubos</span>
                 </div>
               </>
             )}
           </div>
-        </div>
 
-        {/* LIENZO DE DIBUJO RESPONSIVO */}
-        <div
-          data-canvas-zone="true"
-          className="relative border-4 border-black bg-white shadow-[4px_4px_0px_#000000] w-full aspect-[600/540] overflow-hidden"
-        >
-          {/* Barra de progreso de tiempo según modo */}
-          {gameMode === 'fever' && (
-            <div className="absolute top-0 left-0 right-0 h-1.5 bg-neutral-200 pointer-events-none z-10">
-              <div
-                className={`h-full transition-all duration-100 ${
-                  feverTime <= 6 ? 'bg-black animate-pulse' : 'bg-neutral-800'
-                }`}
-                style={{ width: `${Math.min(100, (feverTime / 40) * 100)}%` }}
-              />
-            </div>
-          )}
-          {gameMode === 'blitz' && (
-            <div className="absolute top-0 left-0 right-0 h-1.5 bg-neutral-200 pointer-events-none z-10">
-              <div
-                className={`h-full transition-all duration-100 ${
-                  blitzTime <= 10 ? 'bg-black animate-pulse' : 'bg-neutral-800'
-                }`}
-                style={{ width: `${(blitzTime / 60) * 100}%` }}
-              />
-            </div>
-          )}
-          {gameMode === 'survival' && (
-            <div className="absolute top-0 left-0 right-0 h-1.5 bg-neutral-200 pointer-events-none z-10">
-              <div
-                className={`h-full transition-all duration-100 ${
-                  survivalTime <= 5 ? 'bg-black animate-pulse' : 'bg-neutral-800'
-                }`}
-                style={{ width: `${(survivalTime / 20) * 100}%` }}
-              />
-            </div>
-          )}
-
-          <canvas
-            ref={canvasRef}
-            width={600}
-            height={540}
-            className={`block w-full h-full ${
-              touchMode === 'scroll' ? 'touch-pan-y cursor-grab' : 'touch-none cursor-crosshair'
-            }`}
-            style={{ touchAction: touchMode === 'scroll' ? 'pan-y' : 'none' }}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerUp}
-          />
-
-          {/* Selector de modo táctil móvil: Lápiz (dibujar) vs Mano (desplazar con 1 dedo) */}
-          <div className="absolute bottom-2.5 right-2 z-20 flex items-center border-2 border-black bg-white shadow-[2px_2px_0px_#000000]">
-            <button
-              type="button"
-              onClick={() => setTouchMode('draw')}
-              className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 transition-colors cursor-pointer ${
-                touchMode === 'draw'
-                  ? 'bg-black text-white'
-                  : 'text-neutral-700 hover:text-black hover:bg-neutral-100'
-              }`}
-              title="Modo Trazo: dibuja aristas con el dedo o lápiz táctil"
-            >
-              <Pen className="w-3 h-3 stroke-[2.5]" />
-              <span className="text-[10px] sm:text-xs">Trazo</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setTouchMode('scroll')}
-              className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 transition-colors cursor-pointer ${
-                touchMode === 'scroll'
-                  ? 'bg-black text-white'
-                  : 'text-neutral-700 hover:text-black hover:bg-neutral-100'
-              }`}
-              title="Modo Mover: desliza libremente la pantalla hacia abajo con 1 dedo"
-            >
-              <Hand className="w-3 h-3 stroke-[2.5]" />
-              <span className="text-[10px] sm:text-xs">Mover (1 dedo)</span>
-            </button>
-          </div>
-
-          {/* Indicador visual cuando el modo Mover con 1 dedo está activo */}
-          {touchMode === 'scroll' && (
-            <div className="absolute inset-x-2 top-11 pointer-events-none z-10 flex justify-center">
-              <div className="bg-black/90 text-white border border-white px-2.5 py-1 shadow-[2px_2px_0px_#000000] text-[11px] font-mono font-bold flex items-center gap-1.5 animate-in fade-in duration-200">
-                <Hand className="w-3.5 h-3.5 stroke-[2.5]" />
-                <span>Desliza con 1 dedo para mover la pantalla</span>
-              </div>
-            </div>
-          )}
-
-          {/* Flash visual de acierto o fallo en pantalla */}
-          {flashMessage && (
-            <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
-              <div
-                className={`border-4 border-black px-4 py-2 font-mono font-bold text-sm sm:text-base shadow-[4px_4px_0px_#000000] uppercase tracking-wider ${
-                  flashMessage.positive ? 'bg-black text-white' : 'bg-white text-black'
-                }`}
-              >
-                {flashMessage.text}
-              </div>
-            </div>
-          )}
-
-          {/* Indicador de Desafío en esquina */}
-          <div className="absolute top-2.5 left-2 text-[10px] font-mono uppercase bg-white border border-black px-1.5 py-0.5 pointer-events-none shadow-[1px_1px_0px_#000000] z-10">
-            CUBO #{challenge.seed}
-          </div>
-
-          {/* Badge de Cubo Estrella Especial en Fiebre de Tiempo */}
+          {/* Badge Cubo Estrella en Fiebre */}
           {gameMode === 'fever' && isSpecialCube && (
-            <div className="absolute top-2.5 right-2 border-2 border-black bg-black text-white px-2.5 py-1 text-xs font-mono font-bold flex items-center gap-1.5 shadow-[2px_2px_0px_#000000] z-10 animate-pulse">
+            <div className="border-2 border-black bg-black text-white px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 shadow-[3px_3px_0px_#000000] animate-pulse">
               <Star className="w-3.5 h-3.5 fill-white text-white" />
-              <span>CUBO ESTRELLA (+20s)</span>
+              <span>ESTRELLA (+20s)</span>
             </div>
           )}
         </div>
+      </div>
 
-        {/* BARRA DE HERRAMIENTAS Y ACCIÓN INMEDIATA */}
-        <div className="w-full mt-2 flex flex-wrap items-center justify-between gap-2 border-2 border-black bg-white p-2 shadow-[3px_3px_0px_#000000]">
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <button
-              onClick={handleUndo}
-              disabled={strokes.length === 0}
-              className="btn-ink-outline px-2.5 py-1.5 text-xs font-mono disabled:opacity-30 cursor-pointer flex items-center gap-1"
-              title={
-                gameMode === 'fever'
-                  ? 'Deshacer último trazo (Penaliza -2s en Fiebre)'
-                  : 'Deshacer último trazo (Ctrl+Z)'
-              }
-            >
-              <Undo2 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Deshacer</span>
-              {gameMode === 'fever' && (
-                <span className="text-[9px] bg-black text-white px-1 ml-0.5 font-bold">-2s</span>
-              )}
-            </button>
-
-            <button
-              onClick={handleClear}
-              disabled={gameMode === 'fever' || strokes.length === 0}
-              className={`btn-ink-outline px-2.5 py-1.5 text-xs font-mono flex items-center gap-1 ${
-                gameMode === 'fever'
-                  ? 'opacity-30 line-through cursor-not-allowed text-neutral-400 border-neutral-300'
-                  : 'disabled:opacity-30 cursor-pointer'
-              }`}
-              title={
-                gameMode === 'fever'
-                  ? 'Borrar todo NO está permitido en Fiebre de Tiempo'
-                  : 'Borrar todos los trazos'
-              }
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Borrar</span>
-            </button>
-
-            <span className="text-[11px] font-mono text-neutral-600 pl-1 font-bold">
-              {countDetectedAristas(strokes)}/{challenge.targetEdges.length} aristas
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleSkip}
-              className="btn-ink-outline px-3 py-1.5 text-xs font-mono uppercase font-bold flex items-center gap-1 cursor-pointer"
-              title={
-                gameMode === 'fever'
-                  ? 'Saltar cubo (Penaliza -4s)'
-                  : 'Saltar a otro cubo (con penalización)'
-              }
-            >
-              <SkipForward className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Saltar</span>
-              {gameMode === 'fever' && (
-                <span className="text-[9px] bg-black text-white px-1 ml-0.5 font-bold">-4s</span>
-              )}
-            </button>
-
-            <button
-              onClick={handleValidate}
-              disabled={countDetectedAristas(strokes) === 0}
-              className="btn-ink px-6 sm:px-8 py-1.5 text-xs font-mono uppercase font-bold disabled:opacity-25 disabled:pointer-events-none disabled:cursor-not-allowed cursor-pointer shadow-[3px_3px_0px_#000000] flex items-center gap-1.5"
-              title={
-                countDetectedAristas(strokes) === 0
-                  ? "Dibuja al menos una arista antes de comprobar"
-                  : "Comprobar perspectiva (Enter)"
-              }
-            >
-              <span>Comprobar</span>
-              <Check className="w-4 h-4 stroke-[3]" />
-            </button>
+      {/* Flash visual de acierto o fallo en pantalla */}
+      {flashMessage && (
+        <div className="absolute inset-0 z-40 flex items-center justify-center pointer-events-none">
+          <div
+            className={`border-4 border-black px-4 py-2 font-mono font-bold text-sm sm:text-base shadow-[4px_4px_0px_#000000] uppercase tracking-wider ${
+              flashMessage.positive ? 'bg-black text-white' : 'bg-white text-black'
+            }`}
+          >
+            {flashMessage.text}
           </div>
         </div>
+      )}
 
-        {/* FEEDBACK INMEDIATO EN CASO DE SUSPENSO */}
-        {feedback && !feedback.passed && (
-          <div className="w-full mt-1.5 px-3 py-1.5 border-2 border-black bg-neutral-50 flex items-center justify-between text-xs shadow-[2px_2px_0px_#000000]">
-            <div className="flex items-center gap-2 truncate">
-              <span className="text-[10px] font-mono bg-white text-black border border-black px-1.5 py-0.2 font-bold uppercase shrink-0">
-                {feedback.score}%
-              </span>
-              <span className="font-bold truncate">{feedback.mainIssueMessage}</span>
-            </div>
-            <span className="text-[10px] font-mono text-neutral-500 shrink-0">Mínimo: 75%</span>
+      {/* Feedback flotante en caso de suspenso */}
+      {feedback && !feedback.passed && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-30 pointer-events-none animate-in fade-in slide-in-from-top-2 duration-150">
+          <div className="bg-white border-2 border-black px-3 py-1.5 shadow-[3px_3px_0px_#000000] font-mono text-xs flex items-center gap-2">
+            <span className="bg-white text-black border border-black px-1.5 py-0.2 font-bold uppercase shrink-0">
+              {feedback.score}%
+            </span>
+            <span className="font-bold truncate">{feedback.mainIssueMessage}</span>
+            <span className="text-[10px] text-neutral-500 shrink-0">Mínimo: 75%</span>
           </div>
-        )}
+        </div>
+      )}
+
+      {/* 3. BARRA DE HERRAMIENTAS FLOTANTE INFERIOR */}
+      <div className="absolute bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-30 pointer-events-auto font-mono text-xs">
+        <div className="bg-white border-2 border-black p-1.5 sm:p-2 shadow-[4px_4px_0px_#000000] flex items-center gap-1.5 sm:gap-2 max-w-[calc(100vw-24px)] overflow-x-auto">
+          {/* Deshacer */}
+          <button
+            onClick={handleUndo}
+            disabled={strokes.length === 0}
+            className="btn-ink-outline p-1.5 sm:px-2.5 sm:py-1.5 text-xs font-mono disabled:opacity-30 cursor-pointer flex items-center gap-1 shadow-[1px_1px_0px_#000000]"
+            title={
+              gameMode === 'fever'
+                ? 'Deshacer último trazo (Penaliza -2s en Fiebre)'
+                : 'Deshacer último trazo (Ctrl+Z)'
+            }
+          >
+            <Undo2 className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Deshacer</span>
+            {gameMode === 'fever' && (
+              <span className="text-[9px] bg-black text-white px-1 ml-0.5 font-bold">-2s</span>
+            )}
+          </button>
+
+          {/* Borrar */}
+          <button
+            onClick={handleClear}
+            disabled={gameMode === 'fever' || strokes.length === 0}
+            className={`btn-ink-outline p-1.5 sm:px-2.5 sm:py-1.5 text-xs font-mono flex items-center gap-1 shadow-[1px_1px_0px_#000000] ${
+              gameMode === 'fever'
+                ? 'opacity-30 line-through cursor-not-allowed text-neutral-400 border-neutral-300'
+                : 'disabled:opacity-30 cursor-pointer'
+            }`}
+            title={
+              gameMode === 'fever'
+                ? 'Borrar todo NO está permitido en Fiebre de Tiempo'
+                : 'Borrar todos los trazos'
+            }
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Borrar</span>
+          </button>
+
+          {/* Contador de aristas */}
+          <span className="text-[10px] sm:text-[11px] font-mono text-neutral-700 bg-neutral-100 px-2 py-1 border border-black shadow-[1px_1px_0px_#000000] tabular-nums whitespace-nowrap font-bold">
+            {countDetectedAristas(strokes)}/{challenge.targetEdges.length} aristas
+          </span>
+
+          {/* Saltar */}
+          <button
+            onClick={handleSkip}
+            className="btn-ink-outline px-2.5 sm:px-3 py-1.5 text-xs font-mono uppercase font-bold flex items-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000000] whitespace-nowrap"
+            title={
+              gameMode === 'fever'
+                ? 'Saltar cubo (Penaliza -4s)'
+                : 'Saltar a otro cubo (con penalización)'
+            }
+          >
+            <SkipForward className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Saltar</span>
+            {gameMode === 'fever' && (
+              <span className="text-[9px] bg-black text-white px-1 ml-0.5 font-bold">-4s</span>
+            )}
+          </button>
+
+          {/* Comprobar */}
+          <button
+            onClick={handleValidate}
+            disabled={countDetectedAristas(strokes) === 0}
+            className="btn-ink px-4 sm:px-6 py-1.5 text-xs font-mono uppercase font-bold disabled:opacity-25 disabled:pointer-events-none disabled:cursor-not-allowed cursor-pointer shadow-[2px_2px_0px_#000000] flex items-center gap-1.5 whitespace-nowrap"
+            title={
+              countDetectedAristas(strokes) === 0
+                ? "Dibuja al menos una arista antes de comprobar"
+                : "Comprobar perspectiva (Enter)"
+            }
+          >
+            <span>Comprobar</span>
+            <Check className="w-4 h-4 stroke-[3]" />
+          </button>
+        </div>
       </div>
+
+      {/* Sensei Cubo flotante discreto */}
+      <div className="absolute bottom-4 right-4 z-20 pointer-events-none hidden lg:block opacity-80">
+        <SenseiCubo
+          isDrawing={isDrawing}
+          size={135}
+        />
+      </div>
+
 
       {/* ========================================== */}
       {/* 3. MODAL DE GAME OVER / RESUMEN DE PARTIDA */}
@@ -1534,13 +1513,6 @@ export const MinigamesView: React.FC<MinigamesViewProps> = ({
         </div>
       )}
 
-      {/* Columna Lateral Derecha: Cubito en Minijuegos (lateral, sin desplazar el centro del lienzo) */}
-      <div className="w-full min-w-0 flex flex-col items-center justify-center shrink-0 pt-16 sm:pt-20">
-        <SenseiCubo
-          isDrawing={isDrawing}
-          size={185}
-        />
-      </div>
     </div>
   );
 };

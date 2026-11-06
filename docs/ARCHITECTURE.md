@@ -26,23 +26,46 @@ Este documento describe la arquitectura global de Paplitz, su árbol de componen
 │   │   ├── avatar/
 │   │   │   ├── SenseiCubo.tsx   # Componente del compañero avatar arrastrable
 │   │   │   └── avatarExpressions.tsx # Utilidades de expresiones
+│   │   ├── Lab3D/               # Laboratorio de perspectiva 3D
+│   │   │   ├── Lab3DView.tsx    # Vista principal 3D a 3 puntos de fuga
+│   │   │   ├── Perspective3DPreviewCard.tsx # Previsualización volumétrica
+│   │   │   └── PrimitiveSelectorPanel.tsx # Selector de primitivas
 │   │   ├── AnalogSheetsModal.tsx# Modal para exportar PDFs y escanear por cámara
-│   │   ├── DrawingCanvas.tsx    # Lienzo interactivo de dibujo con soporte de lápiz
+│   │   ├── CubeMinigamePractice.tsx # Práctica arcade integrada en el lienzo espacial
+│   │   ├── DrawingCanvas.tsx    # Lienzo interactivo full-bleed de cubos y volúmenes
 │   │   ├── GuidebookModal.tsx   # Modal del libro guía teórico (principios de perspectiva)
 │   │   ├── LearningPath.tsx     # Mapa pedagógico de niveles estilo Duolingo
 │   │   ├── LevelGuideModal.tsx  # Guía de funcionamiento de niveles y exámenes
-│   │   ├── MinigamesView.tsx    # Modos arcade: Fiebre, Blitz, Supervivencia, Sprint
-│   │   └── ProfileView.tsx      # Estadísticas del usuario, XP y logros
+│   │   ├── MinigameSidebarPanel.tsx # HUD flotante de combo y temporizador
+│   │   ├── MinigamesView.tsx    # Menú y enrutador de modos arcade
+│   │   ├── PracticeInfoModals.tsx # Modales pedagógicos de fases y racha
+│   │   ├── ProfileView.tsx      # Estadísticas del usuario, XP y logros
+│   │   ├── SessionRecordLimitModal.tsx # Advertencia de límite de 500 registros
+│   │   ├── SessionRecordPanel.tsx # Panel de control de grabación y comentarios
+│   │   ├── StrokeLabView.tsx    # Laboratorio procedimental de calistenia
+│   │   └── StrokePracticeCanvas.tsx # Lienzo full-bleed de calistenia de trazos
 │   ├── lib/                     # Motores lógicos puros (independientes de UI)
+│   │   ├── perspective3d/       # Motor matemático de perspectiva cónica a 3 puntos de fuga
+│   │   │   ├── types.ts         # Tipos de cámaras, mallas, proyecciones
+│   │   │   ├── math3d.ts        # Vector3D, transformaciones y matriz de cámara
+│   │   │   ├── primitives.ts    # Generación paramétrica de primitivas 3D
+│   │   │   ├── reconstruct3d.ts # Reconstrucción analítica desde 2D
+│   │   │   ├── evaluator3d.ts   # Evaluación de convergencia de fuga
+│   │   │   └── debugReport3d.ts # Telemetría de diagnóstico 3D
 │   │   ├── avatarTypes.ts       # Tipos de estados de ánimo del avatar
 │   │   ├── cubee.avatar.json    # Definición procedural de Cubee (avatar oficial)
-│   │   ├── curriculumData.ts    # Estructura del currículo (8 unidades, 32+ lecciones)
-│   │   ├── geometry.ts          # Motor de proyección 3D, cubos, ejes y sombras
+│   │   ├── curriculumData.ts    # Estructura del currículo (unidades, lecciones, calistenia)
+│   │   ├── geometry.ts          # Motor de proyección 3D, cubos, prismas y sombras
 │   │   ├── levelSystem.ts       # Algoritmos de XP, rangos y recompensas
 │   │   ├── pdfGenerator.ts      # Generación de láminas A4 con retos y QR
 │   │   ├── qrHelper.ts          # Codificación/decodificación compacta de retos en QR
+│   │   ├── sessionRecorder.ts   # Grabador de sesiones (capacidad 500, notas)
 │   │   ├── sheetScanner.ts      # Procesamiento de vídeo de webcam para leer QR
-│   │   └── validation.ts        # Algoritmo de evaluación y puntuación de trazos
+│   │   ├── strokeEvaluator.ts   # Evaluador cinemático y geométrico de calistenia
+│   │   ├── strokeKinematics.ts  # Análisis temporal, velocidad y aceleración
+│   │   ├── strokeProceduralGenerator.ts # Generador de rectas, elipses y polígonos
+│   │   ├── strokeTypes.ts       # Tipos y catálogo de 279 ejercicios
+│   │   └── validation.ts        # Algoritmo de evaluación y puntuación de cubos
 │   ├── App.tsx                  # Componente raíz y coordinador global de navegación
 │   ├── index.css                # Estilos globales y temas Tailwind
 │   └── main.tsx                 # Entrada principal React DOM

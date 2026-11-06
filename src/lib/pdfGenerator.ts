@@ -192,6 +192,13 @@ export function generateA4PracticeSheet(config: SheetConfig): void {
         mode: config.lesson?.perspectiveMode || 'normal',
         axesMode: config.lesson?.axesMode || 'none',
         forceSide: config.lesson?.forceSide,
+        isShadowLevel: config.lesson?.isShadowLevel,
+        hasGroundGrid: config.lesson?.hasGroundGrid,
+        boxType: config.lesson?.boxType,
+        hasHeightGuide: config.lesson?.hasHeightGuide,
+        hasHorizonGuide: config.lesson?.hasHorizonGuide,
+        viewpoint: config.lesson?.viewpoint,
+        rotationAngle: config.lesson?.rotationAngle,
       });
       
       // Escalar y proyectar la cara al centro de la celda en mm
@@ -258,6 +265,16 @@ export function generateA4PracticeSheet(config: SheetConfig): void {
         doc.setLineDashPattern([], 0);
       }
 
+      // Línea de horizonte técnica sutil (Bloque 2 en adelante)
+      if (challenge.hasHorizonGuide) {
+        const hy = centerY + (challenge.horizonY - 150) * scale;
+        doc.setLineWidth(0.2);
+        doc.setDrawColor(180, 180, 180);
+        doc.setLineDashPattern([1.0, 1.0], 0);
+        doc.line(cellX + pad, hy, cellX + cellWidth - pad, hy);
+        doc.setLineDashPattern([], 0);
+      }
+
       // 3.2. Obtener los 4 vértices de la cara dada
       const facePts = challenge.givenFace.vertices.map((vIdx) => {
         const p2d = challenge.vertices2D[vIdx];
@@ -267,19 +284,47 @@ export function generateA4PracticeSheet(config: SheetConfig): void {
         };
       });
 
-      // Dibujar la cara dada con líneas negras entintadas
+      // Dibujar la cara dada o aristas con líneas negras entintadas
       doc.setLineWidth(0.65);
       doc.setDrawColor(0, 0, 0);
-      doc.line(facePts[0].x, facePts[0].y, facePts[1].x, facePts[1].y);
-      doc.line(facePts[1].x, facePts[1].y, facePts[2].x, facePts[2].y);
-      doc.line(facePts[2].x, facePts[2].y, facePts[3].x, facePts[3].y);
-      doc.line(facePts[3].x, facePts[3].y, facePts[0].x, facePts[0].y);
+      if (facePts.length === 4) {
+        doc.line(facePts[0].x, facePts[0].y, facePts[1].x, facePts[1].y);
+        doc.line(facePts[1].x, facePts[1].y, facePts[2].x, facePts[2].y);
+        doc.line(facePts[2].x, facePts[2].y, facePts[3].x, facePts[3].y);
+        doc.line(facePts[3].x, facePts[3].y, facePts[0].x, facePts[0].y);
+      } else {
+        challenge.givenEdges.forEach((edge) => {
+          const p1 = challenge.vertices2D[edge.start];
+          const p2 = challenge.vertices2D[edge.end];
+          if (p1 && p2) {
+            const x1 = centerX + (p1.x - 150) * scale;
+            const y1 = centerY + (p1.y - 150) * scale;
+            const x2 = centerX + (p2.x - 150) * scale;
+            const y2 = centerY + (p2.y - 150) * scale;
+            doc.line(x1, y1, x2, y2);
+          }
+        });
+      }
 
       // Puntos de esquina marcados
       doc.setFillColor(0, 0, 0);
       facePts.forEach((p) => {
         doc.circle(p.x, p.y, 0.5, 'FD');
       });
+
+      // Guía técnica de altura H si aplica
+      if (challenge.heightGuide) {
+        const hg = challenge.heightGuide;
+        const offsetSide = (challenge.givenSide === 'left' ? 18 : -18) * scale;
+        const gx = centerX + (hg.x - 150) * scale + offsetSide;
+        const gyBot = centerY + (hg.yBottom - 150) * scale;
+        const gyTop = centerY + (hg.yTop - 150) * scale;
+        doc.setDrawColor(90, 90, 90);
+        doc.setLineWidth(0.3);
+        doc.line(gx, gyBot, gx, gyTop);
+        doc.circle(gx, gyBot, 0.35, 'FD');
+        doc.circle(gx, gyTop, 0.35, 'FD');
+      }
     }
   }
 
@@ -410,12 +455,22 @@ async function compositeCellCorrection(
   ctx.lineJoin = 'round';
   ctx.beginPath();
   const facePts = challenge.givenFace.vertices.map((idx) => toSvg(challenge.vertices2D[idx]));
-  if (facePts.length > 0) {
+  if (facePts.length === 4) {
     ctx.moveTo(facePts[0].x, facePts[0].y);
     for (let i = 1; i < facePts.length; i++) {
       ctx.lineTo(facePts[i].x, facePts[i].y);
     }
     ctx.closePath();
+    ctx.stroke();
+  } else {
+    challenge.givenEdges.forEach((edge) => {
+      const p1 = toSvg(challenge.vertices2D[edge.start]);
+      const p2 = toSvg(challenge.vertices2D[edge.end]);
+      if (p1 && p2) {
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+      }
+    });
     ctx.stroke();
   }
   ctx.fillStyle = '#000000';
@@ -424,6 +479,27 @@ async function compositeCellCorrection(
     ctx.arc(pt.x, pt.y, 4.5, 0, Math.PI * 2);
     ctx.fill();
   });
+
+  if (challenge.heightGuide) {
+    const hg = challenge.heightGuide;
+    const offsetSide = challenge.givenSide === 'left' ? 24 : -24;
+    const pBottom = toSvg({ x: hg.x + offsetSide, y: hg.yBottom });
+    const pTop = toSvg({ x: hg.x + offsetSide, y: hg.yTop });
+    ctx.save();
+    ctx.strokeStyle = '#4B5563';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    ctx.moveTo(pBottom.x, pBottom.y);
+    ctx.lineTo(pTop.x, pTop.y);
+    ctx.stroke();
+    ctx.fillStyle = '#4B5563';
+    ctx.beginPath();
+    ctx.arc(pBottom.x, pBottom.y, 3, 0, Math.PI * 2);
+    ctx.arc(pTop.x, pTop.y, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
   ctx.restore();
 
   // 5. Aristas objetivo ideales de corrección (halo blanco 6px + rojo discontinuo #DC2626 3.5px)
@@ -592,6 +668,11 @@ export async function generateCorrectionReportPDF(config: CorrectionPDFConfig): 
       forceSide: lesson.forceSide,
       isShadowLevel: lesson.isShadowLevel,
       hasGroundGrid: lesson.hasGroundGrid,
+      boxType: lesson.boxType,
+      hasHeightGuide: lesson.hasHeightGuide,
+      hasHorizonGuide: lesson.hasHorizonGuide,
+      viewpoint: lesson.viewpoint,
+      rotationAngle: lesson.rotationAngle,
     });
 
     // Componer la imagen con sus correcciones

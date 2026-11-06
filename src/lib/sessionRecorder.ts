@@ -4,7 +4,7 @@ export interface SessionRecordItem {
   id: string;
   timestamp: string;
   displayTime: string;
-  type: 'calisthenics' | 'cube';
+  type: 'calisthenics' | 'cube' | '3d';
   nodeCode: string;
   nodeTitle: string;
   seed: number;
@@ -35,18 +35,19 @@ try {
  * al recargar la web o reiniciar, siempre retorna un array vacío [].
  */
 export function loadSessionRecords(): SessionRecordItem[] {
-  // Siempre array vacío: la sesión no se persiste en disco salvo que el usuario la exporte.
   return [];
 }
 
+export const MAX_SESSION_RECORDS = 500;
+
 /**
- * Añade un nuevo ejercicio al registro de la sesión en memoria (máximo 100 ejercicios recientes)
+ * Añade un nuevo ejercicio al registro de la sesión en memoria (máximo MAX_SESSION_RECORDS ejercicios recientes)
  */
 export function addSessionRecord(
   newRecord: SessionRecordItem,
   currentRecords: SessionRecordItem[]
 ): SessionRecordItem[] {
-  return [newRecord, ...currentRecords].slice(0, 100);
+  return [newRecord, ...currentRecords].slice(0, MAX_SESSION_RECORDS);
 }
 
 /**
@@ -131,7 +132,7 @@ export function generateConsolidatedMarkdown(records: SessionRecordItem[]): stri
   lines.push('---');
   lines.push('## 📊 Tabla Resumen de Ejercicios');
   lines.push('');
-  lines.push('| # | Hora | Tipo | Nivel | Nota | Estado | Comentario del Usuario |');
+  lines.push('| # | Hora | Tipo | Nivel/Forma | Nota | Estado | Comentario del Usuario |');
   lines.push('|---|---|---|---|---|---|---|');
 
   // Orden cronológico para la tabla (del primero realizado al último)
@@ -139,7 +140,7 @@ export function generateConsolidatedMarkdown(records: SessionRecordItem[]): stri
   chronological.forEach((r, idx) => {
     const statusIcon = r.passed ? '✅ Aprobado' : '❌ A mejorar';
     const commentCell = r.userComment ? `"${r.userComment.replace(/\|/g, '\\|')}"` : '—';
-    const typeLabel = r.type === 'calisthenics' ? 'Trazo' : 'Cubo 3D';
+    const typeLabel = r.type === 'calisthenics' ? 'Trazo' : r.type === '3d' ? 'Perspectiva 3D' : 'Cubo 3D';
     lines.push(
       `| ${idx + 1} | ${r.displayTime} | ${typeLabel} | ${r.nodeCode} | **${r.score}%** | ${statusIcon} | ${commentCell} |`
     );

@@ -1,0 +1,1916 @@
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  ALL_LAB_EXERCISES,
+  LabExerciseDef,
+  RawStroke,
+  PointWithMeta,
+  ProceduralStrokeChallenge,
+  StrokeEvaluation,
+} from '../lib/strokeTypes';
+import { generateStrokeChallenge, computeKeyPointBadgePosition } from '../lib/strokeProceduralGenerator';
+import { evaluateStrokeSubmission, buildStrokeDebugReport } from '../lib/strokeEvaluator';
+import { copyReportToClipboard, downloadReportJson } from '../lib/debugReport';
+import {
+  Dices,
+  Eye,
+  EyeOff,
+  Undo2,
+  Trash2,
+  CheckCircle2,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  Layers,
+  Flame,
+  RotateCcw,
+  AlertTriangle,
+  Check,
+  ArrowRight,
+  Menu,
+  Copy,
+  Download,
+  Info,
+} from 'lucide-react';
+
+interface StrokeLabViewProps {
+  onAwardXP?: (amount: number) => void;
+  onAvatarMoodChange?: (mood: any) => void;
+}
+
+// Agrupación dinámica de todos los ejercicios del catálogo
+const ALL_CHALLENGES_LABEL = `Todos los Retos (${ALL_LAB_EXERCISES.length} Ejercicios)`;
+
+const BLOCKS_LIST = [
+  ALL_CHALLENGES_LABEL,
+  '⚡ Calistenia: D1 (↗ Abajo-Arriba / Izq-Der)',
+  '⚡ Calistenia: D2 (↙ Arriba-Abajo / Der-Izq)',
+  '⚡ Calistenia: D3 (↘ Arriba-Abajo / Izq-Der)',
+  '⚡ Calistenia: D4 (↖ Abajo-Arriba / Der-Izq)',
+  '⚡ Calistenia: D5 (→ Horizontal / Izq-Der)',
+  '⚡ Calistenia: D6 (← Horizontal / Der-Izq)',
+  '⚡ Calistenia: D7 (↑ Vertical / Abajo-Arriba)',
+  '⚡ Calistenia: D8 (↓ Vertical / Arriba-Abajo)',
+  '⚡ Calistenia: D9 (↗ Fuga Suave ~15°-20° / Izq-Der)',
+  '⚡ Calistenia: D10 (↖ Fuga Suave ~15°-20° / Der-Izq)',
+  '⚡ Calistenia: D11 (☼ Roseta Dentro-Fuera / 8-12 Radios)',
+  '⚡ Calistenia: D12 (❂ Roseta Fuera-Dentro / 8-12 Radios)',
+  '⚡ Calistenia: Espaciado & Carriles (Ritmo)',
+  '⚡ Calistenia: Trazos Curvos & Arcos (C & S)',
+  'Bloque 1: Consistencia & Calistenia',
+  'Bloque 2: Trazos Fundamentales & Trama',
+  'Bloque 3: Contornos Cruzados (3D)',
+  'Bloque 4: Valor Plano & Gradación',
+  'Bloque 5: Planos, Facetas & Isometría',
+  'Bloque 6: Sombreado de Poliedros',
+  'Bloque 7: Superficies Curvas, Cilindro, Esfera',
+  'Bloque 8: Composiciones & Síntesis',
+];
+
+export const StrokeLabView: React.FC<StrokeLabViewProps> = ({ onAwardXP }) => {
+  // Filtro de bloque y ejercicio seleccionado
+  const [selectedBlock, setSelectedBlock] = useState<string>(ALL_CHALLENGES_LABEL);
+  const [currentExerciseIndex, setCurrentExerciseIndex] = useState<number>(0);
+  const currentExercise: LabExerciseDef =
+    ALL_LAB_EXERCISES[currentExerciseIndex] || ALL_LAB_EXERCISES[0];
+
+  // Fase didáctica activa para calistenia (1: Precisión/Lento, 2: Fluidez/Ritmo, 3: Velocidad/Disparo)
+  const [currentPhase, setCurrentPhase] = useState<1 | 2 | 3>(1);
+
+  // Reto procedural generado con semilla
+  const [challengeSeed, setChallengeSeed] = useState<number>(() =>
+    Math.floor(Math.random() * 90000 + 10000)
+  );
+  const [challenge, setChallenge] = useState<ProceduralStrokeChallenge>(() => {
+    const ch = generateStrokeChallenge(currentExercise, challengeSeed, 600, 540);
+    ch.activePhase = 1;
+    return ch;
+  });
+
+  // Estado del dibujo del usuario
+  const [strokes, setStrokes] = useState<RawStroke[]>([]);
+  const currentStrokeRef = useRef<PointWithMeta[]>([]);
+  const [isDrawing, setIsDrawing] = useState<boolean>(false);
+  const activePointerIdRef = useRef<number | null>(null);
+
+  // Visibilidad de trazos, solución/guías, evaluación y modales de información
+  const [showUserStrokes, setShowUserStrokes] = useState<boolean>(true);
+  const [showSolution, setShowSolution] = useState<boolean>(true);
+  const [showKinematicsInfoModal, setShowKinematicsInfoModal] = useState<boolean>(false);
+  const [showChallengeInfoModal, setShowChallengeInfoModal] = useState<boolean>(false);
+  const [challengeModalTab, setChallengeModalTab] = useState<'info' | 'book'>('info');
+  const [evaluation, setEvaluation] = useState<StrokeEvaluation | null>(null);
+  const [showDebugModal, setShowDebugModal] = useState<boolean>(false);
+  const [debugComment, setDebugComment] = useState<string>('');
+  const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
+  const [imgError, setImgError] = useState<boolean>(false);
+
+  // Calistenia dinámica: Racha de aciertos y estado de copia de reporte
+  const [streak, setStreak] = useState<number>(0);
+  const [copiedDebug, setCopiedDebug] = useState<boolean>(false);
+  const [dismissedDirectionWarning, setDismissedDirectionWarning] = useState<boolean>(false);
+
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // Filtrado de ejercicios por bloque
+  const filteredExercises =
+    selectedBlock === ALL_CHALLENGES_LABEL
+      ? ALL_LAB_EXERCISES
+      : ALL_LAB_EXERCISES.filter((e) => e.block === selectedBlock);
+
+  // Regenerar reto procedural con nueva semilla
+  const handleNewRandomChallenge = useCallback(() => {
+    const newSeed = Math.floor(Math.random() * 90000 + 10000);
+    setChallengeSeed(newSeed);
+    const newChallenge = generateStrokeChallenge(currentExercise, newSeed, 600, 540);
+    newChallenge.activePhase = currentPhase;
+    setChallenge(newChallenge);
+    setStrokes([]);
+    currentStrokeRef.current = [];
+    setIsDrawing(false);
+    setEvaluation(null);
+    setDismissedDirectionWarning(false);
+    setShowUserStrokes(true);
+    setShowSolution(true);
+    setShowDebugModal(false);
+    setDebugComment('');
+  }, [currentExercise, currentPhase]);
+
+  // Cambiar manualmente de fase (1: Precisión, 2: Fluidez, 3: Velocidad)
+  const handlePhaseSelect = useCallback((phase: 1 | 2 | 3) => {
+    setCurrentPhase(phase);
+    setChallenge((prev) => ({ ...prev, activePhase: phase }));
+    setStrokes([]);
+    currentStrokeRef.current = [];
+    setIsDrawing(false);
+    setEvaluation(null);
+    setDismissedDirectionWarning(false);
+    setShowUserStrokes(true);
+    setShowSolution(true);
+    setShowDebugModal(false);
+    setDebugComment('');
+  }, []);
+
+  // Reintentar el reto actual (borrar trazos y reiniciar evaluación manteniendo la misma semilla)
+  const handleRetryCurrent = useCallback(() => {
+    setStrokes([]);
+    currentStrokeRef.current = [];
+    setIsDrawing(false);
+    setEvaluation(null);
+    setDismissedDirectionWarning(false);
+    setShowUserStrokes(true);
+    setShowSolution(true);
+    setShowDebugModal(false);
+    setDebugComment('');
+  }, []);
+
+  // Genera el texto completo del reporte incluyendo comentarios del usuario
+  const getFullReportText = useCallback(() => {
+    if (!evaluation) return '';
+    let text = buildStrokeDebugReport(challenge, strokes, evaluation);
+    if (debugComment.trim()) {
+      text += `\n\n--- COMENTARIO / OBSERVACIÓN DEL USUARIO ---\n${debugComment.trim()}\n`;
+    }
+    return text;
+  }, [challenge, strokes, evaluation, debugComment]);
+
+  // Genera el objeto JSON completo estructurado para descarga
+  const getReportJson = useCallback(() => {
+    return JSON.stringify(
+      {
+        reportType: 'STROKE_LAB',
+        timestamp: new Date().toISOString(),
+        challenge: {
+          code: challenge.code,
+          title: challenge.title,
+          seed: challenge.seed,
+          activePhase: currentPhase,
+          category: challenge.category,
+          keyPoints: challenge.keyPoints,
+          targetLines: challenge.targetLines,
+          targetAngleDeg: challenge.targetAngleDeg,
+          targetLengthPx: challenge.targetLengthPx,
+        },
+        userComment: debugComment.trim(),
+        strokes: strokes.map((s, i) => ({
+          index: i,
+          pointCount: s.points.length,
+          points: s.points,
+        })),
+        evaluation,
+        environment: {
+          userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+          devicePixelRatio: typeof window !== 'undefined' ? window.devicePixelRatio : 1,
+          screenResolution:
+            typeof window !== 'undefined'
+              ? `${window.screen.width}x${window.screen.height}`
+              : '',
+        },
+      },
+      null,
+      2
+    );
+  }, [challenge, currentPhase, debugComment, strokes, evaluation]);
+
+  // Cambiar de ejercicio por código
+  const handleSelectExercise = (exercise: LabExerciseDef) => {
+    const idx = ALL_LAB_EXERCISES.findIndex((e) => e.code === exercise.code);
+    if (idx !== -1) {
+      setCurrentExerciseIndex(idx);
+      setImgError(false);
+      setStreak(0);
+      setCurrentPhase(1);
+      const newSeed = Math.floor(Math.random() * 90000 + 10000);
+      setChallengeSeed(newSeed);
+      const newChallenge = generateStrokeChallenge(exercise, newSeed, 600, 540);
+      newChallenge.activePhase = 1;
+      setChallenge(newChallenge);
+      setStrokes([]);
+      currentStrokeRef.current = [];
+      setIsDrawing(false);
+      setEvaluation(null);
+      setDismissedDirectionWarning(false);
+      setShowDebugModal(false);
+      setDebugComment('');
+    }
+  };
+
+  // Manejar cambio de bloque asegurando que el ejercicio activo sea coherente
+  const handleBlockChange = (newBlock: string) => {
+    setSelectedBlock(newBlock);
+    if (newBlock !== ALL_CHALLENGES_LABEL) {
+      const firstInBlock = ALL_LAB_EXERCISES.find((e) => e.block === newBlock);
+      if (firstInBlock && currentExercise.block !== newBlock) {
+        handleSelectExercise(firstInBlock);
+      }
+    }
+  };
+
+  // Navegar al ejercicio anterior / siguiente
+  const handlePrevExercise = () => {
+    if (currentExerciseIndex > 0) {
+      handleSelectExercise(ALL_LAB_EXERCISES[currentExerciseIndex - 1]);
+    }
+  };
+
+  const handleNextExercise = () => {
+    if (currentExerciseIndex < ALL_LAB_EXERCISES.length - 1) {
+      handleSelectExercise(ALL_LAB_EXERCISES[currentExerciseIndex + 1]);
+    }
+  };
+
+  // Atajos de teclado: Espacio / Enter para avanzar (o cambiar de fase), R para reintentar
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (['INPUT', 'SELECT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) {
+        return;
+      }
+      if ((e.code === 'Space' || e.code === 'Enter') && evaluation !== null) {
+        e.preventDefault();
+        if (evaluation.phasePassed && currentPhase < 3) {
+          handlePhaseSelect((currentPhase + 1) as 1 | 2 | 3);
+        } else {
+          handleNewRandomChallenge();
+        }
+      } else if (e.key.toLowerCase() === 'r' && evaluation !== null) {
+        e.preventDefault();
+        handleRetryCurrent();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentPhase, evaluation, handleNewRandomChallenge, handlePhaseSelect, handleRetryCurrent]);
+
+  // Renderizado del lienzo en estética Paplitz (Papel Blanco Técnico + Tinta Negra)
+  const renderCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const w = 600;
+    const h = 540;
+
+    ctx.save();
+
+    // 1. Fondo Papel Blanco Paplitz
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, w, h);
+
+    // 2. Trama milimétrica sutil técnica
+    ctx.strokeStyle = '#F0F0F0';
+    ctx.lineWidth = 1;
+    const gridStep = 20;
+    for (let x = 0; x < w; x += gridStep) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, h);
+      ctx.stroke();
+    }
+    for (let y = 0; y < h; y += gridStep) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(w, y);
+      ctx.stroke();
+    }
+
+    // 3. Guías y Geometrías del Reto
+    // A. Marco delimitador de trama
+    if (challenge.guideBounds) {
+      const b = challenge.guideBounds;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.02)';
+      ctx.fillRect(b.x, b.y, b.width, b.height);
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([]);
+      ctx.strokeRect(b.x, b.y, b.width, b.height);
+    }
+
+    // B. Blob Orgánico 3D con Eje Rector
+    if (challenge.blobShape) {
+      const pts = challenge.blobShape.splinePoints;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.03)';
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) {
+        ctx.lineTo(pts[i].x, pts[i].y);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      if (showSolution) {
+        const ax = challenge.blobShape.axisLine;
+        ctx.strokeStyle = '#777777';
+        ctx.lineWidth = 1.6;
+        ctx.setLineDash([5, 4]);
+        ctx.beginPath();
+        ctx.moveTo(ax.x1, ax.y1);
+        ctx.lineTo(ax.x2, ax.y2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        const angle = Math.atan2(ax.y2 - ax.y1, ax.x2 - ax.x1);
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.moveTo(ax.x2, ax.y2);
+        ctx.lineTo(ax.x2 - 10 * Math.cos(angle - 0.4), ax.y2 - 10 * Math.sin(angle - 0.4));
+        ctx.lineTo(ax.x2 - 10 * Math.cos(angle + 0.4), ax.y2 - 10 * Math.sin(angle + 0.4));
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+
+    // C. Sólido Poliédrico 3D con Foco Solar
+    if (challenge.polySolid) {
+      const { sunPosition, faces } = challenge.polySolid;
+
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 2;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(sunPosition.x, sunPosition.y, 14, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      for (let i = 0; i < 8; i++) {
+        const rad = (i / 8) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(sunPosition.x + Math.cos(rad) * 17, sunPosition.y + Math.sin(rad) * 17);
+        ctx.lineTo(sunPosition.x + Math.cos(rad) * 26, sunPosition.y + Math.sin(rad) * 26);
+        ctx.stroke();
+      }
+
+      faces.forEach((f) => {
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.beginPath();
+        ctx.moveTo(f.vertices[0].x, f.vertices[0].y);
+        for (let i = 1; i < f.vertices.length; i++) {
+          ctx.lineTo(f.vertices[i].x, f.vertices[i].y);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        if (showSolution) {
+          let fcx = 0;
+          let fcy = 0;
+          for (const v of f.vertices) {
+            fcx += v.x;
+            fcy += v.y;
+          }
+          fcx /= f.vertices.length;
+          fcy /= f.vertices.length;
+
+          ctx.fillStyle = '#000000';
+          ctx.font = 'bold 12px monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(`Valor ${f.targetValueLevel}`, fcx, fcy);
+        }
+      });
+    }
+
+    // D. Red Isométrica (Rhombille Tiling)
+    if (challenge.rhombilleFaces) {
+      challenge.rhombilleFaces.forEach((rf) => {
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.02)';
+        ctx.beginPath();
+        ctx.moveTo(rf.vertices[0].x, rf.vertices[0].y);
+        for (let i = 1; i < rf.vertices.length; i++) {
+          ctx.lineTo(rf.vertices[i].x, rf.vertices[i].y);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        if (showSolution) {
+          let rcx = 0;
+          let rcy = 0;
+          for (const v of rf.vertices) {
+            rcx += v.x;
+            rcy += v.y;
+          }
+          rcx /= rf.vertices.length;
+          rcy /= rf.vertices.length;
+
+          ctx.fillStyle = '#666666';
+          ctx.font = 'bold 11px monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(`${rf.targetAngleDeg}°`, rcx, rcy);
+        }
+      });
+    }
+
+    // E. Curva S generatriz
+    if (challenge.waveParams && showSolution) {
+      const wp = challenge.waveParams;
+      ctx.strokeStyle = '#888888';
+      ctx.lineWidth = 1.8;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      for (let x = wp.startPoint.x; x <= wp.endPoint.x; x += 4) {
+        const y =
+          wp.startPoint.y +
+          wp.amplitude *
+            Math.sin(((x - wp.startPoint.x) / wp.wavelength) * Math.PI * 2 + wp.phase);
+        if (x === wp.startPoint.x) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // E2. Carriles de Espaciado y Muestra (Consistencia 1.1 — Ejercicios E1.1 a E3.2)
+    if (challenge.spacingTrackParams) {
+      const sp = challenge.spacingTrackParams;
+      const { bands, samplePattern, trackXStart, trackXEnd, targetSpacingPx, subdivisionLabel } = sp;
+
+      ctx.save();
+
+      // 1. ZONA DE MUESTRA (Izquierda) — PERMANENTEMENTE VISIBLE
+      const sampleTop = Math.min(...bands.map(b => b.yTop)) - 22;
+      const sampleBot = Math.max(...bands.map(b => b.yBottom)) + 12;
+      let sampleBoxW = (samplePattern.xEnd - samplePattern.xStart) + 16;
+      let sampleBoxX = samplePattern.xStart - 8;
+      if (sp.kinkType === 'chevron_left') {
+        sampleBoxX -= 26;
+        sampleBoxW += 26;
+      } else if (sp.kinkType === 'zigzag_wave') {
+        sampleBoxX -= 18;
+        sampleBoxW += 18;
+      } else if (sp.kinkType === 'triangle_left') {
+        sampleBoxX -= 16;
+        sampleBoxW += 16;
+      }
+
+      // Fondo sutil del bloque de muestra
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.03)';
+      ctx.fillRect(sampleBoxX, sampleTop, sampleBoxW, sampleBot - sampleTop);
+      ctx.strokeStyle = '#CCCCCC';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([]);
+      ctx.strokeRect(sampleBoxX, sampleTop, sampleBoxW, sampleBot - sampleTop);
+
+      // Etiqueta superior de muestra
+      let sampleLabel = `MUESTRA (${subdivisionLabel})`;
+      if (sp.kinkType === 'zigzag_zn') {
+        sampleLabel = `MUESTRA RELÁMPAGO Z/N ↗↘↗ (x/2 = ${targetSpacingPx}px)`;
+      } else if (sp.kinkType === 'v_concentric') {
+        sampleLabel = `MUESTRA VÉRTICES EN V ∨ (x/2 = ${targetSpacingPx}px)`;
+      } else if (sp.kinkType === 'v_inverted') {
+        sampleLabel = `MUESTRA VÉRTICES EN ∧ (x/2 = ${targetSpacingPx}px)`;
+      } else if (sp.kinkType === 'triangle_left') {
+        sampleLabel = `MUESTRA ◄ (x/2 = ${targetSpacingPx}px)`;
+      } else if (sp.kinkType === 'triangle_right') {
+        sampleLabel = `MUESTRA ► (x/2 = ${targetSpacingPx}px)`;
+      } else if (sp.kinkType === 'chevron_left') {
+        sampleLabel = `MUESTRA CHEVRON ◄ (x/2 = ${targetSpacingPx}px)`;
+      } else if (sp.kinkType === 'zigzag_wave') {
+        sampleLabel = `MUESTRA ZIGZAG ◄►◄ (x/2 = ${targetSpacingPx}px)`;
+      } else if (sp.kinkType === 'bracket_left') {
+        sampleLabel = `MUESTRA CORCHETE [ (x/2 = ${targetSpacingPx}px)`;
+      } else if (sp.kinkType === 'curve_c_left') {
+        sampleLabel = `MUESTRA ARCO EN C ◄ (x/2 = ${targetSpacingPx}px)`;
+      } else if (sp.kinkType === 'curve_c_right') {
+        sampleLabel = `MUESTRA ARCO EN C ► (x/2 = ${targetSpacingPx}px)`;
+      } else if (sp.kinkType === 'curve_arch_up') {
+        sampleLabel = `MUESTRA ARCO CONVEXO ⌒ (x/2 = ${targetSpacingPx}px)`;
+      } else if (sp.kinkType === 'curve_arch_down') {
+        sampleLabel = `MUESTRA ARCO CÓNCAVO ∪ (x/2 = ${targetSpacingPx}px)`;
+      } else if (sp.kinkType === 'curve_wave_horizontal') {
+        sampleLabel = `MUESTRA ONDA EN S ~ (x/2 = ${targetSpacingPx}px)`;
+      } else if (sp.kinkType === 'curve_wave_vertical') {
+        sampleLabel = `MUESTRA ONDA EN S § (x/2 = ${targetSpacingPx}px)`;
+      } else if (sp.kinkType === 'curve_wave_slanted') {
+        sampleLabel = `MUESTRA ONDA INCLINADA ∿ (x/2 = ${targetSpacingPx}px)`;
+      } else if (sp.angleDeg && sp.direction) {
+        const arrowMap: Record<string, string> = {
+          bottom_up_left_right: '↗',
+          top_down_right_left: '↙',
+          top_down_left_right: '↘',
+          bottom_up_right_left: '↖',
+        };
+        const arr = arrowMap[sp.direction] || '';
+        sampleLabel = `MUESTRA ${arr} (~${Math.round(sp.angleDeg)}°)`;
+      }
+      ctx.fillStyle = '#000000';
+      ctx.font = 'bold 10px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText(sampleLabel, sampleBoxX + sampleBoxW / 2, sampleTop + 5);
+
+      // Rieles de delimitación de la muestra
+      for (const b of bands) {
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(samplePattern.xStart - 4, b.yTop);
+        ctx.lineTo(samplePattern.xEnd + 4, b.yTop);
+        ctx.moveTo(samplePattern.xStart - 4, b.yBottom);
+        ctx.lineTo(samplePattern.xEnd + 4, b.yBottom);
+        ctx.stroke();
+      }
+
+      // Trazos entintados de muestra (referencia idéntica a libro de ejercicios)
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 2.4;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.setLineDash([]);
+      for (let sIdx = 0; sIdx < samplePattern.lines.length; sIdx++) {
+        const sLine = samplePattern.lines[sIdx];
+        if (sLine.points && sLine.points.length > 1) {
+          ctx.beginPath();
+          ctx.moveTo(sLine.points[0].x, sLine.points[0].y);
+          for (let pIdx = 1; pIdx < sLine.points.length; pIdx++) {
+            ctx.lineTo(sLine.points[pIdx].x, sLine.points[pIdx].y);
+          }
+          ctx.stroke();
+
+          // Flecha indicadora de dirección en la línea muestra con quiebre (p. ej. chevron / triángulo)
+          if (sLine.hasArrow) {
+            const pStart = sLine.points[0];
+            const pLast2 = sLine.points[sLine.points.length - 2];
+            const pEnd = sLine.points[sLine.points.length - 1];
+            const th = Math.atan2(pEnd.y - pLast2.y, pEnd.x - pLast2.x);
+            const arrowLen = 11;
+            const arrowHalfAngle = 0.42;
+
+            ctx.fillStyle = '#000000';
+            ctx.beginPath();
+            ctx.moveTo(pEnd.x, pEnd.y);
+            ctx.lineTo(
+              pEnd.x - arrowLen * Math.cos(th - arrowHalfAngle),
+              pEnd.y - arrowLen * Math.sin(th - arrowHalfAngle)
+            );
+            ctx.lineTo(
+              pEnd.x - arrowLen * Math.cos(th + arrowHalfAngle),
+              pEnd.y - arrowLen * Math.sin(th + arrowHalfAngle)
+            );
+            ctx.closePath();
+            ctx.fill();
+
+            // Dot de inicio (●)
+            ctx.beginPath();
+            ctx.arc(pStart.x, pStart.y, 2.8, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        } else {
+          const x1 = sLine.x1 ?? (sLine as any).x ?? 0;
+          const x2 = sLine.x2 ?? (sLine as any).x ?? 0;
+          ctx.beginPath();
+          ctx.moveTo(x1, sLine.y1!);
+          ctx.lineTo(x2, sLine.y2!);
+          ctx.stroke();
+
+          // Flecha indicadora de dirección en una de las líneas para diagonales (E4.1 a E4.4)
+          const isDiagonalLevel =
+            sp.direction &&
+            [
+              'bottom_up_left_right',
+              'top_down_right_left',
+              'top_down_left_right',
+              'bottom_up_right_left',
+            ].includes(sp.direction);
+
+          const shouldDrawArrow =
+            sLine.hasArrow ||
+            (isDiagonalLevel && sIdx === Math.floor(samplePattern.lines.length / 2));
+
+          if (shouldDrawArrow && sp.direction) {
+            let pStart = { x: x1, y: sLine.y1! };
+            let pEnd = { x: x2, y: sLine.y2! };
+
+            if (sp.direction === 'top_down_right_left') {
+              // ↙ E4.2: De arriba-derecha a abajo-izquierda
+              pStart = { x: x2, y: sLine.y2! };
+              pEnd = { x: x1, y: sLine.y1! };
+            } else if (sp.direction === 'bottom_up_right_left') {
+              // ↖ E4.4: De abajo-derecha a arriba-izquierda
+              pStart = { x: x2, y: sLine.y2! };
+              pEnd = { x: x1, y: sLine.y1! };
+            } else if (sp.direction === 'bottom_up_left_right') {
+              // ↗ E4.1: De abajo-izquierda a arriba-derecha
+              pStart = { x: x1, y: sLine.y1! };
+              pEnd = { x: x2, y: sLine.y2! };
+            } else if (sp.direction === 'top_down_left_right') {
+              // ↘ E4.3: De arriba-izquierda a abajo-derecha
+              pStart = { x: x1, y: sLine.y1! };
+              pEnd = { x: x2, y: sLine.y2! };
+            }
+
+            const th = Math.atan2(pEnd.y - pStart.y, pEnd.x - pStart.x);
+            const arrowLen = 11;
+            const arrowHalfAngle = 0.42;
+
+            // Icono de flecha sólida en el extremo final (pEnd)
+            ctx.fillStyle = '#000000';
+            ctx.beginPath();
+            ctx.moveTo(pEnd.x, pEnd.y);
+            ctx.lineTo(
+              pEnd.x - arrowLen * Math.cos(th - arrowHalfAngle),
+              pEnd.y - arrowLen * Math.sin(th - arrowHalfAngle)
+            );
+            ctx.lineTo(
+              pEnd.x - arrowLen * Math.cos(th + arrowHalfAngle),
+              pEnd.y - arrowLen * Math.sin(th + arrowHalfAngle)
+            );
+            ctx.closePath();
+            ctx.fill();
+
+            // Pequeño dot de origen (●) en el extremo de inicio (pStart)
+            ctx.beginPath();
+            ctx.arc(pStart.x, pStart.y, 2.8, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      }
+
+      // 2. CARRILES GUÍA DE DIBUJO (Derecha) — SIEMPRE VISIBLES PARA DIBUJAR DENTRO
+      for (let i = 0; i < bands.length; i++) {
+        const b = bands[i];
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([]);
+
+        // Riel superior (altura = 0)
+        ctx.beginPath();
+        ctx.moveTo(trackXStart, b.yTop);
+        ctx.lineTo(trackXEnd, b.yTop);
+        ctx.stroke();
+
+        // Riel inferior (altura = y)
+        ctx.beginPath();
+        ctx.moveTo(trackXStart, b.yBottom);
+        ctx.lineTo(trackXEnd, b.yBottom);
+        ctx.stroke();
+
+        // Ticks de inicio vertical
+        ctx.beginPath();
+        ctx.moveTo(trackXStart, b.yTop - 4);
+        ctx.lineTo(trackXStart, b.yTop + 4);
+        ctx.moveTo(trackXStart, b.yBottom - 4);
+        ctx.lineTo(trackXStart, b.yBottom + 4);
+        ctx.stroke();
+
+        // Etiqueta de franja si son 2 o 4 bandas
+        if (bands.length > 1) {
+          ctx.fillStyle = '#666666';
+          ctx.font = 'bold 9px monospace';
+          ctx.textAlign = 'right';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(`F${i + 1}`, trackXStart - 6, (b.yTop + b.yBottom) / 2);
+        }
+      }
+
+      // 2.5 LÍNEAS DE INICIO Y FINAL DE BLOQUES (Con pausas/gaps intermedias)
+      if (sp.blocks && sp.blocks.length > 0) {
+        const b = bands[0];
+        for (let bIdx = 0; bIdx < sp.blocks.length; bIdx++) {
+          const blk = sp.blocks[bIdx];
+
+          // 1. Línea Inicial del bloque (Start Line) pre-dibujada sólida
+          ctx.strokeStyle = '#000000';
+          ctx.lineWidth = 2.4;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.setLineDash([]);
+          ctx.beginPath();
+          ctx.moveTo(blk.startLinePoints[0].x, blk.startLinePoints[0].y);
+          for (let pIdx = 1; pIdx < blk.startLinePoints.length; pIdx++) {
+            ctx.lineTo(blk.startLinePoints[pIdx].x, blk.startLinePoints[pIdx].y);
+          }
+          ctx.stroke();
+
+          // 2. Línea Final del bloque (Final Line) pre-dibujada sólida (salvo en familias de V concéntrica que convergen al centro)
+          const isVFamily = sp.kinkType === 'v_concentric' || sp.kinkType === 'v_inverted';
+          if (!isVFamily) {
+            ctx.beginPath();
+            ctx.moveTo(blk.finalLinePoints[0].x, blk.finalLinePoints[0].y);
+            for (let pIdx = 1; pIdx < blk.finalLinePoints.length; pIdx++) {
+              ctx.lineTo(blk.finalLinePoints[pIdx].x, blk.finalLinePoints[pIdx].y);
+            }
+            ctx.stroke();
+          }
+
+          // Indicadores textuales de inicio y fin
+          ctx.fillStyle = '#000000';
+          ctx.font = 'bold 8px monospace';
+          ctx.textAlign = 'center';
+          if (sp.kinkType === 'zigzag_zn') {
+            ctx.textBaseline = 'bottom';
+            ctx.fillText('INICIO', (blk.xStart + blk.xEnd) / 2, b.yTop - 4);
+            ctx.textBaseline = 'top';
+            ctx.fillText('FIN', (blk.xStart + blk.xEnd) / 2, b.yBottom + 4);
+          } else {
+            ctx.textBaseline = 'bottom';
+            ctx.fillText('INICIO', blk.xStart, b.yTop - 4);
+            if (!isVFamily) {
+              ctx.fillText('FIN', blk.xEnd, b.yTop - 4);
+            }
+          }
+
+          // Ticks verticales adicionales en inicio y fin
+          if (!isVFamily && sp.kinkType !== 'zigzag_zn') {
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(blk.xStart, b.yTop - 3);
+            ctx.lineTo(blk.xStart, b.yTop + 3);
+            ctx.moveTo(blk.xEnd, b.yTop - 3);
+            ctx.lineTo(blk.xEnd, b.yTop + 3);
+            ctx.stroke();
+          } else if (isVFamily) {
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(blk.xStart, b.yTop - 3);
+            ctx.lineTo(blk.xStart, b.yTop + 3);
+            ctx.stroke();
+          }
+
+          // Título de Bloque
+          ctx.fillStyle = '#000000';
+          ctx.font = 'bold 9px monospace';
+          ctx.fillText(`BLOQUE ${bIdx + 1}`, (blk.xStart + blk.xEnd) / 2, b.yTop - 13);
+
+          // Indicador de Pausa en el gap
+          if (bIdx < sp.blocks.length - 1) {
+            const nextBlk = sp.blocks[bIdx + 1];
+            const gapMid = (blk.xEnd + nextBlk.xStart) / 2;
+            ctx.fillStyle = '#999999';
+            ctx.font = 'bold 8px monospace';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('(PAUSA)', gapMid, (b.yTop + b.yBottom) / 2);
+          }
+        }
+      }
+
+      ctx.restore();
+    }
+
+    // F. Líneas de cota y carriles guía (Andamiaje: en Fase 3 se retira la guía del contorno pero se mantienen los ejes radiales de referencia)
+    const isGuideHiddenByPhase = currentPhase === 3;
+    if (!challenge.spacingTrackParams && showSolution && challenge.guideLines) {
+      for (const line of challenge.guideLines) {
+        const isRadialAxis = Boolean((line as any).isRadialAxis);
+        if (isGuideHiddenByPhase && !isRadialAxis) continue;
+
+        if (isRadialAxis) {
+          ctx.strokeStyle = '#b5b5b5';
+          ctx.lineWidth = 1.2;
+          ctx.setLineDash([6, 5]);
+        } else {
+          ctx.strokeStyle = currentPhase === 2 ? '#d8d8d8' : (line.dashed ? '#888888' : '#cccccc');
+          ctx.lineWidth = currentPhase === 2 ? 1.0 : 1.5;
+          if (line.dashed || currentPhase === 2) ctx.setLineDash([5, 5]);
+          else ctx.setLineDash([]);
+        }
+
+        ctx.beginPath();
+        ctx.moveTo(line.x1, line.y1);
+        ctx.lineTo(line.x2, line.y2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    // G. SOLUCIÓN FANTASMA EN GRIS CON OPACIDAD (Visible antes de empezar a dibujar si showSolution está activo y no es Fase 3 sin guía)
+    // Desaparece en cuanto el usuario toca el lienzo o tiene trazos, o si se desactiva Solución
+    if (showSolution && !isGuideHiddenByPhase && strokes.length === 0 && !isDrawing && challenge.ghostSolutionStrokes) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.22)';
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+      ctx.lineWidth = 2.0;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.setLineDash([5, 4]);
+
+      for (const gStroke of challenge.ghostSolutionStrokes) {
+        if (gStroke.points.length < 2) continue;
+        ctx.beginPath();
+        ctx.moveTo(gStroke.points[0].x, gStroke.points[0].y);
+        for (let i = 1; i < gStroke.points.length; i++) {
+          ctx.lineTo(gStroke.points[i].x, gStroke.points[i].y);
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // H. PUNTOS DIANA MINIMALISTAS (Dots de 3.5px en negro con número de orden pequeño)
+    if (challenge.keyPoints && challenge.keyPoints.length > 0) {
+      for (const kp of challenge.keyPoints) {
+        ctx.save();
+        // Dot negro puro
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.arc(kp.x, kp.y, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Número pequeño posicionado al lateral perpendicular para no interferir con el trazo
+        ctx.fillStyle = '#000000';
+        ctx.font = 'bold 10px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        const labelText = kp.label || String(kp.order);
+        const { badgeX: labelX, badgeY: labelY } = computeKeyPointBadgePosition(kp, challenge, w, h, 15);
+
+        ctx.fillText(labelText, labelX, labelY);
+        ctx.restore();
+      }
+    }
+
+    // 4. Dibujar los trazos entintados del usuario con suavizado Bézier
+    const allStrokes =
+      isDrawing && currentStrokeRef.current.length > 0
+        ? (showUserStrokes ? [...strokes, { points: currentStrokeRef.current }] : [{ points: currentStrokeRef.current }])
+        : (showUserStrokes ? strokes : []);
+
+    ctx.strokeStyle = '#000000';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.setLineDash([]);
+
+    for (const stroke of allStrokes) {
+      if (stroke.points.length === 0) continue;
+      const pts = stroke.points;
+
+      if (pts.length === 1) {
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.arc(pts[0].x, pts[0].y, 1.4, 0, Math.PI * 2);
+        ctx.fill();
+        continue;
+      }
+
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+
+      for (let i = 1; i < pts.length - 1; i++) {
+        const xc = (pts[i].x + pts[i + 1].x) / 2;
+        const yc = (pts[i].y + pts[i + 1].y) / 2;
+        ctx.quadraticCurveTo(pts[i].x, pts[i].y, xc, yc);
+      }
+      ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+      const lastP = pts[pts.length - 1];
+      ctx.lineWidth = lastP.pressure > 0 ? 1.6 + lastP.pressure * 2.0 : 2.4;
+      ctx.stroke();
+    }
+
+    // 5. SUPERPOSICIÓN DE SOLUCIÓN TRAS CORRECCIÓN (Línea discontinua estrictamente monocromática negra)
+    if (showSolution && evaluation && evaluation.solutionOverlay) {
+      const linesToDraw: { x: number; y: number }[][] =
+        evaluation.solutionOverlay.multiLines && evaluation.solutionOverlay.multiLines.length > 0
+          ? evaluation.solutionOverlay.multiLines.map((l) => l.points)
+          : evaluation.solutionOverlay.points.length > 1
+          ? [evaluation.solutionOverlay.points]
+          : [];
+
+      // Detectar si múltiples radios convergen al mismo centro común (como en D12)
+      const isCommonCenterEnd =
+        linesToDraw.length > 3 &&
+        linesToDraw.every((l) => {
+          const lastPt = l[l.length - 1];
+          const firstLastPt = linesToDraw[0][linesToDraw[0].length - 1];
+          return Math.hypot(lastPt.x - firstLastPt.x, lastPt.y - firstLastPt.y) < 8;
+        });
+
+      for (const sPts of linesToDraw) {
+        if (sPts.length < 2) continue;
+        ctx.save();
+        ctx.strokeStyle = '#000000'; // Estricto blanco y negro
+        ctx.lineWidth = 2.4;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.setLineDash([5, 4]);
+
+        if (challenge.spacingTrackParams) {
+          ctx.beginPath();
+          ctx.moveTo(sPts[0].x, sPts[0].y);
+          for (let i = 1; i < sPts.length; i++) {
+            ctx.lineTo(sPts[i].x, sPts[i].y);
+          }
+          ctx.stroke();
+
+          // Flecha direccional en el extremo final si tiene dirección configurada
+          if (challenge.spacingTrackParams.direction && sPts.length >= 2) {
+            const pEnd = sPts[sPts.length - 1];
+            const pPrev = sPts[Math.max(0, sPts.length - 3)];
+            const th = Math.atan2(pEnd.y - pPrev.y, pEnd.x - pPrev.x);
+            ctx.fillStyle = '#000000';
+            ctx.beginPath();
+            ctx.moveTo(pEnd.x, pEnd.y);
+            ctx.lineTo(pEnd.x - 7 * Math.cos(th - 0.45), pEnd.y - 7 * Math.sin(th - 0.45));
+            ctx.lineTo(pEnd.x - 7 * Math.cos(th + 0.45), pEnd.y - 7 * Math.sin(th + 0.45));
+            ctx.closePath();
+            ctx.fill();
+          }
+
+          ctx.restore();
+          continue;
+        }
+
+        const lastP = sPts[sPts.length - 1];
+        const prevP = sPts[Math.max(0, sPts.length - 4)];
+        const theta = Math.atan2(lastP.y - prevP.y, lastP.x - prevP.x);
+
+        const arrowTip = isCommonCenterEnd
+          ? { x: lastP.x - 8 * Math.cos(theta), y: lastP.y - 8 * Math.sin(theta) }
+          : lastP;
+
+        ctx.beginPath();
+        ctx.moveTo(sPts[0].x, sPts[0].y);
+        for (let i = 1; i < sPts.length; i++) {
+          const pt = i === sPts.length - 1 && isCommonCenterEnd ? arrowTip : sPts[i];
+          ctx.lineTo(pt.x, pt.y);
+        }
+        ctx.stroke();
+
+        // Flecha de solución en el extremo de llegada
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.moveTo(arrowTip.x, arrowTip.y);
+        ctx.lineTo(arrowTip.x - 11 * Math.cos(theta - 0.38), arrowTip.y - 11 * Math.sin(theta - 0.38));
+        ctx.lineTo(arrowTip.x - 11 * Math.cos(theta + 0.38), arrowTip.y - 11 * Math.sin(theta + 0.38));
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    ctx.restore();
+  }, [challenge, strokes, isDrawing, evaluation, showUserStrokes, showSolution]);
+
+  useEffect(() => {
+    renderCanvas();
+  }, [renderCanvas]);
+
+  // Manejo de punteros normalizado a 600x540
+  const getNormalizedCoords = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0, pressure: 0.5 };
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = 600 / rect.width;
+    const scaleY = 540 / rect.height;
+
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+    const pressure = e.pressure && e.pressure > 0 ? e.pressure : 0.5;
+
+    return { x, y, pressure };
+  };
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    if (activePointerIdRef.current !== null && activePointerIdRef.current !== e.pointerId) return;
+
+    // Si había una evaluación activa y el usuario vuelve a tocar, limpiar para nuevo intento
+    if (evaluation !== null && challenge.isSingleStrokeAutoEval) {
+      setEvaluation(null);
+      setDismissedDirectionWarning(false);
+      setStrokes([]);
+    }
+
+    const canvas = canvasRef.current;
+    if (canvas) {
+      try {
+        canvas.setPointerCapture(e.pointerId);
+      } catch {
+        // Ignorar
+      }
+    }
+
+    activePointerIdRef.current = e.pointerId;
+    const { x, y, pressure } = getNormalizedCoords(e);
+    currentStrokeRef.current = [{ x, y, pressure, time: Date.now() }];
+    setIsDrawing(true);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isDrawing || (activePointerIdRef.current !== null && activePointerIdRef.current !== e.pointerId)) return;
+    const { x, y, pressure } = getNormalizedCoords(e);
+    currentStrokeRef.current.push({ x, y, pressure, time: Date.now() });
+    renderCanvas();
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isDrawing || (activePointerIdRef.current !== null && activePointerIdRef.current !== e.pointerId)) return;
+    setIsDrawing(false);
+    activePointerIdRef.current = null;
+
+    const canvas = canvasRef.current;
+    if (canvas) {
+      try {
+        canvas.releasePointerCapture(e.pointerId);
+      } catch {
+        // Ignorar
+      }
+    }
+
+    if (currentStrokeRef.current.length > 1) {
+      const newStrokes = [...strokes, { points: [...currentStrokeRef.current] }];
+      setStrokes(newStrokes);
+
+      // AUTO-EVALUACIÓN INSTANTÁNEA PARA CALISTENIA (Al alcanzar los trazos requeridos)
+      if (challenge.isSingleStrokeAutoEval) {
+        const requiredStrokes = challenge.minRequiredStrokes || 1;
+        if (newStrokes.length >= requiredStrokes) {
+          currentStrokeRef.current = [];
+          const result = evaluateStrokeSubmission(newStrokes, challenge);
+          setEvaluation(result);
+          setDismissedDirectionWarning(false);
+          if (result.passed) {
+            setStreak((prev) => prev + 1);
+            if (onAwardXP) onAwardXP(15 * requiredStrokes);
+          } else {
+            setStreak(0);
+          }
+          renderCanvas();
+          return;
+        }
+      }
+    }
+    currentStrokeRef.current = [];
+    renderCanvas();
+  };
+
+  const handleUndo = () => {
+    if (strokes.length === 0) return;
+    setStrokes((prev) => prev.slice(0, -1));
+    setEvaluation(null);
+    setDismissedDirectionWarning(false);
+  };
+
+  const handleClear = () => {
+    setStrokes([]);
+    currentStrokeRef.current = [];
+    setEvaluation(null);
+    setDismissedDirectionWarning(false);
+  };
+
+  const handleEvaluate = () => {
+    const result = evaluateStrokeSubmission(strokes, challenge);
+    setEvaluation(result);
+    if (result.passed && onAwardXP) {
+      onAwardXP(30);
+    }
+  };
+
+  return (
+    <div className="w-full flex-1 flex flex-col md:flex-row items-center md:items-start justify-center gap-3 sm:gap-4 bg-neutral-50 px-2 sm:px-4 pt-2 sm:pt-3 pb-6 sm:pb-8 min-h-[calc(100vh-64px)] select-none">
+      {/* Drawer Colapsable de Selección de Ejercicios */}
+      {drawerOpen && (
+        <div className="fixed inset-0 z-50 flex">
+          {/* Backdrop con desenfoque suave */}
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
+            onClick={() => setDrawerOpen(false)}
+          />
+
+          {/* Panel deslizante lateral */}
+          <div className="relative z-10 w-full max-w-sm sm:max-w-md bg-white border-r-4 border-black h-full flex flex-col shadow-[8px_0px_0px_#000000] p-4 overflow-y-auto animate-in slide-in-from-left duration-200">
+            {/* Cabecera del Drawer */}
+            <div className="flex items-center justify-between pb-3 border-b-2 border-black mb-3">
+              <div className="flex items-center gap-2">
+                <Layers className="w-5 h-5 stroke-[2.5]" />
+                <h2 className="font-display font-black text-sm uppercase tracking-wide">
+                  Plan de Trazos ({ALL_LAB_EXERCISES.length})
+                </h2>
+              </div>
+              <button
+                onClick={() => setDrawerOpen(false)}
+                className="p-1 border-2 border-black hover:bg-neutral-100 cursor-pointer text-black"
+                title="Cerrar panel"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* 1. Selector de Bloque */}
+            <div className="mb-3">
+              <label className="text-[10px] font-mono uppercase font-bold text-neutral-600 block mb-1">
+                Filtrar por Bloque:
+              </label>
+              <select
+                value={selectedBlock}
+                onChange={(e) => handleBlockChange(e.target.value)}
+                className="w-full border-2 border-black px-2 py-1.5 text-xs font-mono font-bold bg-white shadow-[2px_2px_0px_#000000] cursor-pointer"
+              >
+                {BLOCKS_LIST.map((b) => (
+                  <option key={b} value={b}>
+                    {b}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* 2. Selector Desplegable de Ejercicios */}
+            <div className="mb-3">
+              <label className="text-[10px] font-mono uppercase font-bold text-neutral-600 mb-1 flex justify-between">
+                <span>Ejercicio ({filteredExercises.length} retos):</span>
+                <span className="font-mono font-black text-black">{currentExercise.code}</span>
+              </label>
+              <select
+                value={currentExercise.code}
+                onChange={(e) => {
+                  const ex = ALL_LAB_EXERCISES.find((item) => item.code === e.target.value);
+                  if (ex) {
+                    handleSelectExercise(ex);
+                    setDrawerOpen(false);
+                  }
+                }}
+                className="w-full border-2 border-black px-2 py-1.5 text-xs font-mono font-bold bg-white shadow-[2px_2px_0px_#000000] cursor-pointer truncate"
+              >
+                {filteredExercises.map((ex) => (
+                  <option key={ex.code} value={ex.code}>
+                    {ex.isSingleStroke ? '⚡ ' : '📖 '}
+                    {ex.page ? `P.${String(ex.page).padStart(2, '0')} ` : ''}
+                    {ex.code} · {ex.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* 3. Navegación Anterior / Siguiente */}
+            <div className="flex items-center gap-2 mb-3">
+              <button
+                onClick={handlePrevExercise}
+                disabled={currentExerciseIndex === 0}
+                className="btn-ink-outline flex-1 py-1.5 text-xs font-mono flex items-center justify-center gap-1 disabled:opacity-30 cursor-pointer shadow-[1px_1px_0px_#000000]"
+                title="Ejercicio Anterior"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                <span>Anterior</span>
+              </button>
+              <button
+                onClick={handleNextExercise}
+                disabled={currentExerciseIndex === ALL_LAB_EXERCISES.length - 1}
+                className="btn-ink-outline flex-1 py-1.5 text-xs font-mono flex items-center justify-center gap-1 disabled:opacity-30 cursor-pointer shadow-[1px_1px_0px_#000000]"
+                title="Ejercicio Siguiente"
+              >
+                <span>Siguiente</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* 4. Ver Lámina Original / Información del Reto */}
+            <button
+              onClick={() => {
+                setChallengeModalTab(currentExercise.page ? 'book' : 'info');
+                setShowChallengeInfoModal(true);
+                setDrawerOpen(false);
+              }}
+              className="btn-ink-outline w-full py-2 text-xs font-mono font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] mb-4"
+            >
+              <Info className="w-4 h-4 text-black" />
+              <span>
+                {currentExercise.page
+                  ? `Ver Lámina & Ficha (P.${currentExercise.page})`
+                  : `Ficha Didáctica (${currentExercise.code})`}
+              </span>
+            </button>
+
+            {/* Ficha Descriptiva del Ejercicio (dentro del drawer para no distraer en el lienzo) */}
+            <div className="border-2 border-black bg-neutral-50 p-3 shadow-[2px_2px_0px_#000000] text-xs mt-auto">
+              <div className="flex items-center justify-between gap-1 mb-1.5 pb-1 border-b border-black">
+                <span className="font-mono font-bold bg-black text-white px-1.5 py-0.5 text-[10px]">
+                  {currentExercise.code}
+                </span>
+                <span className="text-[10px] font-mono border border-black px-1.5 py-0.2 font-bold uppercase bg-white">
+                  Dificultad: {currentExercise.difficulty}
+                </span>
+              </div>
+              <h3 className="font-display font-bold text-sm text-black leading-tight mb-1">
+                {currentExercise.title}
+              </h3>
+              <p className="text-[11px] text-neutral-600 font-sans leading-relaxed mb-2">
+                {currentExercise.desc}
+              </p>
+              <div className="bg-white border border-neutral-300 p-2 font-mono text-[10px] text-neutral-800">
+                <strong className="block text-black uppercase mb-0.5">Qué se mide:</strong>
+                {currentExercise.metrics}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================
+          PANEL DE CONTROL LATERAL IZQUIERDO (COMPACTO PARA TABLET Y PC)
+         ======================================================== */}
+      <aside className="w-full sm:w-[260px] md:w-[260px] lg:w-[270px] shrink-0 flex flex-col gap-2 order-2 md:order-1">
+        <div className="border-2 border-black bg-white p-2.5 shadow-[3px_3px_0px_#000000] flex flex-col gap-2.5">
+          {/* 1. Selección y Navegación de Reto */}
+          <div>
+            <div className="flex items-center justify-between gap-1 mb-1">
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-mono uppercase font-black text-neutral-500 tracking-wider">
+                  Reto Activo
+                </span>
+                <button
+                  onClick={() => {
+                    setChallengeModalTab('info');
+                    setShowChallengeInfoModal(true);
+                  }}
+                  className="text-neutral-400 hover:text-black p-0.5 cursor-pointer transition-colors"
+                  title="Información detallada del nivel"
+                >
+                  <Info className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <div className="flex items-center gap-1">
+                {challenge.isSingleStrokeAutoEval && streak > 0 && (
+                  <div className="flex items-center gap-0.5 bg-black text-white px-1.5 py-0.2 text-[10px] font-mono font-black">
+                    <Flame className="w-3 h-3 text-white stroke-[2.5]" />
+                    <span>{streak}</span>
+                  </div>
+                )}
+                <button
+                  onClick={handleNewRandomChallenge}
+                  className="p-1 border border-black hover:bg-neutral-100 cursor-pointer shadow-[1px_1px_0px_#000000]"
+                  title="Generar nueva semilla aleatoria"
+                >
+                  <Dices className="w-3 h-3 text-black" />
+                </button>
+              </div>
+            </div>
+
+            {/* Botón para abrir el Catálogo completo */}
+            <button
+              onClick={() => setDrawerOpen(true)}
+              className="w-full btn-ink px-2 py-1 text-xs font-mono flex items-center justify-between cursor-pointer shadow-[2px_2px_0px_#000000] mb-1.5"
+              title="Abrir catálogo completo de retos"
+            >
+              <div className="flex items-center gap-1.5 min-w-0">
+                <Menu className="w-3.5 h-3.5 shrink-0" />
+                <span className="font-bold truncate">{currentExercise.code} · {currentExercise.title}</span>
+              </div>
+              <ChevronDown className="w-3 h-3 shrink-0" />
+            </button>
+
+            {/* Navegación rápida Anterior / Siguiente */}
+            <div className="grid grid-cols-2 gap-1">
+              <button
+                onClick={handlePrevExercise}
+                disabled={currentExerciseIndex === 0}
+                className="btn-ink-outline py-1 text-[11px] font-mono disabled:opacity-30 cursor-pointer flex items-center justify-center gap-1 shadow-[1px_1px_0px_#000000]"
+                title="Reto Anterior"
+              >
+                <ChevronLeft className="w-3 h-3" />
+                <span>Anterior</span>
+              </button>
+              <button
+                onClick={handleNextExercise}
+                disabled={currentExerciseIndex === ALL_LAB_EXERCISES.length - 1}
+                className="btn-ink-outline py-1 text-[11px] font-mono disabled:opacity-30 cursor-pointer flex items-center justify-center gap-1 shadow-[1px_1px_0px_#000000]"
+                title="Reto Siguiente"
+              >
+                <span>Siguiente</span>
+                <ChevronRight className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
+
+          {/* 2. Fases Didácticas en 1 sola fila horizontal con botón de información */}
+          {(challenge.isSingleStrokeAutoEval || challenge.spacingTrackParams) && (
+            <div className="border-t border-black pt-2">
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] font-mono uppercase font-black text-neutral-500 tracking-wider">
+                    Fase Cinemática
+                  </span>
+                  <button
+                    onClick={() => setShowKinematicsInfoModal(true)}
+                    className="text-neutral-400 hover:text-black p-0.5 cursor-pointer transition-colors"
+                    title="Información sobre las fases cinemáticas"
+                  >
+                    <Info className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <span className="text-[10px] font-mono text-neutral-600 font-bold">
+                  {currentPhase === 1 ? 'Precisión' : currentPhase === 2 ? 'Fluidez' : 'Velocidad'}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-1">
+                <button
+                  onClick={() => handlePhaseSelect(1)}
+                  className={`py-1 text-[11px] font-mono font-bold border border-black cursor-pointer text-center transition-colors ${
+                    currentPhase === 1 ? 'bg-black text-white' : 'bg-white text-black hover:bg-neutral-100'
+                  }`}
+                  title="Fase 1: Precisión con guía (≥80%)"
+                >
+                  1. Prec.
+                </button>
+                <button
+                  onClick={() => handlePhaseSelect(2)}
+                  className={`py-1 text-[11px] font-mono font-bold border border-black cursor-pointer text-center transition-colors ${
+                    currentPhase === 2 ? 'bg-black text-white' : 'bg-white text-black hover:bg-neutral-100'
+                  }`}
+                  title="Fase 2: Fluidez continua con guía atenuada (≥83%)"
+                >
+                  2. Fluid.
+                </button>
+                <button
+                  onClick={() => handlePhaseSelect(3)}
+                  className={`py-1 text-[11px] font-mono font-bold border border-black cursor-pointer text-center transition-colors ${
+                    currentPhase === 3 ? 'bg-black text-white' : 'bg-white text-black hover:bg-neutral-100'
+                  }`}
+                  title="Fase 3: Disparo veloz sin guía visual (≥85%)"
+                >
+                  3. Vel.
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 3. Herramientas del Lienzo: Deshacer/Borrar y Visibilidad de Mi Trazo y Solución */}
+          <div className="border-t border-black pt-2">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] font-mono uppercase font-black text-neutral-500 tracking-wider">
+                Lienzo
+              </span>
+              <span className="text-[10px] font-mono text-neutral-700 font-bold">
+                {strokes.length}/{challenge.minRequiredStrokes} trazos
+              </span>
+            </div>
+
+            {/* Fila 1: Deshacer y Borrar */}
+            <div className="grid grid-cols-2 gap-1 mb-1">
+              <button
+                onClick={handleUndo}
+                disabled={strokes.length === 0}
+                className="btn-ink-outline py-1 text-[11px] font-mono disabled:opacity-30 cursor-pointer flex items-center justify-center gap-1 shadow-[1px_1px_0px_#000000]"
+                title="Deshacer último trazo (Ctrl+Z)"
+              >
+                <Undo2 className="w-3 h-3" />
+                <span>Deshacer</span>
+              </button>
+              <button
+                onClick={handleClear}
+                disabled={strokes.length === 0}
+                className="btn-ink-outline py-1 text-[11px] font-mono disabled:opacity-30 cursor-pointer flex items-center justify-center gap-1 shadow-[1px_1px_0px_#000000]"
+                title="Borrar lienzo"
+              >
+                <Trash2 className="w-3 h-3" />
+                <span>Borrar</span>
+              </button>
+            </div>
+
+            {/* Fila 2: Ver/Ocultar Mi Trazo y Ver/Ocultar Solución (Activos solo tras obtener la nota) */}
+            <div className="grid grid-cols-2 gap-1">
+              <button
+                onClick={() => evaluation && setShowUserStrokes((prev) => !prev)}
+                disabled={!evaluation}
+                className={`btn-ink-outline py-1 text-[11px] font-mono flex items-center justify-center gap-1 shadow-[1px_1px_0px_#000000] transition-opacity ${
+                  !evaluation
+                    ? 'opacity-30 cursor-not-allowed bg-neutral-50 text-neutral-400'
+                    : showUserStrokes
+                    ? 'bg-neutral-100 font-bold text-black cursor-pointer'
+                    : 'text-neutral-400 line-through cursor-pointer'
+                }`}
+                title={!evaluation ? 'Disponible tras obtener la nota' : (showUserStrokes ? 'Ocultar mi trazo dibujado' : 'Mostrar mi trazo dibujado')}
+              >
+                {showUserStrokes ? <Eye className="w-3 h-3 text-black" /> : <EyeOff className="w-3 h-3 text-neutral-400" />}
+                <span>Mi Trazo</span>
+              </button>
+              <button
+                onClick={() => evaluation && setShowSolution((prev) => !prev)}
+                disabled={!evaluation}
+                className={`btn-ink-outline py-1 text-[11px] font-mono flex items-center justify-center gap-1 shadow-[1px_1px_0px_#000000] transition-opacity ${
+                  !evaluation
+                    ? 'opacity-30 cursor-not-allowed bg-neutral-50 text-neutral-400'
+                    : showSolution
+                    ? 'bg-neutral-100 font-bold text-black cursor-pointer'
+                    : 'text-neutral-400 line-through cursor-pointer'
+                }`}
+                title={!evaluation ? 'Disponible tras obtener la nota' : (showSolution ? 'Ocultar solución y guías' : 'Mostrar solución y guías')}
+              >
+                {showSolution ? <Eye className="w-3 h-3 text-black" /> : <EyeOff className="w-3 h-3 text-neutral-400" />}
+                <span>Solución</span>
+              </button>
+            </div>
+          </div>
+
+          {/* 4. Evaluación & Acciones compactas */}
+          <div className="border-t border-black pt-2 flex flex-col gap-1.5">
+            {/* Si hay evaluación activa */}
+            {evaluation ? (
+              <div className="flex flex-col gap-1.5">
+                {/* Nota destacada en grande con veredicto y telemetría */}
+                <div className="bg-neutral-100 border-2 border-black p-2 flex items-center justify-between shadow-[2px_2px_0px_#000000]">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-black text-3xl sm:text-4xl text-black leading-none tracking-tight">
+                      {evaluation.overallScore}%
+                    </span>
+                    <span
+                      className={`text-[10px] font-mono px-1.5 py-0.5 font-black uppercase tracking-wider ${
+                        evaluation.isReversed
+                          ? 'bg-black text-white'
+                          : evaluation.phasePassed
+                          ? 'bg-black text-white'
+                          : 'bg-white text-black border border-black'
+                      }`}
+                    >
+                      {evaluation.isReversed
+                        ? 'Dirección ⚠️'
+                        : evaluation.phasePassed
+                        ? 'Superado ✓'
+                        : 'Ajustar'}
+                    </span>
+                  </div>
+                  {evaluation.kinematics && (
+                    <div className="text-right font-mono text-[10px] text-neutral-600 font-bold leading-tight">
+                      <div>{(evaluation.kinematics.durationMs / 1000).toFixed(2)}s</div>
+                      <div className="text-neutral-500">{evaluation.kinematics.avgSpeedPxPerSec} px/s</div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Botones de acción post-evaluación en 1 sola fila */}
+                <div className="flex items-center gap-1">
+                  {(challenge.isSingleStrokeAutoEval || challenge.spacingTrackParams) ? (
+                    evaluation.phasePassed && currentPhase < 3 ? (
+                      <button
+                        onClick={() => handlePhaseSelect((currentPhase + 1) as 1 | 2 | 3)}
+                        className="flex-1 btn-ink py-1 text-xs font-mono font-bold uppercase flex items-center justify-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000000]"
+                      >
+                        <span>Fase {currentPhase + 1}</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleNewRandomChallenge}
+                        className="flex-1 btn-ink py-1 text-xs font-mono font-bold uppercase flex items-center justify-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000000]"
+                      >
+                        <span>{evaluation.phasePassed && currentPhase === 3 ? '¡Dominado!' : 'Siguiente'}</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </button>
+                    )
+                  ) : (
+                    <button
+                      onClick={handleNewRandomChallenge}
+                      className="flex-1 btn-ink py-1 text-xs font-mono font-bold uppercase flex items-center justify-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000000]"
+                    >
+                      <span>Siguiente</span>
+                      <ArrowRight className="w-3 h-3" />
+                    </button>
+                  )}
+
+                  <button
+                    onClick={handleRetryCurrent}
+                    className="btn-ink-outline p-1 text-xs font-mono font-bold flex items-center justify-center cursor-pointer shadow-[1px_1px_0px_#000000]"
+                    title="Reintentar este mismo reto (R)"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setShowDebugModal(true)}
+                    className="btn-ink-outline p-1 text-xs font-mono font-bold flex items-center justify-center cursor-pointer shadow-[1px_1px_0px_#000000]"
+                    title="Abrir reporte de depuración y diagnóstico"
+                  >
+                    <AlertTriangle className="w-3.5 h-3.5 text-black stroke-[2.5]" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              strokes.length > 0 && (
+                <button
+                  onClick={handleEvaluate}
+                  disabled={strokes.length === 0}
+                  className="w-full btn-ink py-1.5 text-xs font-mono font-bold uppercase disabled:opacity-30 cursor-pointer flex items-center justify-center gap-1 shadow-[2px_2px_0px_#000000]"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Evaluar Trazos</span>
+                </button>
+              )
+            )}
+          </div>
+        </div>
+      </aside>
+
+      {/* ========================================================
+          ZONA DE LIENZO EXPANSIVA (SIN NINGÚN BOTÓN QUE ESTORBE)
+         ======================================================== */}
+      <main className="flex-1 w-full flex items-center justify-center select-none min-w-0 order-1 md:order-2 pb-3 sm:pb-5">
+        <div
+          className="w-full flex items-center justify-center mb-2 sm:mb-4"
+          style={{
+            maxWidth: 'min(100%, calc((100vh - 120px) * 600 / 540), 960px)',
+            aspectRatio: '600 / 540',
+          }}
+        >
+          <div
+            data-canvas-zone="true"
+            className="relative border-4 border-black bg-white shadow-[4px_4px_0px_#000000] w-full h-full overflow-hidden"
+          >
+            <canvas
+              ref={canvasRef}
+              width={600}
+              height={540}
+              className="touch-none cursor-crosshair block w-full h-full"
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={handlePointerUp}
+            />
+
+            {/* Pop-up sobre el lienzo al trazar en dirección invertida */}
+            {evaluation?.isReversed && !dismissedDirectionWarning && (
+              <div className="absolute top-3 inset-x-3 sm:top-4 sm:inset-x-6 z-20 bg-white border-3 border-black p-3 sm:p-4 shadow-[4px_4px_0px_#000000] animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="flex items-start justify-between gap-2.5">
+                  <div className="flex items-start gap-2.5 min-w-0">
+                    <div className="p-1.5 bg-black text-white shrink-0 mt-0.5 shadow-[1px_1px_0px_#000000]">
+                      <RotateCcw className="w-4 h-4 stroke-[2.5]" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <h4 className="font-display font-black text-xs sm:text-sm uppercase tracking-wider text-black">
+                          Dirección Invertida (0%)
+                        </h4>
+                        <span className="bg-black text-white px-1.5 py-0.2 font-mono text-[9px] font-bold uppercase">
+                          Sentido Contrario
+                        </span>
+                      </div>
+                      <p className="font-sans text-xs text-neutral-800 leading-snug">
+                        {evaluation.directionWarning ||
+                          'Has trazado en sentido contrario (de ② hacia ①). Inicia siempre en el punto ① y proyecta el trazo hacia ②.'}
+                      </p>
+                      <p className="font-mono text-[10px] text-neutral-500 mt-1.5">
+                        Toca el lienzo para un nuevo trazo o pulsa Siguiente para continuar.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setDismissedDirectionWarning(true)}
+                    className="p-1 text-black hover:bg-neutral-100 border border-black cursor-pointer shrink-0 transition-colors shadow-[1px_1px_0px_#000000]"
+                    title="Cerrar aviso"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
+
+
+
+      {/* Modal de Reporte de Depuración del Trazo (Idéntico a Práctica con Comentario, Copiar y Descargar JSON) */}
+      {showDebugModal && evaluation && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 animate-fade-in">
+          <div className="bg-white border-3 border-black p-4 sm:p-5 max-w-lg w-full shadow-[6px_6px_0px_#000000] flex flex-col gap-3 font-sans max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b-2 border-black pb-2">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-black stroke-[2.5]" />
+                <h3 className="font-display font-bold text-sm sm:text-base uppercase tracking-tight">
+                  Reporte de Evaluación del Trazo
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowDebugModal(false)}
+                className="p-1 hover:bg-neutral-100 border border-black cursor-pointer text-black"
+                title="Cerrar modal"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between text-xs font-mono bg-neutral-50 p-2 border border-black">
+              <div>
+                <span className="text-neutral-500">Semilla:</span> <strong>#{challenge.seed}</strong>
+              </div>
+              <div>
+                <span className="text-neutral-500">Reto:</span> <strong>{currentExercise.code}</strong>
+              </div>
+              <div>
+                <span className="text-neutral-500">Nota:</span> <strong>{evaluation.overallScore}%</strong>
+              </div>
+            </div>
+
+            {/* Campo de comentario del usuario */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-mono font-bold text-neutral-700">
+                Comentario / Observación sobre la nota (opcional):
+              </label>
+              <textarea
+                value={debugComment}
+                onChange={(e) => setDebugComment(e.target.value)}
+                placeholder="Escribe aquí tu duda, sugerencia o lo que creas que ha puntuado mal..."
+                className="w-full h-16 p-2 font-sans text-xs bg-white border border-black resize-none focus:outline-none focus:ring-1 focus:ring-black"
+              />
+            </div>
+
+            {/* Vista previa del contenido */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-mono font-bold text-neutral-600">
+                Vista previa del reporte (Markdown / Texto):
+              </label>
+              <textarea
+                readOnly
+                value={getFullReportText()}
+                className="w-full h-28 p-2 font-mono text-[10px] bg-neutral-50 border border-black resize-none selection:bg-black selection:text-white"
+              />
+            </div>
+
+            {/* Acciones */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-neutral-200">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={async () => {
+                    await copyReportToClipboard(getFullReportText());
+                    setCopiedDebug(true);
+                    setTimeout(() => setCopiedDebug(false), 2500);
+                  }}
+                  className="btn-ink px-3 py-1.5 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
+                >
+                  {copiedDebug ? <Check className="w-3.5 h-3.5 text-white stroke-[2.5]" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedDebug ? '¡Copiado!' : 'Copiar Texto'}</span>
+                </button>
+
+                <button
+                  onClick={() => downloadReportJson(getReportJson(), challenge.seed)}
+                  className="btn-ink-outline px-3 py-1.5 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Descargar JSON</span>
+                </button>
+              </div>
+
+              <button
+                onClick={() => setShowDebugModal(false)}
+                className="px-3 py-1.5 text-xs font-mono text-neutral-600 hover:text-black border border-neutral-300 hover:border-black cursor-pointer ml-auto"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal: Información del Reto Activo y Lámina Original */}
+      {showChallengeInfoModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-fade-in">
+          <div className="bg-white border-3 border-black p-4 sm:p-5 max-w-lg sm:max-w-xl w-full shadow-[6px_6px_0px_#000000] flex flex-col gap-3 font-sans max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b-2 border-black pb-2">
+              <div className="flex items-center gap-2">
+                <Info className="w-5 h-5 text-black stroke-[2.5]" />
+                <h3 className="font-display font-bold text-sm sm:text-base uppercase tracking-tight">
+                  Información del Reto
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowChallengeInfoModal(false)}
+                className="p-1 hover:bg-neutral-100 border border-black cursor-pointer text-black"
+                title="Cerrar modal"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Pestañas si el ejercicio tiene lámina en el libro */}
+            {currentExercise.page && (
+              <div className="flex border-2 border-black bg-neutral-100 p-0.5 text-xs font-mono font-bold">
+                <button
+                  type="button"
+                  onClick={() => setChallengeModalTab('info')}
+                  className={`flex-1 py-1 text-center transition-colors cursor-pointer ${
+                    challengeModalTab === 'info'
+                      ? 'bg-black text-white shadow-xs'
+                      : 'text-neutral-700 hover:text-black'
+                  }`}
+                >
+                  Ficha Técnica & Instrucciones
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChallengeModalTab('book')}
+                  className={`flex-1 py-1 text-center transition-colors cursor-pointer ${
+                    challengeModalTab === 'book'
+                      ? 'bg-black text-white shadow-xs'
+                      : 'text-neutral-700 hover:text-black'
+                  }`}
+                >
+                  Lámina Original (P.{currentExercise.page})
+                </button>
+              </div>
+            )}
+
+            {challengeModalTab === 'book' && currentExercise.page ? (
+              <div className="flex-1 overflow-auto border-2 border-black bg-neutral-100 p-2 flex items-center justify-center min-h-[300px]">
+                {!imgError ? (
+                  <img
+                    src={`/extracted_pages/page_${String(currentExercise.page).padStart(2, '0')}.jpg`}
+                    alt={`Lámina Página ${currentExercise.page}`}
+                    onError={() => setImgError(true)}
+                    className="max-h-[60vh] object-contain border border-neutral-300 bg-white shadow-sm"
+                  />
+                ) : (
+                  <div className="p-4 text-center font-mono text-xs text-neutral-600">
+                    No se pudo cargar la imagen de la lámina original (Página {currentExercise.page}).
+                  </div>
+                )}
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between gap-2 bg-neutral-50 p-2.5 border border-black font-mono text-xs">
+                  <span className="font-black bg-black text-white px-2 py-0.5 text-xs">
+                    {currentExercise.code}
+                  </span>
+                  <span className="font-bold border border-black px-1.5 py-0.5 bg-white uppercase text-[10px]">
+                    Dificultad: {currentExercise.difficulty}
+                  </span>
+                </div>
+
+                <div>
+                  <h4 className="font-display font-black text-base text-black mb-1">
+                    {currentExercise.title}
+                  </h4>
+                  <p className="text-xs text-neutral-700 font-sans leading-relaxed">
+                    {currentExercise.desc}
+                  </p>
+                </div>
+
+                <div className="bg-neutral-50 border border-black p-2.5 font-mono text-[11px] space-y-2">
+                  <div>
+                    <strong className="block text-black uppercase text-[10px] tracking-wider mb-0.5">
+                      Instrucción didáctica:
+                    </strong>
+                    <span className="text-neutral-800">{currentExercise.instruction}</span>
+                  </div>
+                  <div>
+                    <strong className="block text-black uppercase text-[10px] tracking-wider mb-0.5">
+                      Qué se mide:
+                    </strong>
+                    <span className="text-neutral-800">{currentExercise.metrics}</span>
+                  </div>
+                  <div className="pt-1.5 border-t border-neutral-300 grid grid-cols-2 gap-2 text-[10px]">
+                    <div>
+                      <span className="text-neutral-500">Bloque:</span>{' '}
+                      <strong className="text-neutral-800">{currentExercise.block.split(':')[0]}</strong>
+                    </div>
+                    <div>
+                      <span className="text-neutral-500">Evaluación:</span>{' '}
+                      <strong className="text-neutral-800">
+                        {challenge.isSingleStrokeAutoEval ? 'Instantánea (auto)' : 'Manual'}
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            <div className="pt-2 border-t border-neutral-200 flex items-center justify-between">
+              <span className="text-[11px] font-mono text-neutral-500 truncate max-w-[280px]">
+                {currentExercise.code} · {currentExercise.title}
+              </span>
+              <button
+                onClick={() => setShowChallengeInfoModal(false)}
+                className="btn-ink px-4 py-1.5 text-xs font-mono font-bold uppercase cursor-pointer"
+              >
+                Entendido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Información de Fases Cinemáticas */}
+      {showKinematicsInfoModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-fade-in">
+          <div className="bg-white border-3 border-black p-4 sm:p-5 max-w-lg w-full shadow-[6px_6px_0px_#000000] flex flex-col gap-3 font-sans max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b-2 border-black pb-2">
+              <div className="flex items-center gap-2">
+                <Info className="w-5 h-5 text-black stroke-[2.5]" />
+                <h3 className="font-display font-bold text-sm sm:text-base uppercase tracking-tight">
+                  Fases Cinemáticas del Trazo
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowKinematicsInfoModal(false)}
+                className="p-1 hover:bg-neutral-100 border border-black cursor-pointer text-black"
+                title="Cerrar modal"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-neutral-700 font-sans leading-relaxed">
+              El dibujo profesional exige desacoplar primero y coordinar después la <strong>precisión espacial</strong> y la <strong>velocidad balística</strong>. Entrenar en 3 fases evita el vicio de dibujar con titubeos o frenadas:
+            </p>
+
+            <div className="space-y-2.5 font-mono text-xs">
+              {/* Fase 1 */}
+              <div className="border border-black p-2.5 bg-neutral-50">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-black bg-black text-white px-1.5 py-0.5 text-[11px] uppercase">
+                    1. Precisión
+                  </span>
+                  <span className="text-[10px] text-neutral-600 font-bold uppercase">Ritmo Libre</span>
+                </div>
+                <p className="font-sans text-[11px] text-neutral-700 mb-1">
+                  <strong>Sentido:</strong> Calibrar el control motriz fino conectando inicio y meta con fidelidad a la trayectoria geométrica.
+                </p>
+                <div className="text-[10px] text-neutral-600 bg-white border border-neutral-300 p-1.5">
+                  • <em>Valores & Criterio:</em> No hay penalización por lentitud. La nota prioriza que no te desvíes del eje ni te pases de los puntos.
+                </div>
+              </div>
+
+              {/* Fase 2 */}
+              <div className="border border-black p-2.5 bg-neutral-50">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-black bg-black text-white px-1.5 py-0.5 text-[11px] uppercase">
+                    2. Fluidez
+                  </span>
+                  <span className="text-[10px] text-neutral-600 font-bold uppercase">Ritmo Continuo</span>
+                </div>
+                <p className="font-sans text-[11px] text-neutral-700 mb-1">
+                  <strong>Sentido:</strong> Automatizar la continuidad del trazo, erradicando micro-paradas, titubeos o dudas en el lápiz.
+                </p>
+                <div className="text-[10px] text-neutral-600 bg-white border border-neutral-300 p-1.5">
+                  • <em>Valores & Criterio:</em> Velocidad constante y sostenida. Penaliza frenazos antes de tocar la diana final.
+                </div>
+              </div>
+
+              {/* Fase 3 */}
+              <div className="border border-black p-2.5 bg-neutral-50">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-black bg-black text-white px-1.5 py-0.5 text-[11px] uppercase">
+                    3. Velocidad
+                  </span>
+                  <span className="text-[10px] text-neutral-600 font-bold uppercase">Disparo Rápido</span>
+                </div>
+                <p className="font-sans text-[11px] text-neutral-700 mb-1">
+                  <strong>Sentido:</strong> Gesto balístico rápido desde el hombro / codo (técnica de "ghosting") con total confianza.
+                </p>
+                <div className="text-[10px] text-neutral-600 bg-white border border-neutral-300 p-1.5">
+                  • <em>Valores & Criterio:</em> Exige alta velocidad media (&gt; 400-600 px/s) manteniendo la puntería hacia el punto diana.
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-neutral-200 flex justify-end">
+              <button
+                onClick={() => setShowKinematicsInfoModal(false)}
+                className="btn-ink px-4 py-1.5 text-xs font-mono font-bold uppercase cursor-pointer"
+              >
+                Entendido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

@@ -68,3 +68,17 @@ El nivel 8 introduce el cálculo de **sombras arrojadas por luz puntual**:
      $$S = L' + \frac{z_L}{z_L - z_{top}} \cdot (V_{base} - L')$$
 - **Malla Cuadrada de Suelo (`hasGroundGrid`)**:
   Dibuja una cuadrícula sutil en el suelo con líneas finas convergentes que orientan al usuario para visualizar el plano horizontal de contacto.
+
+---
+
+## 5. Motor de Perspectiva 3D (`src/lib/perspective3d/`)
+
+A partir de la versión v0.4.0, Paplitz incorpora un subsistema de perspectiva cónica completa a **3 puntos de fuga** para primitivas complejas:
+- **Primitivas Paramétricas**: Cubos, losas alargadas, torres verticales, cilindros con tapas elípticas, conos, pirámides, cuñas triangulares y escalones.
+- **Cámara Sintética 3D (`PerspectiveCamera`)**:
+  - Matriz de vista y traslación basada en `target`, `eye`, vector `up`, distancia focal y ángulo de inclinación / cabeceo (*pitch* y *yaw*).
+  - Proyección de vértices tridimensionales a coordenadas de pantalla normalizadas con cálculo analítico de los 3 puntos de fuga ($VP_1$, $VP_2$, $VP_3$) en el infinito proyectivo.
+- **Evaluador de Convergencia Espacial (`evaluator3d.ts`)**:
+  - Reconstruye aristas candidatas a partir de trazos y calcula la distancia angular de convergencia hacia el punto de fuga teórico correspondiente.
+  - Genera informes de telemetría con vectores de error angular en radianes y grados para diagnóstico de precisión geométrica.
+

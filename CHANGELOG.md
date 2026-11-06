@@ -4,6 +4,48 @@ All notable changes, new features, bug fixes, and UX improvements to the Paplitz
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] — 2026-11-06
+
+### 🚀 Mega-Actualización: Laboratorio 3D Dinámico, Lienzo Espacial Full-Bleed & Minijuegos Integrados
+
+Sincronización oficial de las innovaciones validadas en el entorno de desarrollo y pruebas (`drawing-lab`), incorporando el nuevo Laboratorio 3D de tres puntos de fuga, la integración espacial del lienzo de práctica y la unificación de minijuegos arcade.
+
+#### 📦 Laboratorio de Perspectiva 3D Dinámica (`Lab 3D`)
+- **Visualizador y Entrenador 3D Realista**: Nuevo modo de práctica y deducción espacial basado en perspectiva con 3 puntos de fuga, horizonte nivelado y escorzo vertical natural.
+- **Catálogo de Primitivas Técnicas**: Cubo, cilindro, cono, pirámide, prisma regular, toroide/anillo y cápsula con cálculo dinámico de siluetas tangentes dependientes de la cámara.
+- **Alineación Estética Neobrutalista**: Pestaña y panel de Lab 3D completamente integrados en la estética monocromática/tinta de Paplitz (sin colores azules ni acentos disonantes).
+- **Herramientas de Corrección y Visualización 3D**:
+  - Modo de visión cíclico multi-etapa (ambos, solo solución, solo dibujo, apagado).
+  - Selector de primitivas flotante con 3 estados de asistencia visual (apagado, aristas base, vértices guía).
+  - Trazado de líneas de construcción técnicas con trazo encadenado diferenciado (`[16, 5, 2.5, 5]`) y gris técnico.
+  - Generador de nuevos ángulos aleatorios en barra flotante inferior.
+  - Integración completa con el Modo Récord (REC) para registrar y exportar ejercicios 3D.
+
+#### 🎨 Lienzo de Práctica Espacial Full-Bleed & HUDs Flotantes
+- **Lienzo al 100% del Espacio**: El área de dibujo ocupa todo el viewport disponible, eliminando márgenes muertos y contenedores encajonados.
+- **Botón Docked Unificado**: Botón superior izquierdo anclado al borde que unifica el control del panel lateral y el badge del nivel activo.
+- **HUDs Anclados al Lienzo**: Indicadores flotantes de Fases (`F: [1][2][3]`) y Maestría (`★★★`) anclados directamente sobre los límites del lienzo a la misma altura horizontal.
+- **Badge de Nota Cuadrado Compacto**: Calificación post-evaluación en tarjeta cuadrada compacta de alto contraste (`Nota` + `XX%` + `Aprobado/Excelente/Reintentar`) ubicada en la esquina superior derecha del dibujo.
+- **Barra de Herramientas Flotante**: Controles de trazo (Deshacer, Borrar, REC, Comprobar / Siguiente, Auto-avance) suspendidos en una barra neobrutalista inferior adaptada a tablets y pantallas táctiles.
+
+#### 🎮 Unificación de Minijuegos en la Arena de Práctica
+- **Arena Central Compartida**: Los modos Blitz 60s, Fiebre de Tiempo, Supervivencia y Sprint 5 Cubos se ejecutan directamente en el lienzo central de alta resolución mediante `CubeMinigamePractice`.
+- **Panel Lateral de Minijuegos**: Nuevo `MinigameSidebarPanel` con cronómetros en vivo, contador de vidas con corazones, racha de combos y récords históricos.
+- **Stroke Rush y Línea Fantasma**:
+  - Zona segura de generación (100% visible sin solapamientos con botones flotantes).
+  - Nuevos presets de práctica (vertical, círculo, caja) con selector de mutación.
+
+#### 📈 Ampliación del Modo Récord (REC) & Modal de Límite
+- **Límite Ampliado a 500 Ejercicios**: Capacidad ampliada de 100 a 500 registros en memoria por sesión.
+- **Modal Preventivo de Límite**: `SessionRecordLimitModal` alerta al usuario con opciones de copiado Markdown o descarga JSON cuando la sesión alcanza el cupo máximo.
+
+#### 📐 Geometría y Currículum Volumétrico
+- **Bloques Compuestos y Proporciones en Unidad 3**: Soporte para monolitos verticales (`tower`), losas apaisadas (`slab`), cierre de tapa (`missing_lid`) y bloques escalonados (`step_block`).
+- **Nuevos Retos de Calistenia**:
+  - Líneas largas de hombro en `C1.5` y `C2.7`.
+  - Polígonos concéntricos con ejes radiales en `C4.4` con evaluador `evaluateConcentricPolygonSubmission`.
+  - Posicionamiento lateral adaptativo de números diana basado en las normales de la trayectoria.
+
 ## [0.3.0] — 2026-10-20
 
 ### 🌟 3-Tier Mastery System (★☆☆, ★★☆, ★★★), Unit 2 Progression Gate & Stylus Biomechanics

@@ -62,6 +62,11 @@ const DetailedMatrixCell: React.FC<{
       forceSide: lesson.forceSide,
       isShadowLevel: lesson.isShadowLevel,
       hasGroundGrid: lesson.hasGroundGrid,
+      boxType: lesson.boxType,
+      hasHeightGuide: lesson.hasHeightGuide,
+      hasHorizonGuide: lesson.hasHorizonGuide,
+      viewpoint: lesson.viewpoint,
+      rotationAngle: lesson.rotationAngle,
     });
   }, [cell.seed, lesson]);
 
@@ -225,20 +230,54 @@ const DetailedMatrixCell: React.FC<{
                 );
               })}
 
-            {/* 3. Cara dada inicial (4 aristas iniciales en negro técnico para verificar alineación perfecta) */}
+            {/* 3. Cara dada inicial o aristas iniciales */}
             <g>
-              <polygon
-                points={givenPts}
-                fill={viewMode === 'ideal-only' ? '#F0F0F0' : 'none'}
-                stroke="#000000"
-                strokeWidth="3.5"
-                strokeLinejoin="round"
-              />
+              {challenge.givenFace.vertices.length === 4 ? (
+                <polygon
+                  points={givenPts}
+                  fill={viewMode === 'ideal-only' ? '#F0F0F0' : 'none'}
+                  stroke="#000000"
+                  strokeWidth="3.5"
+                  strokeLinejoin="round"
+                />
+              ) : (
+                challenge.givenEdges.map((edge, eIdx) => {
+                  const p1 = toSvg(challenge.vertices2D[edge.start]);
+                  const p2 = toSvg(challenge.vertices2D[edge.end]);
+                  return (
+                    <line
+                      key={eIdx}
+                      x1={p1.x}
+                      y1={p1.y}
+                      x2={p2.x}
+                      y2={p2.y}
+                      stroke="#000000"
+                      strokeWidth="3.5"
+                      strokeLinecap="round"
+                    />
+                  );
+                })
+              )}
               {challenge.givenFace.vertices.map((idx) => {
                 const pt = toSvg(challenge.vertices2D[idx]);
                 return <circle key={idx} cx={pt.x} cy={pt.y} r="4.5" fill="#000000" />;
               })}
             </g>
+
+            {/* Guía de altura técnica H */}
+            {challenge.heightGuide && (() => {
+              const hg = challenge.heightGuide;
+              const offsetSide = challenge.givenSide === 'left' ? 24 : -24;
+              const pBottom = toSvg({ x: hg.x + offsetSide, y: hg.yBottom });
+              const pTop = toSvg({ x: hg.x + offsetSide, y: hg.yTop });
+              return (
+                <g>
+                  <line x1={pBottom.x} y1={pBottom.y} x2={pTop.x} y2={pTop.y} stroke="#4B5563" strokeWidth="1.5" strokeDasharray="4 3" />
+                  <circle cx={pBottom.x} cy={pBottom.y} r="3" fill="#4B5563" />
+                  <circle cx={pTop.x} cy={pTop.y} r="3" fill="#4B5563" />
+                </g>
+              );
+            })()}
 
             {/* 4. Aristas objetivo ideales de corrección (5 aristas restantes en rojo discontinuo con resalte blanco) */}
             {challenge.targetEdges.map((edge, eIdx) => {

@@ -1,4 +1,4 @@
-import { PerspectiveMode, AxesMode } from './geometry';
+import { PerspectiveMode, AxesMode, BoxType, ViewpointMode, RotationAngleMode } from './geometry';
 import { ALL_SINGLE_STROKE_EXERCISES, LabExerciseDef } from './strokeTypes';
 
 export interface LessonNode {
@@ -13,13 +13,18 @@ export interface LessonNode {
   forceSide?: 'left' | 'right';
   status: 'completed' | 'current' | 'locked';
   score?: number;
+  masteryLevel?: 1 | 2 | 3; // 1: Bronce (Precisión), 2: Plata (Fluidez), 3: Oro / Corona (Velocidad)
   xpReward: number;
   isShadowLevel?: boolean;
   hasGroundGrid?: boolean;
   isCalisthenics?: boolean;
   exerciseDef?: LabExerciseDef;
   variants?: LabExerciseDef[];
-  masteryLevel?: 1 | 2 | 3;
+  boxType?: BoxType;
+  viewpoint?: ViewpointMode;
+  rotationAngle?: RotationAngleMode;
+  hasHeightGuide?: boolean;
+  hasHorizonGuide?: boolean;
 }
 
 export interface Unit {
@@ -73,8 +78,24 @@ function createGroupedCalisthenicsNode(
   };
 }
 
+function isCoreGuidedVariant(e: LabExerciseDef): boolean {
+  if (e.singleStrokeConfig?.guideType === 'points_only') return false;
+  // En direcciones horizontales y verticales puras (D5, D6, D7, D8),
+  // la versión 5 (total_random) es matemáticamente idéntica a la 4 (position_length)
+  // porque la rotación angular está bloqueada a 0°/90°.
+  // La excluimos para eliminar la repetición redundante.
+  const id = e.id || '';
+  if (
+    (id.startsWith('d5_') || id.startsWith('d6_') || id.startsWith('d7_') || id.startsWith('d8_')) &&
+    id.endsWith('_05')
+  ) {
+    return false;
+  }
+  return true;
+}
+
 /**
- * Construye las 5 Unidades Pedagógicas de Calistenia Agrupadas (18 Niveles con 237 Variantes Dinámicas)
+ * Construye las 5 Unidades Pedagógicas de Calistenia Agrupadas (Fading Scaffolding: Fase 3 es el test sin guía)
  */
 function buildCalisthenicsModuleUnits(): Unit[] {
   const all = ALL_SINGLE_STROKE_EXERCISES;
@@ -95,7 +116,7 @@ function buildCalisthenicsModuleUnits(): Unit[] {
           'Mantén una presión constante de pluma durante todo el recorrido.',
           'Ajusta la postura antes de cada trazo para alinearte con la dirección solicitada.',
         ],
-        diagramNotes: 'Primero domina la dirección natural de izquierda a derecha antes de pasar a la inversa.',
+        diagramNotes: 'Domina los ejes ortogonales naturales (→ y ↑) antes de abordar los recorridos inversos (↓ y ←).',
       },
       nodes: [
         createGroupedCalisthenicsNode(
@@ -103,40 +124,50 @@ function buildCalisthenicsModuleUnits(): Unit[] {
           'C1.1',
           'Horizontales Naturales (→)',
           'Deslizamiento de izquierda a derecha con control de inercia y longitud',
-          all.filter((e) => e.id?.startsWith('d5_')),
-          globalIndex++,
-          'easy',
-          25
-        ),
-        createGroupedCalisthenicsNode(
-          'cal_u1_d6',
-          'C1.2',
-          'Horizontales Inversas (←)',
-          'Recogida de derecha a izquierda con frenado seco en diana',
-          all.filter((e) => e.id?.startsWith('d6_')),
+          all.filter((e) => e.id?.startsWith('d5_') && isCoreGuidedVariant(e) && e.singleStrokeConfig?.variationType !== 'multi_line'),
           globalIndex++,
           'easy',
           25
         ),
         createGroupedCalisthenicsNode(
           'cal_u1_d7',
-          'C1.3',
+          'C1.2',
           'Verticales Ascendentes (↑)',
           'Empuje vertical de abajo a arriba con alineación del antebrazo',
-          all.filter((e) => e.id?.startsWith('d7_')),
+          all.filter((e) => e.id?.startsWith('d7_') && isCoreGuidedVariant(e) && e.singleStrokeConfig?.variationType !== 'multi_line'),
+          globalIndex++,
+          'easy',
+          25
+        ),
+        createGroupedCalisthenicsNode(
+          'cal_u1_d8',
+          'C1.3',
+          'Verticales Descendentes (↓)',
+          'Tirón vertical hacia el cuerpo con parada milimétrica',
+          all.filter((e) => e.id?.startsWith('d8_') && isCoreGuidedVariant(e) && e.singleStrokeConfig?.variationType !== 'multi_line'),
           globalIndex++,
           'medium',
           30
         ),
         createGroupedCalisthenicsNode(
-          'cal_u1_d8',
+          'cal_u1_d6',
           'C1.4',
-          'Verticales Descendentes (↓)',
-          'Tirón vertical hacia el cuerpo con parada milimétrica',
-          all.filter((e) => e.id?.startsWith('d8_')),
+          'Horizontales Inversas (←)',
+          'Recogida de derecha a izquierda con frenado seco en diana',
+          all.filter((e) => e.id?.startsWith('d6_') && isCoreGuidedVariant(e) && e.singleStrokeConfig?.variationType !== 'multi_line'),
           globalIndex++,
           'medium',
           30
+        ),
+        createGroupedCalisthenicsNode(
+          'cal_u1_d_long',
+          'C1.5',
+          'Trazos Largos de Hombro (→ / ↑)',
+          'Líneas extensas de borde a borde para soltar el brazo entero',
+          all.filter((e) => e.id?.startsWith('d_long_h') || e.id?.startsWith('d_long_v')),
+          globalIndex++,
+          'medium',
+          40
         ),
       ],
     },
@@ -145,7 +176,7 @@ function buildCalisthenicsModuleUnits(): Unit[] {
       number: 2,
       title: 'Diagonales Principales y Fugas de Perspectiva',
       description: 'Líneas dinámicas a 45° y fugas sutiles a 15°-20° para proyectar aristas en escorzo y planos oblicuos.',
-      bookChapter: 'Paplitz Calisthenics — Cuadrantes Diagonales D1 (↗), D3 (↘), D2 (↙), D4 (↖) y Fugas D9, D10',
+      bookChapter: 'Paplitz Calisthenics — Cuadrantes Diagonales D1 (↗), D3 (↘), D2 (↙), D4 (↖), Fugas D9, D10 y Gran Diagonal C2.7',
       guidebookContent: {
         title: 'Cuadrantes Diagonales y Líneas de Fuga',
         axioms: [
@@ -161,7 +192,7 @@ function buildCalisthenicsModuleUnits(): Unit[] {
           'C2.1',
           'Diagonal Ascendente Natural (↗)',
           'Lanzamiento a 45°-60° de abajo-izquierda a arriba-derecha',
-          all.filter((e) => e.id?.startsWith('d1_') && e.singleStrokeConfig?.variationType !== 'multi_line'),
+          all.filter((e) => e.id?.startsWith('d1_') && isCoreGuidedVariant(e) && e.singleStrokeConfig?.variationType !== 'multi_line'),
           globalIndex++,
           'easy',
           30
@@ -171,7 +202,7 @@ function buildCalisthenicsModuleUnits(): Unit[] {
           'C2.2',
           'Diagonal Inversa al Pecho (↙)',
           'Flexión de arriba-derecha a abajo-izquierda con muñeca libre',
-          all.filter((e) => e.id?.startsWith('d2_') && e.singleStrokeConfig?.variationType !== 'multi_line'),
+          all.filter((e) => e.id?.startsWith('d2_') && isCoreGuidedVariant(e) && e.singleStrokeConfig?.variationType !== 'multi_line'),
           globalIndex++,
           'medium',
           30
@@ -181,7 +212,7 @@ function buildCalisthenicsModuleUnits(): Unit[] {
           'C2.3',
           'Diagonal Descendente Externa (↘)',
           'Empuje diagonal hacia afuera de arriba-izquierda a abajo-derecha',
-          all.filter((e) => e.id?.startsWith('d3_') && e.singleStrokeConfig?.variationType !== 'multi_line'),
+          all.filter((e) => e.id?.startsWith('d3_') && isCoreGuidedVariant(e) && e.singleStrokeConfig?.variationType !== 'multi_line'),
           globalIndex++,
           'medium',
           30
@@ -191,7 +222,7 @@ function buildCalisthenicsModuleUnits(): Unit[] {
           'C2.4',
           'Diagonal de Empuje Superior (↖)',
           'Ascenso hacia la esquina superior izquierda de abajo-derecha',
-          all.filter((e) => e.id?.startsWith('d4_') && e.singleStrokeConfig?.variationType !== 'multi_line'),
+          all.filter((e) => e.id?.startsWith('d4_') && isCoreGuidedVariant(e) && e.singleStrokeConfig?.variationType !== 'multi_line'),
           globalIndex++,
           'medium',
           35
@@ -201,7 +232,7 @@ function buildCalisthenicsModuleUnits(): Unit[] {
           'C2.5',
           'Aristas en Fuga Suave Derecha (↗ ~18°)',
           'Pendiente baja de perspectiva cónica hacia el punto de fuga derecho',
-          all.filter((e) => e.id?.startsWith('d9_') && e.singleStrokeConfig?.variationType !== 'multi_line'),
+          all.filter((e) => e.id?.startsWith('d9_') && isCoreGuidedVariant(e) && e.singleStrokeConfig?.variationType !== 'multi_line'),
           globalIndex++,
           'hard',
           40
@@ -211,10 +242,20 @@ function buildCalisthenicsModuleUnits(): Unit[] {
           'C2.6',
           'Aristas en Fuga Suave Izquierda (↖ ~18°)',
           'Pendiente baja de perspectiva cónica hacia el punto de fuga izquierdo',
-          all.filter((e) => e.id?.startsWith('d10_') && e.singleStrokeConfig?.variationType !== 'multi_line'),
+          all.filter((e) => e.id?.startsWith('d10_') && isCoreGuidedVariant(e) && e.singleStrokeConfig?.variationType !== 'multi_line'),
           globalIndex++,
           'hard',
           40
+        ),
+        createGroupedCalisthenicsNode(
+          'cal_u2_d_long',
+          'C2.7',
+          'Gran Diagonal Ascendente (↗)',
+          'Trazo continuo de esquina a esquina cruzando todo el lienzo',
+          all.filter((e) => e.id?.startsWith('d_long_diag')),
+          globalIndex++,
+          'medium',
+          45
         ),
       ],
     },
@@ -239,7 +280,7 @@ function buildCalisthenicsModuleUnits(): Unit[] {
           'C3.1',
           'Roseta Radial Divergente 360° (☼)',
           'Disparo de 8 y 12 radios regulares desde el centro hacia las dianas exteriores',
-          all.filter((e) => e.id?.startsWith('d11_')),
+          all.filter((e) => e.id?.startsWith('d11_') && isCoreGuidedVariant(e)),
           globalIndex++,
           'medium',
           40
@@ -249,7 +290,7 @@ function buildCalisthenicsModuleUnits(): Unit[] {
           'C3.2',
           'Roseta Radial Convergente 360° (❂)',
           'Recogida de radios perimetrales hacia el núcleo central común',
-          all.filter((e) => e.id?.startsWith('d12_')),
+          all.filter((e) => e.id?.startsWith('d12_') && isCoreGuidedVariant(e)),
           globalIndex++,
           'medium',
           40
@@ -269,17 +310,18 @@ function buildCalisthenicsModuleUnits(): Unit[] {
     {
       id: 'unit-cal-4',
       number: 4,
-      title: 'Carriles de Ritmo y Espaciado Interlineal',
-      description: 'Consistencia de trama en bandas acotadas: espaciado x y x/2, diagonales, quiebros en V, relámpagos y ondas.',
-      bookChapter: 'Paplitz Calisthenics — Carriles y Espaciado Rítmico E1.1 a E17.1',
+      title: 'Carriles de Ritmo, Espaciado y Polígonos Concéntricos',
+      description: 'Consistencia de trama en bandas y figuras concéntricas: espaciado x y x/2, quiebros, ondas y polígonos anidados.',
+      bookChapter: 'Paplitz Calisthenics — Carriles y Polígonos Concéntricos C4.1 a C4.4',
       guidebookContent: {
-        title: 'Espaciado Interlineal y Muros de Carril',
+        title: 'Espaciado Interlineal y Polígonos Concéntricos',
         axioms: [
           'Observa la muestra entintada a la izquierda y replica el paso exacto dentro de los carriles.',
           'En quiebros angulares (V, chevron, zigzag), detén el trazo secamente en el vértice antes de cambiar de dirección.',
-          'Respeta los límites superior e inferior de cada franja sin salirte ni quedarte corto.',
+          'En los polígonos concéntricos (△ / ▢ / ⬡), ancla cada vértice en los ejes radiales y mantén el paso constante.',
+          'Respeta los límites de cada figura sin salirte ni deformar el paralelismo entre caras.',
         ],
-        diagramNotes: 'El espaciado regular crea valores tonales homogéneos fundamentales para el render.',
+        diagramNotes: 'El espaciado regular y el paralelismo concéntrico crean ritmos tonales y geométricos homogéneos.',
       },
       nodes: [
         createGroupedCalisthenicsNode(
@@ -326,6 +368,16 @@ function buildCalisthenicsModuleUnits(): Unit[] {
           'hard',
           50
         ),
+        createGroupedCalisthenicsNode(
+          'cal_u4_concentric',
+          'C4.4',
+          'Polígonos Concéntricos y Fugas Radiales (△ / ▢ / ⬡)',
+          'Triángulos, cuadrados, diamantes y trapecios con paso y ángulos variables',
+          all.filter((e) => e.id?.startsWith('cp_')),
+          globalIndex++,
+          'hard',
+          55
+        ),
       ],
     },
     {
@@ -349,7 +401,7 @@ function buildCalisthenicsModuleUnits(): Unit[] {
           'C5.1',
           'Control de Curvatura: Arcos en C (⌒)',
           'Arcos cóncavos y convexos de flecha suave, media y pronunciada',
-          all.filter((e) => e.id?.startsWith('cc_')),
+          all.filter((e) => e.id?.startsWith('cc_') && isCoreGuidedVariant(e)),
           globalIndex++,
           'medium',
           35
@@ -359,7 +411,7 @@ function buildCalisthenicsModuleUnits(): Unit[] {
           'C5.2',
           'Puntos de Inflexión: Ondas en S (∿)',
           'Transición de doble curvatura continua sin aristas vivas ni saltos',
-          all.filter((e) => e.id?.startsWith('cs_')),
+          all.filter((e) => e.id?.startsWith('cs_') && isCoreGuidedVariant(e)),
           globalIndex++,
           'hard',
           45
@@ -372,7 +424,7 @@ function buildCalisthenicsModuleUnits(): Unit[] {
 export const MODULE_CALISTHENICS: ModuleTrack = {
   id: 'module-calisthenics',
   name: 'Líneas, Trazos & Calistenia',
-  subtitle: '237 retos dinámicos de biomecánica: precisión, fluidez, velocidad y ritmo',
+  subtitle: 'Retos dinámicos de biomecánica: precisión, fluidez, velocidad y andamiaje sin guía',
   icon: 'pen-tool',
   units: buildCalisthenicsModuleUnits(),
 };
@@ -441,8 +493,8 @@ export const MODULE_PARALLELEPIPEDS: ModuleTrack = {
         {
           id: 'u1-n4',
           code: '1.4',
-          title: 'Reto Libre (Sin Ejes)',
-          subtitle: 'Completa el cubo a 2 puntos sin asistencia',
+          title: 'Reto Isométrico Suave (Sin Ejes)',
+          subtitle: 'Cubo sereno sin guías a 2 puntos (Ángulos paralelos ~14°)',
           type: 'rush',
           difficulty: 'easy',
           perspectiveMode: 'gentle',
@@ -455,63 +507,72 @@ export const MODULE_PARALLELEPIPEDS: ModuleTrack = {
     {
       id: 'unit-2',
       number: 2,
-      title: 'Perspectiva Clásica (2 Puntos de Fuga)',
-      description: 'El formato estándar: mayor variedad de ángulos, alturas de horizonte y control de escorzo.',
+      title: 'Perspectiva Cónica (2 Puntos de Fuga)',
+      description: 'Convergencia cónica acentuada, contrastes de punto de vista y rotaciones angulares asimétricas.',
       bookChapter: 'Koos Eissen — Capítulo 3: Viewpoint & Convergence',
       guidebookContent: {
         title: 'Control del Escorzo y Puntos de Fuga',
         axioms: [
           'Cuanto más se aleja una cara hacia su punto de fuga, más se estrechan sus aristas verticales.',
-          'Comprueba que las líneas de la misma familia converjan hacia el mismo punto en el horizonte.',
+          'Comprueba que las líneas de la misma familia converjan visiblemente hacia la línea de horizonte.',
+          'En vista cenital (ojo de pájaro), la tapa superior se abre ampliamente.',
+          'En contrapicado (ojo de hormiga), la tapa se aplana en un escorzo rasante extremo.',
         ],
-        diagramNotes: 'La cara superior debe verse como un romboide proporcionado.',
+        diagramNotes: 'La inclinación asimétrica de caras (30°/60°) resalta una cara frontal mientras la otra se comprime.',
       },
       nodes: [
         {
           id: 'u2-n1',
           code: '2.1',
-          title: 'Perspectiva Normal',
-          subtitle: 'Convergencia y proporciones naturales',
+          title: 'Convergencia Cónica Natural',
+          subtitle: '2 puntos de fuga marcados con convergencia visible al horizonte',
           type: 'standard',
           difficulty: 'medium',
           perspectiveMode: 'normal',
+          viewpoint: 'normal',
           axesMode: 'none',
+          hasHorizonGuide: true,
           status: 'locked',
           xpReward: 30,
         },
         {
           id: 'u2-n2',
           code: '2.2',
-          title: 'Variaciones de Altura',
-          subtitle: 'Cubos vistos desde arriba y abajo',
+          title: 'Puntos de Vista Opuestos',
+          subtitle: 'Cenital amplio (ojo de pájaro) vs Contrapicado rasante (ojo de hormiga)',
           type: 'standard',
           difficulty: 'medium',
           perspectiveMode: 'normal',
+          viewpoint: 'dynamic',
           axesMode: 'none',
+          hasHorizonGuide: true,
           status: 'locked',
           xpReward: 35,
         },
         {
           id: 'u2-n3',
           code: '2.3',
-          title: 'Ángulos Pronunciados',
-          subtitle: 'Control del escorzo en caras laterales',
+          title: 'Giro Angular Asimétrico (30°/60°)',
+          subtitle: 'Una cara frontal dominante y la otra en escorzo pronunciado',
           type: 'standard',
           difficulty: 'medium',
           perspectiveMode: 'normal',
+          rotationAngle: 'dynamic',
           axesMode: 'none',
+          hasHorizonGuide: true,
           status: 'locked',
           xpReward: 40,
         },
         {
           id: 'u2-n4',
           code: '2.4',
-          title: 'Examen de Nivel',
-          subtitle: 'Supera el reto clásico con >70% de precisión',
+          title: 'Examen de Perspectiva Cónica',
+          subtitle: 'Supera el reto clásico a 2 puntos con >70% de precisión',
           type: 'exam',
           difficulty: 'medium',
           perspectiveMode: 'normal',
           axesMode: 'none',
+          hasHorizonGuide: true,
           status: 'locked',
           xpReward: 60,
         },
@@ -520,41 +581,90 @@ export const MODULE_PARALLELEPIPEDS: ModuleTrack = {
     {
       id: 'unit-3',
       number: 3,
-      title: 'Perspectiva Dinámica y Dramática',
-      description: 'Puntos de fuga más cercanos con escorzo pronunciado para bocetado rápido de producto.',
-      bookChapter: 'Koos Eissen — Capítulo 6: Fast and Fearless',
+      title: 'Tipologías, Alturas & Bloques Compuestos',
+      description: 'Domina torres con eje de cota, losas bajas, cierre de tapas y bloques compuestos con cubo adyacente.',
+      bookChapter: 'Koos Eissen — Capítulo 6: Fast and Fearless & Proportion Control',
       guidebookContent: {
-        title: 'Perspectiva Acelerada',
+        title: 'Proporciones Volumétricas & Bloques Compuestos',
         axioms: [
-          'Útil para darle impacto a objetos en diseño de producto.',
-          'Requiere trazos firmes sin repasar dos veces la misma línea.',
+          'Un monolito o torre vertical (1:1:3) incluye un eje de cota H para delimitar con exactitud su coronación.',
+          'Una losa o plataforma horizontal (3:3:1) entrena el control de planos de apoyo amplios y escorzo horizontal.',
+          'En el cierre de tapa, une los 4 vértices superiores manteniendo la convergencia estricta hacia VPL y VPR.',
+          'En bloques compuestos (escalonados), el cubo secundario comparte el plano de suelo y la pared de unión del volumen principal.',
         ],
-        diagramNotes: 'Mantén la calma y confía en el primer trazo.',
+        diagramNotes: 'En cajas esbeltas, alinea la vertical central antes de proyectar las aristas de profundidad.',
       },
       nodes: [
         {
           id: 'u3-n1',
           code: '3.1',
-          title: 'Escorzo Acelerado',
-          subtitle: 'Puntos de fuga cercanos para bocetado ágil',
+          title: 'Torre con Eje de Altura (H)',
+          subtitle: 'Proporción esbelta 1:1:3 guiada por eje de cota vertical',
           type: 'standard',
-          difficulty: 'hard',
-          perspectiveMode: 'dynamic',
-          axesMode: 'none',
+          difficulty: 'medium',
+          perspectiveMode: 'normal',
+          boxType: 'tower',
+          hasHeightGuide: true,
+          hasHorizonGuide: true,
+          axesMode: 'height_axis',
           status: 'locked',
           xpReward: 45,
         },
         {
           id: 'u3-n2',
           code: '3.2',
-          title: 'Desafío Dinámico Pro',
-          subtitle: 'Trazos firmes en perspectiva extrema',
+          title: 'Losa / Plataforma Horizontal',
+          subtitle: 'Proporción apaisada 3:3:1 (Superficie de apoyo ancha)',
+          type: 'standard',
+          difficulty: 'medium',
+          perspectiveMode: 'normal',
+          boxType: 'slab',
+          axesMode: 'none',
+          hasHorizonGuide: true,
+          status: 'locked',
+          xpReward: 50,
+        },
+        {
+          id: 'u3-n3',
+          code: '3.3',
+          title: 'Cierre de Tapa Superior',
+          subtitle: 'Estructura vertical dada: completa el techo en fuga exacta',
+          type: 'standard',
+          difficulty: 'medium',
+          perspectiveMode: 'normal',
+          boxType: 'missing_lid',
+          axesMode: 'none',
+          hasHorizonGuide: true,
+          status: 'locked',
+          xpReward: 55,
+        },
+        {
+          id: 'u3-n4',
+          code: '3.4',
+          title: 'Bloque Escalonado (Cubo Doble)',
+          subtitle: 'Cubo principal con cubo chico acoplado en el suelo lateral',
           type: 'rush',
           difficulty: 'hard',
-          perspectiveMode: 'dynamic',
+          perspectiveMode: 'normal',
+          boxType: 'step_block',
           axesMode: 'none',
+          hasHorizonGuide: true,
           status: 'locked',
           xpReward: 70,
+        },
+        {
+          id: 'u3-n5',
+          code: '3.5',
+          title: 'Examen de Proporción Espacial',
+          subtitle: 'Supera el reto de monolitos, losas y cajas libres con >70%',
+          type: 'exam',
+          difficulty: 'hard',
+          perspectiveMode: 'dynamic',
+          boxType: 'dynamic',
+          axesMode: 'none',
+          hasHorizonGuide: true,
+          status: 'locked',
+          xpReward: 85,
         },
       ],
     },
@@ -562,44 +672,80 @@ export const MODULE_PARALLELEPIPEDS: ModuleTrack = {
       id: 'unit-4',
       number: 4,
       title: 'Sombras Arrojadas & Iluminación Técnica',
-      description: 'Proyecta la sombra exacta de un cubo sólido sobre el plano horizontal a partir de un foco de luz L y su base L\'.',
+      description: 'Proyecta la sombra exacta sobre el plano horizontal a partir de un foco de luz L y su base L\'.',
       bookChapter: 'Scott Robertson & Koos Eissen — Capítulo 8: Shadow Projection in Perspective',
       guidebookContent: {
         title: 'Sombras Arrojadas en Perspectiva sobre Plano Horizontal',
         axioms: [
-          'El Foco L en el aire emite los rayos de luz a través de las esquinas superiores del cubo.',
-          'La Base L\' en el suelo proyecta los rayos de suelo a través de las esquinas de la base del cubo.',
+          'El Foco L en el aire emite los rayos de luz a través de las esquinas superiores de la caja.',
+          'La Base L\' en el suelo proyecta los rayos de suelo a través de las esquinas de apoyo.',
           'El punto donde se cortan el rayo de luz (desde L) y el de suelo (desde L\') es el vértice de sombra (S).',
-          'Une los vértices de sombra con las esquinas de apoyo del cubo para delimitar la silueta en el plano.',
+          'En torres altas la sombra se estira longitudinalmente; en losas bajas la sombra es compacta.',
         ],
-        diagramNotes: 'El mallado cuadrado del suelo te ayuda a visualizar la profundidad y el plano horizontal antes de proyectar.',
+        diagramNotes: 'El mallado cuadrado del suelo te ayuda a calibrar la profundidad antes de proyectar.',
       },
       nodes: [
         {
           id: 'u4-n1',
           code: '4.1',
-          title: 'Sombra con Suelo Guía',
-          subtitle: 'Proyección sobre mallado cuadrado de suelo horizontal',
+          title: 'Sombra del Cubo Equilibrado (1:1:1)',
+          subtitle: 'Proyección sobre cuadrícula de suelo para un cubo puro de lados iguales',
           type: 'standard',
           difficulty: 'medium',
           perspectiveMode: 'normal',
+          boxType: 'cube',
           axesMode: 'none',
+          hasHorizonGuide: true,
           status: 'locked',
-          xpReward: 80,
+          xpReward: 70,
           isShadowLevel: true,
           hasGroundGrid: true,
         },
         {
           id: 'u4-n2',
           code: '4.2',
-          title: 'Sombra Libre (Examen de Maestría)',
-          subtitle: 'Proyección sobre plano horizontal puro sin mallado de suelo',
+          title: 'Sombra de Torre Vertical',
+          subtitle: 'Proyección alargada para volumen esbelto sobre mallado de suelo',
+          type: 'standard',
+          difficulty: 'hard',
+          perspectiveMode: 'normal',
+          boxType: 'tower',
+          axesMode: 'none',
+          hasHorizonGuide: true,
+          status: 'locked',
+          xpReward: 80,
+          isShadowLevel: true,
+          hasGroundGrid: true,
+        },
+        {
+          id: 'u4-n3',
+          code: '4.3',
+          title: 'Sombra de Losa Horizontal',
+          subtitle: 'Proyección ancha y concentrada para plataforma plana sobre suelo',
+          type: 'standard',
+          difficulty: 'hard',
+          perspectiveMode: 'normal',
+          boxType: 'slab',
+          axesMode: 'none',
+          hasHorizonGuide: true,
+          status: 'locked',
+          xpReward: 85,
+          isShadowLevel: true,
+          hasGroundGrid: true,
+        },
+        {
+          id: 'u4-n4',
+          code: '4.4',
+          title: 'Examen de Sombra Libre (Maestría)',
+          subtitle: 'Proyección sin mallado de suelo con proporciones de caja variadas',
           type: 'exam',
           difficulty: 'hard',
           perspectiveMode: 'normal',
+          boxType: 'dynamic',
           axesMode: 'none',
+          hasHorizonGuide: true,
           status: 'locked',
-          xpReward: 100,
+          xpReward: 110,
           isShadowLevel: true,
           hasGroundGrid: false,
         },

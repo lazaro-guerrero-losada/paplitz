@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { CubeChallenge, Point2D } from '../lib/geometry';
 import { UserStroke, ValidationFeedback, countDetectedAristas } from '../lib/validation';
-import { Undo2, Trash2, Check, ArrowRight, AlertTriangle, CheckCircle, Clock, Zap, Copy, Download, X, Pen, Hand, ArrowDown, ArrowUp, Eye, EyeOff, FileText, PanelLeft, MessageSquare } from 'lucide-react';
+import { Undo2, Trash2, Check, ArrowRight, AlertTriangle, Clock, Copy, Download, X, Pen, Hand, Eye, FileText, PanelLeft, MessageSquare, Sparkles, PenTool } from 'lucide-react';
 import { buildDebugReport, copyReportToClipboard, downloadReportJson } from '../lib/debugReport';
 import { QuickCommentModal } from './QuickCommentModal';
 
@@ -59,28 +59,36 @@ function renderGroundGrid(
   v0: Point2D,
   v2: Point2D,
   v4: Point2D,
-  horizonY: number
+  horizonY: number,
+  exactVPL?: Point2D,
+  exactVPR?: Point2D
 ) {
   ctx.save();
   // Limitar el suelo al área por debajo del horizonte
   ctx.beginPath();
-  ctx.rect(0, horizonY + 25, width, height - (horizonY + 25));
+  ctx.rect(0, horizonY + 8, width, height - (horizonY + 8));
   ctx.clip();
 
-  ctx.strokeStyle = '#E2E2E2';
-  ctx.lineWidth = 0.8;
+  ctx.strokeStyle = '#ECECEC'; // Gris papel tenue y elegante
+  ctx.lineWidth = 0.75;
   ctx.setLineDash([]);
 
   // Puntos de fuga en el horizonte
-  const dyL = v2.y - v0.y;
-  const dxL = v2.x - v0.x;
-  const tL = (horizonY - v0.y) / (dyL || -0.001);
-  const VPL = { x: v0.x + tL * dxL, y: horizonY };
+  let VPL = exactVPL;
+  if (!VPL) {
+    const dyL = v2.y - v0.y;
+    const dxL = v2.x - v0.x;
+    const tL = (horizonY - v0.y) / (dyL || -0.001);
+    VPL = { x: v0.x + tL * dxL, y: horizonY };
+  }
 
-  const dyR = v4.y - v0.y;
-  const dxR = v4.x - v0.x;
-  const tR = (horizonY - v0.y) / (dyR || -0.001);
-  const VPR = { x: v0.x + tR * dxR, y: horizonY };
+  let VPR = exactVPR;
+  if (!VPR) {
+    const dyR = v4.y - v0.y;
+    const dxR = v4.x - v0.x;
+    const tR = (horizonY - v0.y) / (dyR || -0.001);
+    VPR = { x: v0.x + tR * dxR, y: horizonY };
+  }
 
   const distR_to_V4 = Math.hypot(v4.x - v0.x, v4.y - v0.y);
   const totalDistR = Math.hypot(VPR.x - v0.x, VPR.y - v0.y) || 1;
@@ -118,6 +126,165 @@ function renderGroundGrid(
     ctx.moveTo(VPR.x + dir.x * 0.35, VPR.y + dir.y * 0.35);
     ctx.lineTo(VPR.x + dir.x * 2.8, VPR.y + dir.y * 2.8);
     ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Dibuja la línea de horizonte y los puntos de fuga con líneas sutiles
+ * (Activado a partir del Bloque 2 en adelante para guiar el dibujo del cubo)
+ */
+function renderHorizonAndVanishingPoints(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  _height: number,
+  challenge: CubeChallenge
+) {
+  const hy = challenge.horizonY;
+  const vpl = challenge.vanishingPointLeft;
+  const vpr = challenge.vanishingPointRight;
+
+  ctx.save();
+
+  // 1. Línea de horizonte técnica continua y visible de borde a borde
+  ctx.strokeStyle = '#94A3B8'; // Slate-400: nítida y técnica
+  ctx.lineWidth = 1.2;
+  ctx.setLineDash([8, 5]);
+  ctx.beginPath();
+  ctx.moveTo(0, hy);
+  ctx.lineTo(width, hy);
+  ctx.stroke();
+
+  // Etiqueta sutil central de la Línea de Horizonte
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#64748B'; // Slate-500
+  ctx.font = 'bold 9px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText('L.H. (HORIZONTE)', width / 2, hy - 4);
+
+  // 2. Puntos de Fuga visibles sobre el horizonte (VPL y VPR)
+  const drawVpMarker = (vp: Point2D, label: string, isLeft: boolean) => {
+    const margin = 12;
+    const isOnScreen = vp.x >= margin && vp.x <= width - margin;
+
+    if (isOnScreen) {
+      // Anillo concéntrico sutil de enfoque
+      ctx.strokeStyle = '#94A3B8';
+      ctx.lineWidth = 1.0;
+      ctx.setLineDash([2, 2]);
+      ctx.beginPath();
+      ctx.arc(vp.x, hy, 8, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Cruz técnica de precisión
+      ctx.setLineDash([]);
+      ctx.strokeStyle = '#0F172A';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(vp.x - 11, hy);
+      ctx.lineTo(vp.x + 11, hy);
+      ctx.moveTo(vp.x, hy - 11);
+      ctx.lineTo(vp.x + 11, hy);
+      ctx.stroke();
+
+      // Punto central sólido de alto contraste (bullseye)
+      ctx.fillStyle = '#0F172A';
+      ctx.beginPath();
+      ctx.arc(vp.x, hy, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Centro blanco para máxima definición
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(vp.x, hy, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Placa / Etiqueta destacada
+      const text = label;
+      ctx.font = 'bold 9.5px monospace';
+      const textWidth = ctx.measureText(text).width;
+      const padX = 5;
+      const badgeH = 14;
+      let badgeY = hy - 12 - badgeH;
+      if (badgeY < 4) {
+        badgeY = hy + 12;
+      }
+
+      ctx.fillStyle = '#0F172A';
+      ctx.beginPath();
+      if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(vp.x - textWidth / 2 - padX, badgeY, textWidth + padX * 2, badgeH, 3);
+      } else {
+        ctx.rect(vp.x - textWidth / 2 - padX, badgeY, textWidth + padX * 2, badgeH);
+      }
+      ctx.fill();
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, vp.x, badgeY + badgeH / 2 + 0.5);
+    } else {
+      // Indicador y punto de referencia en el borde si el punto de fuga cae fuera del marco
+      const edgeX = isLeft ? 12 : width - 12;
+      const arrowDir = isLeft ? -1 : 1;
+
+      ctx.setLineDash([]);
+
+      // 1. Diana técnica de borde a la altura exacta del horizonte
+      ctx.strokeStyle = '#0F172A';
+      ctx.lineWidth = 1.4;
+      ctx.fillStyle = '#0F172A';
+      ctx.beginPath();
+      ctx.arc(edgeX, hy, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Centro blanco para definición
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(edgeX, hy, 1.6, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Flecha de dirección hacia la fuga
+      ctx.fillStyle = '#0F172A';
+      ctx.beginPath();
+      ctx.moveTo(edgeX + arrowDir * 9, hy);
+      ctx.lineTo(edgeX + arrowDir * 2, hy - 4);
+      ctx.lineTo(edgeX + arrowDir * 2, hy + 4);
+      ctx.closePath();
+      ctx.fill();
+
+      // Placa / Badge técnico en el borde
+      const badgeText = isLeft ? `← ${label}` : `${label} →`;
+      ctx.font = 'bold 9px monospace';
+      const bWidth = ctx.measureText(badgeText).width;
+      const bPad = 4;
+      const bH = 13;
+      const bX = isLeft ? edgeX + 10 : edgeX - 10 - bWidth - bPad * 2;
+      let bY = hy - bH / 2;
+
+      ctx.fillStyle = '#0F172A';
+      ctx.beginPath();
+      if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(bX, bY, bWidth + bPad * 2, bH, 2.5);
+      } else {
+        ctx.rect(bX, bY, bWidth + bPad * 2, bH);
+      }
+      ctx.fill();
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(badgeText, bX + (bWidth + bPad * 2) / 2, bY + bH / 2 + 0.5);
+    }
+  };
+
+  if (vpl) {
+    drawVpMarker(vpl, 'PF-I', true);
+  }
+  if (vpr) {
+    drawVpMarker(vpr, 'PF-D', false);
   }
 
   ctx.restore();
@@ -175,7 +342,7 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((p
     activeLesson,
     showUserDrawing: externalShowUserDrawing,
     showParametricSolution: externalShowParametricSolution,
-    isLandscapeMobile: propIsLandscapeMobile,
+    isLandscapeMobile: _propIsLandscapeMobile,
     onToggleSidebar,
     nodeCode,
     isDailyChallenge = false,
@@ -188,27 +355,6 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((p
     onAddCurrentToRecording,
   } = props;
 
-  const [internalIsLandscape, setInternalIsLandscape] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    return window.innerWidth > window.innerHeight && (window.innerHeight <= 520 || (window.innerWidth <= 960 && window.innerHeight <= 560));
-  });
-
-  useEffect(() => {
-    const handleResize = () => {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
-      setInternalIsLandscape(w > h && (h <= 520 || (w <= 960 && h <= 560)));
-    };
-    window.addEventListener('resize', handleResize);
-    window.addEventListener('orientationchange', handleResize);
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      window.removeEventListener('orientationchange', handleResize);
-    };
-  }, []);
-
-  const effectiveIsLandscape = propIsLandscapeMobile !== undefined ? propIsLandscapeMobile : internalIsLandscape;
-
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [strokes, setStrokes] = useState<UserStroke[]>([]);
@@ -216,19 +362,23 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((p
   const activePointerIdRef = useRef<number | null>(null);
   const activePointerTypeRef = useRef<string | null>(null);
 
-  // Visibilidad de trazos del usuario y solución paramétrica tras resolver el problema
-  const [internalShowUserDrawing, setInternalShowUserDrawing] = useState<boolean>(true);
-  const [internalShowParametricSolution, setInternalShowParametricSolution] = useState<boolean>(true);
+  // Modo de visión tras la evaluación: 'all' (ambos) | 'solution' (solo solución) | 'drawing' (solo mi dibujo)
+  const [visionMode, setVisionMode] = useState<'all' | 'solution' | 'drawing'>('all');
 
-  const showUserDrawing = externalShowUserDrawing !== undefined ? externalShowUserDrawing : internalShowUserDrawing;
-  const showParametricSolution = externalShowParametricSolution !== undefined ? externalShowParametricSolution : internalShowParametricSolution;
+  const showUserDrawing = externalShowUserDrawing !== undefined
+    ? externalShowUserDrawing
+    : (visionMode === 'all' || visionMode === 'drawing');
+  const showParametricSolution = externalShowParametricSolution !== undefined
+    ? externalShowParametricSolution
+    : (visionMode === 'all' || visionMode === 'solution');
 
-  const setShowUserDrawing = (val: boolean | ((prev: boolean) => boolean)) => {
-    setInternalShowUserDrawing(val);
-  };
-  const setShowParametricSolution = (val: boolean | ((prev: boolean) => boolean)) => {
-    setInternalShowParametricSolution(val);
-  };
+  const cycleVisionMode = useCallback(() => {
+    setVisionMode((prev) => {
+      if (prev === 'all') return 'solution';
+      if (prev === 'solution') return 'drawing';
+      return 'all';
+    });
+  }, []);
 
 
   // Estados para el reporte y diagnóstico del cubo con notas del usuario
@@ -263,23 +413,16 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((p
   // Modo táctil en dispositivos móviles: 'draw' (dibujar con dedo o lápiz) | 'scroll' (desplazar la pantalla con 1 dedo)
   const [touchMode, setTouchMode] = useState<'draw' | 'scroll'>('draw');
 
-  // Estado del scroll de la ventana para botón flotante de acceso rápido en móviles
-  const [isScrolledDown, setIsScrolledDown] = useState(false);
 
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolledDown(window.scrollY > 140);
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
 
   // Al validarse o comprobar el cubo, activar modo scroll automáticamente para ver notas y Cubito con 1 dedo
   useEffect(() => {
     if (feedback) {
       setTouchMode('scroll');
+      setVisionMode('all');
     } else {
       setTouchMode('draw');
+      setVisionMode('all');
     }
   }, [feedback]);
 
@@ -291,8 +434,7 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((p
     activePointerTypeRef.current = null;
     currentStrokeRef.current = [];
     setIsDrawing(false);
-    setShowUserDrawing(true);
-    setShowParametricSolution(true);
+    setVisionMode('all');
     setUserNote('');
     setCopiedReport(false);
     setDownloadedReport(false);
@@ -332,36 +474,29 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((p
     }
   }, [isTimerRunning, feedback]);
 
-  // Renderizado del canvas
+  // Renderizado del canvas de alta definición (HiDPI / Retina responsive)
   const render = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const width = canvas.width;
-    const height = canvas.height;
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const width = 600;
+    const height = 540;
+    const targetW = Math.round(width * dpr);
+    const targetH = Math.round(height * dpr);
 
-    // Fondo blanco papel puro
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, width, height);
+    if (canvas.width !== targetW || canvas.height !== targetH) {
+      canvas.width = targetW;
+      canvas.height = targetH;
+    }
 
-    // Cuadrícula sutil de dibujo técnico
-    ctx.strokeStyle = '#F3F3F3';
-    ctx.lineWidth = 1;
-    const gridSize = 24;
-    for (let x = 0; x < width; x += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, height);
-      ctx.stroke();
-    }
-    for (let y = 0; y < height; y += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(width, y);
-      ctx.stroke();
-    }
+    ctx.save();
+    ctx.scale(dpr, dpr);
+
+    // Limpiar lienzo manteniendo transparencia sobre la cuadrícula milimétrica continua
+    ctx.clearRect(0, 0, width, height);
 
     // Mallado cuadrado de perspectiva en el suelo (líneas finas para orientar el plano horizontal)
     if (challenge.hasGroundGrid) {
@@ -372,7 +507,19 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((p
         challenge.vertices2D[0],
         challenge.vertices2D[2],
         challenge.vertices2D[4],
-        challenge.horizonY
+        challenge.horizonY,
+        challenge.vanishingPointLeft,
+        challenge.vanishingPointRight
+      );
+    }
+
+    // Línea de horizonte y Puntos de Fuga técnicos sutiles (A partir del Bloque 2 en adelante)
+    if (challenge.hasHorizonGuide) {
+      renderHorizonAndVanishingPoints(
+        ctx,
+        width,
+        height,
+        challenge
       );
     }
 
@@ -382,16 +529,18 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((p
 
       // 1. Si la solución está activa, dibujar en el suelo la proyección de sombra y los rayos
       if (showSolution && showParametricSolution) {
-        // Línea de horizonte técnica
-        ctx.save();
-        ctx.strokeStyle = '#D6D6D6';
-        ctx.setLineDash([4, 4]);
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(0, challenge.horizonY);
-        ctx.lineTo(width, challenge.horizonY);
-        ctx.stroke();
-        ctx.restore();
+        // Línea de horizonte técnica (solo si no se ha dibujado ya con la guía)
+        if (!challenge.hasHorizonGuide) {
+          ctx.save();
+          ctx.strokeStyle = '#D6D6D6';
+          ctx.setLineDash([4, 4]);
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(0, challenge.horizonY);
+          ctx.lineTo(width, challenge.horizonY);
+          ctx.stroke();
+          ctx.restore();
+        }
 
         // Rayos de proyección proyectivos
         ctx.save();
@@ -694,6 +843,35 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((p
           ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
           ctx.fill();
         });
+      } else {
+        // Estructuras compuestas o abiertas (ej: missing_lid, step_block)
+        ctx.save();
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 3.5;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        challenge.givenEdges.forEach((edge) => {
+          const p1 = challenge.vertices2D[edge.start];
+          const p2 = challenge.vertices2D[edge.end];
+          if (p1 && p2) {
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.stroke();
+          }
+        });
+
+        // Marcar vértices dados
+        challenge.givenFace.vertices.forEach((idx) => {
+          const p = challenge.vertices2D[idx];
+          if (p) {
+            ctx.fillStyle = '#000000';
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        });
+        ctx.restore();
       }
 
       // 1.5. EJES DE AYUDA TÉCNICOS X, Y, Z (Finos, largos y rayados / discontinuos)
@@ -751,6 +929,49 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((p
         ctx.beginPath();
         ctx.arc(origin.x, origin.y, 3, 0, Math.PI * 2);
         ctx.fill();
+
+        ctx.restore();
+      }
+
+      // 1.6. GUÍA DE COTA DE ALTURA (Para torres y variaciones de altura)
+      if (challenge.heightGuide) {
+        const hg = challenge.heightGuide;
+        ctx.save();
+        ctx.strokeStyle = '#4B5563'; // gris técnico grafito
+        ctx.lineWidth = 1.0;
+        ctx.setLineDash([3, 3]);
+
+        const offsetSide = challenge.givenSide === 'left' ? 28 : -28;
+        const guideX = hg.x + offsetSide;
+
+        // Línea de cota vertical paralela
+        ctx.beginPath();
+        ctx.moveTo(guideX, hg.yBottom);
+        ctx.lineTo(guideX, hg.yTop);
+        ctx.stroke();
+
+        // Líneas auxiliares de referencia horizontales desde el cubo hasta la cota
+        ctx.beginPath();
+        ctx.moveTo(hg.x, hg.yTop);
+        ctx.lineTo(guideX + (offsetSide > 0 ? 6 : -6), hg.yTop);
+        ctx.moveTo(hg.x, hg.yBottom);
+        ctx.lineTo(guideX + (offsetSide > 0 ? 6 : -6), hg.yBottom);
+        ctx.stroke();
+
+        // Remates en los extremos de la cota
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.arc(guideX, hg.yTop, 2.5, 0, Math.PI * 2);
+        ctx.arc(guideX, hg.yBottom, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Etiqueta técnica con cota
+        ctx.fillStyle = '#111827';
+        ctx.font = 'bold 9px monospace';
+        ctx.textAlign = offsetSide > 0 ? 'left' : 'right';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(hg.label, guideX + (offsetSide > 0 ? 7 : -7), (hg.yTop + hg.yBottom) / 2);
 
         ctx.restore();
       }
@@ -829,10 +1050,19 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((p
         ctx.stroke();
       }
     }
+    ctx.restore();
   }, [challenge, strokes, isDrawing, showSolution, showUserDrawing, showParametricSolution]);
 
   useEffect(() => {
     render();
+  }, [render]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      render();
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, [render]);
 
   // Atajos de teclado para un flujo de dibujo ágil y sin fricciones
@@ -858,26 +1088,29 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((p
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         undoLastStroke();
-      } else if (feedback && e.key.toLowerCase() === 'd') {
+      } else if (feedback && e.key.toLowerCase() === 'v') {
         e.preventDefault();
-        setShowUserDrawing((prev) => !prev);
+        cycleVisionMode();
       } else if (feedback && e.key.toLowerCase() === 's') {
         e.preventDefault();
-        setShowParametricSolution((prev) => !prev);
+        setVisionMode((prev) => (prev === 'solution' ? 'all' : 'solution'));
+      } else if (feedback && e.key.toLowerCase() === 'd') {
+        e.preventDefault();
+        setVisionMode((prev) => (prev === 'drawing' ? 'all' : 'drawing'));
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [feedback, onNextCube, onValidate, strokes]);
+  }, [feedback, onNextCube, onValidate, strokes, cycleVisionMode]);
 
   const getNormalizedCoords = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0, pressure: 0.5 };
 
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
+    const scaleX = 600 / rect.width;
+    const scaleY = 540 / rect.height;
 
     const x = (e.clientX - rect.left) * scaleX;
     const y = (e.clientY - rect.top) * scaleY;
@@ -993,243 +1226,132 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((p
   }));
 
   return (
-    <div className="w-full flex flex-col items-center justify-center select-none">
-      {effectiveIsLandscape ? (
-        /* ============================================================ */
-        /* MODO MÓVIL HORIZONTAL (LANDSCAPE COMPACTO): CUBO 3D          */
-        /* ============================================================ */
-        <div className="w-full h-full flex flex-row items-center justify-center gap-2 sm:gap-3 max-w-full select-none overflow-hidden font-mono">
-          {/* LIENZO 600x540 ESCALADO A MÁXIMA ALTURA */}
-          <div
-            data-canvas-zone="true"
-            className="relative border-3 border-black bg-white shadow-[3px_3px_0px_#000000] aspect-[600/540] overflow-hidden shrink-0"
-            style={{
-              height: 'min(calc(100vh - 46px), calc(100dvh - 46px), 360px)',
-              width: 'auto',
-              maxWidth: 'calc(100vw - 210px)',
-            }}
-          >
-            {/* Barra superior de progreso del temporizador */}
-            <div className="absolute top-0 left-0 right-0 h-1 bg-neutral-200 pointer-events-none z-10">
-              <div
-                className={`h-full transition-all duration-100 ${
-                  timeLeft <= 5 && isTimerRunning ? 'bg-black animate-pulse' : 'bg-neutral-800'
-                }`}
-                style={{ width: `${(timeLeft / TOTAL_COUNTDOWN_SECONDS) * 100}%` }}
-              />
-            </div>
+    <div className="relative w-full h-full overflow-hidden flex items-center justify-center select-none bg-white pattern-grid-paper">
+      {/* Barra superior de progreso del temporizador */}
+      <div className="absolute top-0 left-0 right-0 h-1.5 bg-neutral-200 pointer-events-none z-30">
+        <div
+          className={`h-full transition-all duration-100 ${
+            timeLeft <= 5 && isTimerRunning ? 'bg-black animate-pulse' : 'bg-neutral-800'
+          }`}
+          style={{ width: `${(timeLeft / TOTAL_COUNTDOWN_SECONDS) * 100}%` }}
+        />
+      </div>
 
-            <canvas
-              ref={canvasRef}
-              width={600}
-              height={540}
-              className="block w-full h-full touch-none cursor-crosshair select-none"
-              style={{ touchAction: 'none' }}
-              onPointerDown={handlePointerDown}
-              onPointerMove={handlePointerMove}
-              onPointerUp={handlePointerUp}
-              onPointerCancel={handlePointerUp}
-            />
+      {/* 1. BOTÓN TOGGLE PANEL DEDICADO A LA IZQUIERDA DE LA PANTALLA */}
+      {onToggleSidebar && (
+        <button
+          type="button"
+          onClick={onToggleSidebar}
+          className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3 z-30 bg-white hover:bg-neutral-100 text-black px-2.5 py-1.5 border-2 border-black shadow-[3px_3px_0px_#000000] text-xs font-bold font-mono flex items-center gap-1.5 cursor-pointer active:scale-95 transition-transform"
+          title="Abrir / cerrar panel de práctica"
+        >
+          <PanelLeft className="w-4 h-4 stroke-[2.5]" />
+          <span>Panel</span>
+        </button>
+      )}
 
-            <div className="absolute top-1.5 left-1.5 text-[9px] font-mono uppercase bg-white border border-black px-1.5 py-0.5 pointer-events-none shadow-[1px_1px_0px_#000000] z-10">
-              #{challenge.seed}
-            </div>
+      {/* 2. HUD SUPERIOR: A LA MISMA ALTURA QUE EL BOTÓN PANEL (top-2.5 / top-3) ALINEADO CON EL CUBO */}
+      <div
+        className="absolute top-2.5 sm:top-3 z-20 flex items-start justify-between pointer-events-none px-2 sm:px-0"
+        style={{
+          width: 'min(calc(100% - 130px), 760px, calc((100dvh - 170px) * (600 / 540)))',
+        }}
+      >
+        {/* A la izquierda del cubo (por donde está ahora): NIVEL, SEMILLA Y MODO TÁCTIL EN UNA SOLA TIRA */}
+        <div className="pointer-events-auto self-start font-mono text-xs select-none bg-white border-2 border-black p-1 sm:p-1.5 shadow-[3px_3px_0px_#000000] flex items-center gap-1.5 sm:gap-2">
+          <div className="flex items-center gap-1 min-w-0 bg-neutral-100 border border-black px-1.5 py-0.5">
+            <span className="text-[9px] sm:text-[10px] font-bold text-neutral-600 uppercase">
+              {isDailyChallenge && dailyProgress
+                ? `RETO ${dailyProgress.current}/${dailyProgress.total}`
+                : (nodeCode || activeLesson?.code || '1.1')}
+            </span>
+            <span className="text-[10px] sm:text-[11px] font-bold text-black truncate max-w-[90px] sm:max-w-[140px]">
+              {activeLesson?.title || (challenge.isShadowLevel ? 'Sombras' : 'Prisma 3D')}
+            </span>
+          </div>
 
-            {/* Temporizador */}
+          <span className="text-[9px] sm:text-[10px] font-bold bg-neutral-100 px-1.5 py-0.5 border border-black shrink-0">
+            #{challenge.seed}
+          </span>
+
+          {challenge.isShadowLevel && (
+            <span className="text-[9px] sm:text-[10px] font-bold text-neutral-700 truncate max-w-[110px] hidden sm:inline">
+              {challenge.hasGroundGrid ? '☀️ Suelo Guía' : '☀️ Sombra Libre'}
+            </span>
+          )}
+
+          {/* Toggle de Modo Táctil (Trazo vs Mover) */}
+          <div className="flex items-center border border-black ml-0.5">
+            <button
+              type="button"
+              onClick={() => setTouchMode('draw')}
+              className={`px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold cursor-pointer transition-colors ${
+                touchMode === 'draw' ? 'bg-black text-white' : 'bg-neutral-100 text-neutral-700'
+              }`}
+              title="Modo Trazo: dibuja aristas"
+            >
+              <Pen className="w-2.5 h-2.5 inline mr-0.5" />
+              Trazo
+            </button>
+            <button
+              type="button"
+              onClick={() => setTouchMode('scroll')}
+              className={`px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold cursor-pointer transition-colors ${
+                touchMode === 'scroll' ? 'bg-black text-white' : 'bg-neutral-100 text-neutral-700'
+              }`}
+              title="Modo Mover: desplazar con 1 dedo"
+            >
+              <Hand className="w-2.5 h-2.5 inline mr-0.5" />
+              Mover
+            </button>
+          </div>
+        </div>
+
+        {/* A la derecha del cubo: TEMPORIZADOR O CUADRADITO CON LA NOTA */}
+        {!feedback ? (
+          <div className="pointer-events-auto self-start font-mono text-xs select-none">
             <div
-              className={`absolute top-1.5 right-1.5 border border-black px-1.5 py-0.5 font-mono text-[10px] pointer-events-none shadow-[1px_1px_0px_#000000] z-10 flex items-center gap-1 ${
+              className={`border-2 border-black p-1.5 sm:p-2 shadow-[3px_3px_0px_#000000] flex items-center gap-1.5 ${
                 timeLeft <= 5 && isTimerRunning ? 'bg-black text-white animate-pulse' : 'bg-white text-black'
               }`}
             >
-              <Clock className="w-3 h-3 stroke-[2.5]" />
-              <span className="font-bold tabular-nums">{timeLeft.toFixed(1)}s</span>
-              {feedback && feedback.passed && (feedback.speedBonus ?? 0) > 0 && (
-                <span className="text-[9px] font-bold bg-neutral-200 text-black border border-black px-0.5">
-                  +{feedback.speedBonus}%
-                </span>
-              )}
-            </div>
-
-            {/* Banner sombras si aplica */}
-            {challenge.isShadowLevel && (
-              <div className="absolute bottom-1.5 left-1.5 right-1.5 bg-black text-white text-[9px] font-mono px-2 py-0.5 border border-white pointer-events-none z-10 truncate">
-                ☀️ {challenge.hasGroundGrid ? "Sombra con suelo guía" : "Sombra libre"}
-              </div>
-            )}
-          </div>
-
-          {/* BARRA LATERAL ERGONÓMICA EN MÓVIL HORIZONTAL (DERECHA) */}
-          <div
-            className="w-44 sm:w-48 shrink-0 flex flex-col justify-between border-2 border-black bg-white shadow-[3px_3px_0px_#000000] p-1.5 select-none font-mono"
-            style={{
-              height: 'min(calc(100vh - 46px), calc(100dvh - 46px), 360px)',
-            }}
-          >
-            {/* SECCIÓN SUPERIOR */}
-            <div className="space-y-1">
-              <div className="flex items-center justify-between gap-1 pb-1 border-b border-black">
-                {onToggleSidebar && (
-                  <button
-                    type="button"
-                    onClick={onToggleSidebar}
-                    className="bg-white hover:bg-neutral-100 text-black px-1.5 py-0.5 border border-black shadow-[1px_1px_0px_#000000] text-[10px] font-bold flex items-center gap-1 cursor-pointer active:scale-95"
-                    title="Abrir panel"
-                  >
-                    <PanelLeft className="w-3 h-3 stroke-[2.5]" />
-                    <span>Panel</span>
-                  </button>
-                )}
-                <span className="text-[9px] font-bold bg-neutral-100 px-1 py-0.5 border border-black truncate">
-                  {isDailyChallenge && dailyProgress
-                    ? `Reto ${dailyProgress.current}/${dailyProgress.total}`
-                    : (nodeCode || activeLesson?.code || '1.1')}
-                </span>
-              </div>
-
-              {/* Contador de aristas */}
-              <div className="flex items-center justify-between text-[10px] font-bold text-neutral-700 bg-neutral-50 px-1.5 py-0.5 border border-neutral-300">
-                <span>Aristas:</span>
-                <span className="tabular-nums">
-                  {countDetectedAristas(strokes)} / {challenge.targetEdges.length}
-                </span>
-              </div>
-
-              {/* Herramientas: Deshacer, Borrar, Comentar, Reporte */}
-              <div className="grid grid-cols-4 gap-1">
-                <button
-                  onClick={undoLastStroke}
-                  disabled={strokes.length === 0 || showSolution}
-                  className="btn-ink-outline p-1 text-xs font-mono disabled:opacity-30 cursor-pointer flex items-center justify-center shadow-[1px_1px_0px_#000000]"
-                  title="Deshacer (Ctrl+Z)"
-                >
-                  <Undo2 className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={clearStrokes}
-                  disabled={strokes.length === 0 || showSolution}
-                  className="btn-ink-outline p-1 text-xs font-mono disabled:opacity-30 cursor-pointer hover:bg-red-50 hover:text-red-700 flex items-center justify-center shadow-[1px_1px_0px_#000000]"
-                  title="Borrar todo"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={isRecording ? onOpenRecordModal : onToggleRecording}
-                  className={`btn-ink-outline p-1 text-xs font-mono font-bold flex items-center justify-center cursor-pointer shadow-[1px_1px_0px_#000000] ${
-                    isRecording ? 'bg-black text-white' : 'bg-white text-black'
-                  }`}
-                  title={isRecording ? `Grabando: ${recordedCount} ejercicios. Clic para ver o exportar.` : "Activar grabación (Modo Récord)"}
-                >
-                  <span className={`w-2 h-2 rounded-full ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-neutral-400'}`} />
-                  <span className="text-[9px] ml-0.5">{isRecording ? `REC(${recordedCount})` : 'REC'}</span>
-                </button>
-                <button
-                  onClick={() => setShowQuickCommentModal(true)}
-                  className={`btn-ink-outline p-1 text-xs font-mono font-bold flex items-center justify-center cursor-pointer shadow-[1px_1px_0px_#000000] ${
-                    userNote.trim() ? 'bg-black text-white' : ''
-                  }`}
-                  title={userNote.trim() ? `Nota: "${userNote}"` : "Añadir comentario a este cubo (Modo Récord)"}
-                >
-                  <MessageSquare className="w-3.5 h-3.5 stroke-[2.5]" />
-                </button>
-                <button
-                  onClick={handleOpenReportModal}
-                  className="btn-ink-outline p-1 text-xs font-mono font-bold flex items-center justify-center cursor-pointer shadow-[1px_1px_0px_#000000]"
-                  title="Reporte de anomalía"
-                >
-                  <AlertTriangle className="w-3.5 h-3.5 text-black stroke-[2.5]" />
-                </button>
-              </div>
-
-              {/* Capas dibujo y solución cuando está resuelto */}
-              {feedback && (
-                <div className="grid grid-cols-2 gap-1 pt-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setShowUserDrawing((prev) => !prev)}
-                    className={`p-1 text-[10px] font-mono font-bold border border-black flex items-center justify-center gap-0.5 ${
-                      showUserDrawing ? 'bg-black text-white' : 'bg-neutral-100 text-neutral-400 line-through'
-                    }`}
-                    title={showUserDrawing ? "Ocultar trazo" : "Mostrar trazo"}
-                  >
-                    {showUserDrawing ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                    <span>Trazo</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowParametricSolution((prev) => !prev)}
-                    className={`p-1 text-[10px] font-mono font-bold border border-black flex items-center justify-center gap-0.5 ${
-                      showParametricSolution ? 'bg-black text-white' : 'bg-neutral-100 text-neutral-400 line-through'
-                    }`}
-                    title={showParametricSolution ? "Ocultar solución" : "Mostrar solución"}
-                  >
-                    {showParametricSolution ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                    <span>Solución</span>
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* SECCIÓN INFERIOR */}
-            <div className="pt-1 border-t border-neutral-300">
-              {!feedback ? (
-                <button
-                  onClick={handleValidateClick}
-                  disabled={countDetectedAristas(strokes) === 0}
-                  className="w-full btn-ink py-2 text-xs font-mono uppercase font-bold disabled:opacity-25 disabled:pointer-events-none cursor-pointer shadow-[2px_2px_0px_#000000] flex items-center justify-center gap-1"
-                  title="Comprobar perspectiva (Enter)"
-                >
-                  <span>Comprobar</span>
-                  <Check className="w-3.5 h-3.5 stroke-[3]" />
-                </button>
-              ) : (
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-[11px] font-bold bg-neutral-100 p-1 border border-black">
-                    <span className="text-[10px] text-neutral-600">Nota:</span>
-                    <span className="font-black text-sm">{feedback.totalScore ?? feedback.score}%</span>
-                  </div>
-                  <button
-                    onClick={onNextCube}
-                    className="w-full btn-ink py-2 text-xs font-mono uppercase font-bold flex items-center justify-center gap-1 cursor-pointer shadow-[2px_2px_0px_#000000]"
-                    title="Siguiente ejercicio"
-                  >
-                    <span>Siguiente</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              )}
+              <Clock className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span className="font-bold tabular-nums text-xs sm:text-sm">{timeLeft.toFixed(1)}s</span>
             </div>
           </div>
-        </div>
-      ) : (
-        /* ============================================================ */
-        /* MODO ESTÁNDAR (PORTRAIT MÓVIL, TABLET, ESCRITORIO)           */
-        /* ============================================================ */
-        <div
-          className="flex flex-col items-center select-none w-full mx-auto"
-          style={{
-            width: 'min(100%, 680px, max(280px, calc((100vh - 180px) * 600 / 540)))',
-          }}
-        >
-          {/* Contenedor responsivo del lienzo: aspecto 600/540 bloqueado 1:1 sin deformación ni márgenes invisibles */}
-          <div
-            data-canvas-zone="true"
-            className="relative border-4 border-black bg-white shadow-[4px_4px_0px_#000000] w-full aspect-[600/540] overflow-hidden"
-          >
-        {/* Barra superior de progreso del temporizador */}
-        <div className="absolute top-0 left-0 right-0 h-1 bg-neutral-200 pointer-events-none z-10">
-          <div
-            className={`h-full transition-all duration-100 ${
-              timeLeft <= 5 && isTimerRunning ? 'bg-black animate-pulse' : 'bg-neutral-800'
-            }`}
-            style={{ width: `${(timeLeft / TOTAL_COUNTDOWN_SECONDS) * 100}%` }}
-          />
-        </div>
+        ) : (
+          <div className="pointer-events-auto self-start bg-white border-2 border-black p-2 sm:p-2.5 shadow-[4px_4px_0px_#000000] font-mono flex flex-col items-center justify-center min-w-[88px] sm:min-w-[100px] aspect-square animate-in fade-in zoom-in-95 duration-150 select-none">
+            <span className="text-[10px] sm:text-xs font-bold uppercase text-neutral-500 tracking-wider">
+              Nota
+            </span>
+            <span className="text-2xl sm:text-3xl font-black leading-none my-1">
+              {feedback.totalScore ?? feedback.score}%
+            </span>
+            <span
+              className={`text-[9px] sm:text-[10px] font-bold uppercase px-1.5 py-0.5 border border-black ${
+                feedback.passed ? 'bg-black text-white' : 'bg-white text-neutral-700'
+              }`}
+            >
+              {feedback.passed ? 'Aprobado' : 'Reintentar'}
+            </span>
+          </div>
+        )}
+      </div>
 
+      {/* CONTENEDOR ANCLADO AL DIBUJO (Mantiene aspecto exacto 600x540 con escala adaptada) */}
+      <div
+        className="relative aspect-[600/540] max-w-[min(calc(100%-24px),760px)] max-h-[calc(100%-125px)] flex items-center justify-center pointer-events-none"
+        style={{
+          width: 'min(calc(100% - 24px), 760px, calc((100dvh - 170px) * (600 / 540)))',
+          height: 'auto',
+          aspectRatio: '600 / 540',
+        }}
+      >
         <canvas
           ref={canvasRef}
           width={600}
           height={540}
-          className={`block w-full h-full ${
+          className={`block w-full h-full z-10 pointer-events-auto ${
             touchMode === 'scroll' ? 'touch-pan-y cursor-grab' : 'touch-none cursor-crosshair'
           }`}
           style={{ touchAction: touchMode === 'scroll' ? 'pan-y' : 'none' }}
@@ -1238,128 +1360,45 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((p
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
         />
-
-        <div className="absolute top-2.5 left-2 text-[10px] font-mono uppercase bg-white border border-black px-1.5 py-0.5 pointer-events-none shadow-[1px_1px_0px_#000000] z-10">
-          DESAFÍO #{challenge.seed}
-        </div>
-
-        {/* Temporizador con bonus por velocidad */}
-        <div
-          className={`absolute top-2.5 right-2 border-2 border-black px-2 py-0.5 font-mono text-xs transition-colors duration-200 pointer-events-none shadow-[2px_2px_0px_#000000] z-10 flex items-center gap-1.5 ${
-            timeLeft <= 5 && isTimerRunning
-              ? 'bg-black text-white animate-pulse'
-              : 'bg-white text-black'
-          }`}
-        >
-          <Clock className="w-3.5 h-3.5 stroke-[2.5]" />
-          <span className="font-bold tabular-nums">
-            {timeLeft.toFixed(1)}s
-          </span>
-          {!isTimerRunning && strokes.length === 0 && !feedback && (
-            <span className="text-[9px] uppercase font-bold tracking-tighter opacity-70 hidden sm:inline">
-              · Arranca al trazar
-            </span>
-          )}
-          {feedback && feedback.passed && (feedback.speedBonus ?? 0) > 0 && (
-            <span className="text-[10px] font-bold bg-neutral-200 text-black border border-black px-1">
-              +{feedback.speedBonus}% vel.
-            </span>
-          )}
-        </div>
-
-        {/* Banner didáctico específico para el nivel de sombras */}
-        {challenge.isShadowLevel && (
-          <div className="absolute bottom-2 left-2 right-2 bg-black text-white text-[11px] font-mono px-2.5 py-1 flex items-center justify-between border border-white shadow-[2px_2px_0px_#000000] pointer-events-none z-10">
-            <span className="truncate">
-              {challenge.hasGroundGrid
-                ? "☀️ 4.1 · SOMBRA CON SUELO GUÍA: Proyecta los rayos apoyándote en el mallado del suelo"
-                : "☀️ 4.2 · SOMBRA LIBRE: Proyecta la sombra a mano alzada en perspectiva pura"}
-            </span>
-            <span className="font-bold shrink-0 hidden sm:inline ml-2 text-neutral-300">
-              {challenge.hasGroundGrid ? "NIVEL 4.1" : "NIVEL 4.2"}
-            </span>
-          </div>
-        )}
-
-        {/* Selector de modo táctil móvil: Lápiz (dibujar) vs Mano (desplazar con 1 dedo) */}
-        <div className={`absolute z-20 flex items-center border-2 border-black bg-white shadow-[2px_2px_0px_#000000] ${
-          challenge.isShadowLevel ? 'top-10 left-2' : 'bottom-2.5 right-2'
-        }`}>
-          <button
-            type="button"
-            onClick={() => setTouchMode('draw')}
-            className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 transition-colors cursor-pointer ${
-              touchMode === 'draw'
-                ? 'bg-black text-white'
-                : 'text-neutral-700 hover:text-black hover:bg-neutral-100'
-            }`}
-            title="Modo Trazo: dibuja aristas con el dedo o lápiz táctil"
-          >
-            <Pen className="w-3 h-3 stroke-[2.5]" />
-            <span className="text-[10px] sm:text-xs">Trazo</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setTouchMode('scroll')}
-            className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 transition-colors cursor-pointer ${
-              touchMode === 'scroll'
-                ? 'bg-black text-white'
-                : 'text-neutral-700 hover:text-black hover:bg-neutral-100'
-            }`}
-            title="Modo Mover: desliza libremente la pantalla hacia abajo con 1 dedo"
-          >
-            <Hand className="w-3 h-3 stroke-[2.5]" />
-            <span className="text-[10px] sm:text-xs">Mover (1 dedo)</span>
-          </button>
-        </div>
-
-        {/* Indicador visual cuando el modo Mover con 1 dedo está activo */}
-        {touchMode === 'scroll' && !feedback && (
-          <div className="absolute inset-x-2 top-11 pointer-events-none z-10 flex justify-center">
-            <div className="bg-black/90 text-white border border-white px-2.5 py-1 shadow-[2px_2px_0px_#000000] text-[11px] font-mono font-bold flex items-center gap-1.5 animate-in fade-in duration-200">
-              <Hand className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>Desliza con 1 dedo para mover la pantalla</span>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* BARRA DE HERRAMIENTAS Y ACCIONES (TODO DENTRO DEL MARCO DEL LIENZO) */}
-      <div className="w-full mt-2 border-2 border-black bg-white p-2 shadow-[3px_3px_0px_#000000] min-w-0">
-        {!feedback ? (
-          <div className="flex items-center justify-between gap-1.5 sm:gap-2 w-full">
-            {/* Lado Izquierdo: Herramientas de dibujo */}
-            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+      {/* 3. BARRA DE HERRAMIENTAS FLOTANTE INFERIOR */}
+      <div className="absolute bottom-3 sm:bottom-5 left-1/2 -translate-x-1/2 z-30 pointer-events-auto font-mono text-xs">
+        <div className="bg-white border-2 border-black p-1.5 sm:p-2 shadow-[4px_4px_0px_#000000] flex items-center gap-1.5 sm:gap-2 max-w-[calc(100vw-24px)] overflow-x-auto">
+          {!feedback ? (
+            <>
+              {/* Contador de aristas */}
+              <span className="text-[10px] sm:text-[11px] font-bold text-neutral-700 bg-neutral-100 px-2 py-1 border border-black shadow-[1px_1px_0px_#000000] tabular-nums whitespace-nowrap">
+                {countDetectedAristas(strokes)}/{challenge.targetEdges.length} {challenge.isShadowLevel ? 'sombras' : 'aristas'}
+              </span>
+
+              {/* Deshacer */}
               <button
+                type="button"
                 onClick={undoLastStroke}
-                disabled={strokes.length === 0 || showSolution}
-                className="btn-ink-outline px-2 py-1 text-xs font-mono disabled:opacity-30 cursor-pointer flex items-center gap-1 shrink-0 shadow-[1px_1px_0px_#000000]"
-                title="Deshacer último trazo (Ctrl+Z)"
+                disabled={strokes.length === 0}
+                className="btn-ink-outline p-1.5 text-xs font-bold disabled:opacity-30 disabled:pointer-events-none cursor-pointer shadow-[1px_1px_0px_#000000]"
+                title="Deshacer trazo (Ctrl+Z)"
               >
-                <Undo2 className="w-3.5 h-3.5" />
-                <span className="hidden md:inline">Deshacer</span>
+                <Undo2 className="w-3.5 h-3.5 stroke-[2.5]" />
               </button>
+
+              {/* Borrar */}
               <button
+                type="button"
                 onClick={clearStrokes}
-                disabled={strokes.length === 0 || showSolution}
-                className="btn-ink-outline px-2 py-1 text-xs font-mono disabled:opacity-30 cursor-pointer flex items-center gap-1 shrink-0 shadow-[1px_1px_0px_#000000]"
+                disabled={strokes.length === 0}
+                className="btn-ink-outline p-1.5 text-xs font-bold disabled:opacity-30 disabled:pointer-events-none cursor-pointer hover:bg-red-50 hover:text-red-700 shadow-[1px_1px_0px_#000000]"
                 title="Borrar todos los trazos"
               >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span className="hidden md:inline">Borrar</span>
+                <Trash2 className="w-3.5 h-3.5 stroke-[2.5]" />
               </button>
-              <span className="text-[11px] font-mono text-neutral-600 pl-0.5 font-bold shrink-0">
-                {countDetectedAristas(strokes)}/{challenge.targetEdges.length}
-                <span className="hidden lg:inline font-normal"> {challenge.isShadowLevel ? 'sombras' : 'aristas'}</span>
-              </span>
-            </div>
 
-            {/* Lado Derecho: REC, Reporte y Comprobar */}
-            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              {/* Modo Récord */}
               <button
                 type="button"
                 onClick={isRecording ? onOpenRecordModal : onToggleRecording}
-                className={`px-2 py-1 text-xs font-mono font-bold border border-black cursor-pointer shadow-[1px_1px_0px_#000000] flex items-center gap-1 transition-colors ${
+                className={`px-2 py-1 text-xs font-mono font-bold border border-black cursor-pointer shadow-[1px_1px_0px_#000000] flex items-center gap-1 transition-colors whitespace-nowrap ${
                   isRecording ? 'bg-black text-white' : 'bg-white hover:bg-neutral-100 text-black'
                 }`}
                 title={isRecording ? `Grabando: ${recordedCount} ejercicios. Clic para ver o exportar sesión` : "Activar grabación de sesión (Modo Récord)"}
@@ -1368,193 +1407,111 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((p
                 <span>{isRecording ? `REC (${recordedCount})` : 'REC'}</span>
               </button>
 
+              {/* Reportar anomalía */}
               <button
+                type="button"
                 onClick={handleOpenReportModal}
-                className="btn-ink-outline p-1.5 text-xs font-mono font-bold flex items-center gap-1 cursor-pointer transition-transform active:scale-95 shadow-[1px_1px_0px_#000000] shrink-0"
-                title="Escribir nota y descargar reporte (JSON / Copiar)"
+                className="p-1.5 text-xs font-bold border border-black cursor-pointer shadow-[1px_1px_0px_#000000] bg-white hover:bg-neutral-100 flex items-center justify-center transition-colors"
+                title="Reportar anomalía en este cubo"
               >
-                <AlertTriangle className="w-3.5 h-3.5 text-black stroke-[2.5]" />
+                <AlertTriangle className="w-3.5 h-3.5 stroke-[2.5]" />
               </button>
 
+              {/* Botón principal: COMPROBAR */}
               <button
+                type="button"
                 onClick={handleValidateClick}
                 disabled={countDetectedAristas(strokes) === 0}
-                className="btn-ink px-2.5 sm:px-3.5 py-1.5 text-xs font-mono uppercase font-bold disabled:opacity-25 disabled:pointer-events-none disabled:cursor-not-allowed cursor-pointer shadow-[2px_2px_0px_#000000] flex items-center gap-1 shrink-0"
-                title={
-                  countDetectedAristas(strokes) === 0
-                    ? "Dibuja al menos una arista antes de comprobar"
-                    : challenge.isShadowLevel
-                    ? "Comprobar proyección de sombra (Enter)"
-                    : "Comprobar perspectiva (Enter)"
-                }
+                className="btn-ink px-3 sm:px-4 py-1.5 text-xs font-bold uppercase disabled:opacity-30 disabled:pointer-events-none cursor-pointer shadow-[2px_2px_0px_#000000] flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap"
+                title={countDetectedAristas(strokes) === 0 ? "Dibuja al menos una arista antes de comprobar" : "Comprobar perspectiva (Enter)"}
               >
                 <span>Comprobar</span>
-                <Check className="w-3.5 h-3.5 stroke-[3]" />
+                <Check className="w-4 h-4 stroke-[3]" />
               </button>
-            </div>
-          </div>
-        ) : (
-          /* DOS FILAS ESTRUCTURADAS AL RESOLVER: NUNCA SE SALE DEL CUADRO DE DIBUJO */
-          <div className="flex flex-col gap-1.5 w-full">
-            {/* Fila 1: Contador de aristas y Botones para Mostrar/Ocultar Dibujo y Solución */}
-            <div className="flex items-center justify-between gap-1.5 pb-1.5 border-b border-neutral-200 w-full">
-              <span className="text-[11px] font-mono font-bold text-neutral-700 bg-neutral-100 px-1.5 sm:px-2 py-0.5 border border-black shadow-[1px_1px_0px_#000000] shrink-0">
-                {countDetectedAristas(strokes)}/{challenge.targetEdges.length}
-                <span className="hidden sm:inline"> {challenge.isShadowLevel ? 'aristas sombra' : 'aristas'}</span>
+            </>
+          ) : (
+            <>
+              {/* Contador de aristas */}
+              <span className="text-[10px] sm:text-[11px] font-bold text-neutral-700 bg-neutral-100 px-2 py-1 border border-black shadow-[1px_1px_0px_#000000] tabular-nums whitespace-nowrap">
+                {countDetectedAristas(strokes)}/{challenge.targetEdges.length} aristas
               </span>
 
-              <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-                {/* Botón Ver/Ocultar Mi Dibujo */}
-                <button
-                  type="button"
-                  onClick={() => setShowUserDrawing((prev) => !prev)}
-                  className={`px-2 py-0.5 text-xs font-mono font-bold flex items-center gap-1 cursor-pointer transition-all shadow-[1px_1px_0px_#000000] border border-black ${
-                    showUserDrawing
-                      ? 'bg-black text-white hover:bg-neutral-800'
-                      : 'bg-neutral-100 text-neutral-500 border-neutral-400 hover:bg-neutral-200'
-                  }`}
-                  title={showUserDrawing ? 'Ocultar mi dibujo (D)' : 'Mostrar mi dibujo (D)'}
-                >
-                  {showUserDrawing ? (
-                    <Eye className="w-3.5 h-3.5 stroke-[2.5]" />
-                  ) : (
-                    <EyeOff className="w-3.5 h-3.5 stroke-[2]" />
-                  )}
-                  <span className={showUserDrawing ? '' : 'line-through opacity-75'}>
-                    <span className="hidden sm:inline">Mi dibujo</span>
-                    <span className="sm:hidden">Dibujo</span>
-                  </span>
-                </button>
-
-                {/* Botón Ver/Ocultar Solución Paramétrica */}
-                <button
-                  type="button"
-                  onClick={() => setShowParametricSolution((prev) => !prev)}
-                  className={`px-2 py-0.5 text-xs font-mono font-bold flex items-center gap-1 cursor-pointer transition-all shadow-[1px_1px_0px_#000000] border border-black ${
-                    showParametricSolution
-                      ? 'bg-black text-white hover:bg-neutral-800'
-                      : 'bg-neutral-100 text-neutral-500 border-neutral-400 hover:bg-neutral-200'
-                  }`}
-                  title={showParametricSolution ? 'Ocultar solución paramétrica (S)' : 'Mostrar solución paramétrica (S)'}
-                >
-                  {showParametricSolution ? (
-                    <Eye className="w-3.5 h-3.5 stroke-[2.5]" />
-                  ) : (
-                    <EyeOff className="w-3.5 h-3.5 stroke-[2]" />
-                  )}
-                  <span className={showParametricSolution ? '' : 'line-through opacity-75'}>
-                    <span className="hidden sm:inline">Solución</span>
-                    <span className="sm:hidden">Solución</span>
-                  </span>
-                </button>
-              </div>
-            </div>
-
-            {/* Fila 2: Diagnóstico/Reporte a la izquierda y Botón Siguiente a la derecha */}
-            <div className="flex items-center justify-between gap-1.5 pt-0.5 w-full">
-              <div className="flex items-center gap-1.5 shrink-0">
-                {/* Botón Modo Récord tras evaluar */}
-                <button
-                  type="button"
-                  onClick={isRecording ? onOpenRecordModal : onToggleRecording}
-                  className={`px-2 py-1 text-xs font-mono font-bold border border-black cursor-pointer shadow-[1px_1px_0px_#000000] flex items-center gap-1 transition-colors ${
-                    isRecording ? 'bg-black text-white' : 'bg-white hover:bg-neutral-100 text-black'
-                  }`}
-                  title={isRecording ? `Grabando: ${recordedCount} ejercicios. Clic para ver o exportar sesión` : "Activar grabación de sesión (Modo Récord)"}
-                >
-                  <span className={`w-2 h-2 rounded-full ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-neutral-400 border border-black'}`} />
-                  <span>{isRecording ? `REC (${recordedCount})` : 'REC'}</span>
-                </button>
-
-                {/* Botón Rápido de Comentario (Modo Récord) */}
-                <button
-                  onClick={() => setShowQuickCommentModal(true)}
-                  className={`btn-ink-outline p-1.5 text-xs font-mono font-bold flex items-center gap-1 cursor-pointer transition-transform active:scale-95 shadow-[1px_1px_0px_#000000] shrink-0 ${
-                    userNote.trim() ? 'bg-black text-white' : ''
-                  }`}
-                  title={userNote.trim() ? `Comentario guardado: "${userNote}"` : "Añadir comentario a este cubo (Modo Récord)"}
-                >
-                  <MessageSquare className="w-3.5 h-3.5 stroke-[2.5]" />
-                </button>
-
-                {/* Botón de Reporte */}
-                <button
-                  onClick={handleOpenReportModal}
-                  className="btn-ink-outline p-1.5 text-xs font-mono font-bold flex items-center gap-1 cursor-pointer transition-transform active:scale-95 shadow-[1px_1px_0px_#000000] shrink-0"
-                  title="Escribir nota y descargar reporte (JSON / Copiar)"
-                >
-                  <AlertTriangle className="w-3.5 h-3.5 text-black stroke-[2.5]" />
-                </button>
-
-                {/* Badge de puntuación */}
-                <div className="flex items-center gap-1 border-2 border-black bg-neutral-100 px-2 py-1 font-mono text-xs font-bold shadow-[1px_1px_0px_#000000] shrink-0">
-                  {feedback.passed ? (
-                    <CheckCircle className="w-3.5 h-3.5 text-black stroke-[2.5]" />
-                  ) : (
-                    <AlertTriangle className="w-3.5 h-3.5 text-black stroke-[2.5]" />
-                  )}
-                  <span>{feedback.totalScore ?? feedback.score}%</span>
-                  {feedback.passed && (feedback.speedBonus ?? 0) > 0 && (
-                    <span
-                      className="text-[10px] bg-black text-white px-1 ml-0.5 flex items-center gap-0.5"
-                      title={`Base: ${feedback.score}% + Bonus velocidad: +${feedback.speedBonus}%`}
-                    >
-                      <Zap className="w-2.5 h-2.5 fill-white text-white shrink-0" />
-                      <span>+{feedback.speedBonus}%</span>
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Botón Siguiente alineado a la derecha sin desbordar el cuadro */}
+              {/* Botón único de 3 estados de visión: Ambos -> Solución -> Dibujo -> Ambos */}
               <button
+                type="button"
+                onClick={cycleVisionMode}
+                className="px-2.5 py-1 text-xs font-mono font-bold border border-black flex items-center gap-1.5 cursor-pointer transition-colors shadow-[1px_1px_0px_#000000] whitespace-nowrap bg-black text-white hover:bg-neutral-800"
+                title={
+                  visionMode === 'all'
+                    ? 'Visión: Ambos (Solución + Mi dibujo). Clic para ver solo solución (V)'
+                    : visionMode === 'solution'
+                    ? 'Visión: Solución (Mi dibujo oculto). Clic para ver solo mi dibujo (V)'
+                    : 'Visión: Mi Dibujo (Solución oculta). Clic para ver ambos (V)'
+                }
+              >
+                {visionMode === 'all' && <Eye className="w-3.5 h-3.5 stroke-[2.2]" />}
+                {visionMode === 'solution' && <Sparkles className="w-3.5 h-3.5 stroke-[2.2]" />}
+                {visionMode === 'drawing' && <PenTool className="w-3.5 h-3.5 stroke-[2.2]" />}
+                <span className="text-[10px] uppercase font-mono tracking-wider">
+                  <span className="hidden sm:inline">Visión: </span>
+                  {visionMode === 'all'
+                    ? 'Ambos'
+                    : visionMode === 'solution'
+                    ? 'Solución'
+                    : 'Dibujo'}
+                </span>
+              </button>
+
+              {/* Modo Récord */}
+              <button
+                type="button"
+                onClick={isRecording ? onOpenRecordModal : onToggleRecording}
+                className={`px-2 py-1 text-xs font-mono font-bold border border-black cursor-pointer shadow-[1px_1px_0px_#000000] flex items-center gap-1 transition-colors whitespace-nowrap ${
+                  isRecording ? 'bg-black text-white' : 'bg-white hover:bg-neutral-100 text-black'
+                }`}
+                title={isRecording ? `Grabando: ${recordedCount} ejercicios. Clic para ver o exportar sesión` : "Activar grabación de sesión (Modo Récord)"}
+              >
+                <span className={`w-2 h-2 rounded-full ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-neutral-400 border border-black'}`} />
+                <span>{isRecording ? `REC (${recordedCount})` : 'REC'}</span>
+              </button>
+
+              {/* Comentario Récord */}
+              <button
+                type="button"
+                onClick={() => setShowQuickCommentModal(true)}
+                className={`p-1.5 text-xs font-bold border border-black cursor-pointer shadow-[1px_1px_0px_#000000] flex items-center justify-center transition-colors ${
+                  userNote.trim() ? 'bg-black text-white' : 'bg-white hover:bg-neutral-100 text-black'
+                }`}
+                title={userNote.trim() ? `Comentario: "${userNote}"` : "Añadir comentario a este cubo (Modo Récord)"}
+              >
+                <MessageSquare className="w-3.5 h-3.5 stroke-[2.5]" />
+              </button>
+
+              {/* Reportar anomalía */}
+              <button
+                type="button"
+                onClick={handleOpenReportModal}
+                className="p-1.5 text-xs font-bold border border-black cursor-pointer shadow-[1px_1px_0px_#000000] bg-white hover:bg-neutral-100 flex items-center justify-center transition-colors"
+                title="Escribir nota y descargar reporte"
+              >
+                <AlertTriangle className="w-3.5 h-3.5 stroke-[2.5]" />
+              </button>
+
+              {/* Botón principal: SIGUIENTE */}
+              <button
+                type="button"
                 onClick={onNextCube}
-                className="btn-ink px-3 sm:px-4 py-1.5 text-xs font-mono uppercase font-bold flex items-center gap-1 cursor-pointer shadow-[2px_2px_0px_#000000] shrink-0"
+                className="btn-ink px-3 sm:px-4 py-1.5 text-xs uppercase font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000] shrink-0 whitespace-nowrap"
                 title="Siguiente ejercicio (Enter)"
               >
                 <span>Siguiente</span>
-                <ArrowRight className="w-3.5 h-3.5" />
+                <ArrowRight className="w-4 h-4 stroke-[2.5]" />
               </button>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  )}
-
-      {/* Feedback técnico si se ha comprobado */}
-      {feedback && (
-        <div className="w-full mt-1.5 px-3 py-1.5 border-2 border-black bg-neutral-50 flex flex-col gap-0.5 text-xs shadow-[2px_2px_0px_#000000] min-w-0 max-w-full overflow-hidden">
-          <div className="flex items-center justify-between gap-2 min-w-0">
-            <div className="flex items-center gap-2 truncate min-w-0 flex-1">
-              <span
-                className={`text-[10px] font-mono px-1.5 py-0.2 font-bold uppercase shrink-0 ${
-                  feedback.passed
-                    ? 'bg-black text-white'
-                    : 'bg-white text-black border border-black'
-                }`}
-              >
-                {feedback.passed ? 'Aprobado ✓' : 'No Superado'}
-              </span>
-              <span className="font-bold font-display truncate">{feedback.mainIssueMessage}</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-[10px] font-mono shrink-0">
-              {feedback.passed && (feedback.speedBonus ?? 0) > 0 ? (
-                <span className="bg-neutral-200 border border-black px-1.5 py-0.5 font-bold flex items-center gap-1">
-                  <Zap className="w-3 h-3 fill-black text-black shrink-0" />
-                  <span className="hidden sm:inline">Base {feedback.score}% + Vel. +{feedback.speedBonus}% ({feedback.timeRemainingSeconds?.toFixed(1)}s)</span>
-                  <span className="sm:hidden">+{feedback.speedBonus}% vel</span>
-                </span>
-              ) : (
-                <span className="text-neutral-500">Mínimo: 75%</span>
-              )}
-            </div>
-          </div>
-          <span className="text-neutral-600 text-[11px] font-sans truncate">
-            {feedback.tipMessage}
-          </span>
+            </>
+          )}
         </div>
-      )}
+      </div>
+
 
       {/* Modal Rápido de Comentario para Modo Récord */}
       <QuickCommentModal
@@ -1716,35 +1673,6 @@ export const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>((p
               </button>
             </div>
           </div>
-        </div>
-      )}
-      {/* Botón flotante móvil de desplazamiento rápido con 1 dedo (solo en vertical) */}
-      {!effectiveIsLandscape && (
-        <div className="fixed bottom-4 right-4 z-40 sm:hidden">
-          <button
-            type="button"
-            onClick={() => {
-              if (isScrolledDown) {
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              } else {
-                window.scrollBy({ top: 380, behavior: 'smooth' });
-              }
-            }}
-            className="btn-ink px-2.5 py-1.5 text-xs font-mono font-bold flex items-center gap-1.5 shadow-[2px_2px_0px_#000000] cursor-pointer active:scale-95"
-            title={isScrolledDown ? "Volver arriba al lienzo" : "Bajar a los controles"}
-          >
-            {isScrolledDown ? (
-              <>
-                <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
-                <span className="text-[11px]">Lienzo</span>
-              </>
-            ) : (
-              <>
-                <ArrowDown className="w-3.5 h-3.5 stroke-[2.5]" />
-                <span className="text-[11px]">Controles</span>
-              </>
-            )}
-          </button>
         </div>
       )}
     </div>

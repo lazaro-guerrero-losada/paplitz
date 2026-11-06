@@ -62,11 +62,11 @@ export const MasteryStreakInfoModal: React.FC<InfoModalProps> = ({ isOpen, onClo
               <span>Regla del 3/3 Progresivo:</span>
             </div>
             <ul className="list-disc list-inside space-y-1 text-[11px] text-neutral-600">
-              <li><strong>Fase 1 (Precisión):</strong> 3 aciertos seguidos con nota <strong>≥80%</strong> para pasar a Fase 2.</li>
-              <li><strong>Fase 2 (Fluidez):</strong> 3 aciertos seguidos con nota <strong>≥85%</strong> a velocidad continua para pasar a Fase 3.</li>
-              <li><strong>Fase 3 (Velocidad):</strong> 3 aciertos seguidos con nota <strong>≥90%</strong> en disparo balístico para dominar la versión o nivel.</li>
+              <li><strong>Fase 1 (Precisión):</strong> 3 aciertos con nota <strong>≥80%</strong> con línea guía visible para pasar a Fase 2.</li>
+              <li><strong>Fase 2 (Fluidez):</strong> 3 aciertos con nota <strong>≥83%</strong> a velocidad continua con guía atenuada para pasar a Fase 3.</li>
+              <li><strong>Fase 3 (Velocidad & Sin Guía):</strong> 3 aciertos con nota <strong>≥85%</strong> en disparo balístico a ciegas (se retira la guía visual) para dominar la versión.</li>
               <li><strong>Módulo de Cajas 3D:</strong> 3 cubos seguidos con nota <strong>≥90%</strong>.</li>
-              <li>Si la nota baja del umbral de la fase activa, la racha se reinicia a 0.</li>
+              <li><strong>Racha Resiliente:</strong> Si tienes racha y cometes un fallo cercano (≥65%), solo pierdes 1 punto de racha (ej. de 2/3 a 1/3) en lugar de volver a 0. Solo un fallo grave (&lt;65%) o trazo en dirección contraria resetea a 0.</li>
             </ul>
           </div>
         </div>
@@ -162,10 +162,10 @@ export const KinematicPhasesInfoModal: React.FC<InfoModalProps> = ({ isOpen, onC
               </span>
               <div>
                 <div className="font-bold font-display text-black text-xs uppercase">
-                  Fase 3: Velocidad (Disparo Rápido / Flick)
+                  Fase 3: Velocidad & Sin Guía (Disparo Balístico)
                 </div>
                 <p className="text-[11px] text-neutral-600 mt-0.5">
-                  Lanza el trazo con velocidad balística, soltando el miedo a fallar y manteniendo la dirección con agilidad de pluma y despegue limpio.
+                  Se retira la guía visual (andamio). Lanza el trazo con velocidad balística guiado únicamente por las dianas de inicio y fin, automatizando el reflejo motor con despegue limpio.
                 </p>
               </div>
             </div>

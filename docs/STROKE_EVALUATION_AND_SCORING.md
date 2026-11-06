@@ -76,3 +76,18 @@ La puntuación final se descompone en 3 factores clave:
 - **$80\% - 91\%$**: *Aprobado.* Trazo seguro, proporciones equilibradas y buena convergencia.
 - **$70\% - 79\%$**: *No superado.* Desviación notable en aristas de fuga o aristas cortas.
 - **$< 70\%$**: *Insuficiente.* Error estructural o distorsión geométrica grave.
+
+---
+
+## 5. Evaluación de Calistenia y Cinemática del Trazo (`strokeEvaluator.ts`)
+
+Para ejercicios de control neuromuscular (líneas rectas, curvas, elipses y polígonos concéntricos):
+- **Compuerta Estricta de Llegada a Diana (Punto ②)**:
+  - Tolerancias de radio calibradas: $14\text{px}$ para segmentos cortos ($\le 120\text{px}$), $15\text{px}$ para longitud media ($120-220\text{px}$), y $19\text{px}$ para segmentos largos ($> 220\text{px}$).
+  - Si el trazo no alcanza la diana ② dentro del radio de tolerancia, la puntuación se penaliza drásticamente mediante un degradado continuo y se limita la nota final máxima para impedir aprobados con dianas falladas.
+- **Límite Biomecánico de Velocidad**:
+  - Se impone un techo de velocidad fisiológica en $620\text{ px/s}$.
+  - Los trazos descontrolados tipo latigazo que superen dicho límite sufren penalización por pérdida de control neuromuscular.
+- **Polígonos Concéntricos Procedurales**:
+  - `evaluateConcentricPolygonSubmission`: Evalúa la planitud de aristas, paralelismo de caras concéntricas y cierre de vértices.
+

@@ -7,6 +7,8 @@ import {
   KeyPoint,
   TargetLineDef,
   SpacingTrackBlock,
+  ConcentricPolygonRing,
+  ConcentricPolygonShape,
 } from './strokeTypes';
 
 /**
@@ -643,6 +645,256 @@ export function generateZNStrokePoints(
     { x: Math.round(p2X * 10) / 10, y: Math.round(yBase * 10) / 10 },
     { x: Math.round(xEnd * 10) / 10, y: Math.round((yBase - amplitude) * 10) / 10 },
   ];
+}
+
+/**
+ * Genera un reto de Calistenia de Polígonos Concéntricos con Ejes Radiales (C4.4)
+ * Triángulos, cuadrados, diamantes, trapecios y hexágonos anidados a paso regular
+ */
+export function generateConcentricPolygonChallenge(
+  exercise: LabExerciseDef,
+  seed: number,
+  canvasWidth = 750,
+  canvasHeight = 500
+): ProceduralStrokeChallenge {
+  const cfg = exercise.concentricPolygonConfig || {
+    shape: 'triangle_up' as ConcentricPolygonShape,
+    ringCount: 4,
+    basePitchPx: 22,
+    pitchProgression: 'constant',
+    hasRadialAxes: true,
+    guideType: 'gray_line',
+  };
+
+  const cx = Math.round(canvasWidth / 2);
+  const cy = Math.round(canvasHeight / 2);
+  const ringCount = cfg.ringCount || 4;
+  const targetPitchPx = cfg.basePitchPx || 22;
+
+  // 1. Cálculo de Radios para cada anillo concéntrico
+  const baseR = 48;
+  const radii: number[] = [];
+  for (let i = 0; i < ringCount; i++) {
+    if (cfg.pitchProgression === 'increasing') {
+      const prev = i === 0 ? baseR : radii[i - 1];
+      radii.push(prev + Math.round(targetPitchPx * (0.8 + i * 0.35)));
+    } else {
+      radii.push(baseR + i * targetPitchPx);
+    }
+  }
+
+  // 2. Generación de vértices para cada anillo según la forma geométrica
+  const rings: ConcentricPolygonRing[] = [];
+  const targetLines: TargetLineDef[] = [];
+  const guideLines: { x1: number; y1: number; x2: number; y2: number; dashed?: boolean; isRadialAxis?: boolean }[] = [];
+  const ghostSolutionStrokes: { points: { x: number; y: number }[] }[] = [];
+  const keyPoints: KeyPoint[] = [];
+
+  let lineOrderCounter = 1;
+  let kpOrderCounter = 1;
+
+  for (let rIdx = 0; rIdx < ringCount; rIdx++) {
+    const r = radii[rIdx];
+    let ringVertices: { x: number; y: number }[] = [];
+
+    if (cfg.shape === 'triangle_up') {
+      // Triángulo hacia arriba (idéntico al de la imagen de referencia):
+      // Vértice superior en el eje vertical
+      // Vértices inferiores con base horizontal y esquinas sobre los ejes diagonales
+      const topY = cy - r * 1.25;
+      const botY = cy + r * 0.72;
+      const halfW = r * 1.22;
+      ringVertices = [
+        { x: cx, y: Math.round(topY) },
+        { x: Math.round(cx + halfW), y: Math.round(botY) },
+        { x: Math.round(cx - halfW), y: Math.round(botY) },
+      ];
+    } else if (cfg.shape === 'triangle_wide') {
+      // Triángulo ancho obtuso
+      const topY = cy - r * 0.85;
+      const botY = cy + r * 0.65;
+      const halfW = r * 1.55;
+      ringVertices = [
+        { x: cx, y: Math.round(topY) },
+        { x: Math.round(cx + halfW), y: Math.round(botY) },
+        { x: Math.round(cx - halfW), y: Math.round(botY) },
+      ];
+    } else if (cfg.shape === 'diamond') {
+      // Cuadrado rotado 45° (Rombo con vértices en ejes X e Y)
+      ringVertices = [
+        { x: cx, y: Math.round(cy - r) },
+        { x: Math.round(cx + r), y: cy },
+        { x: cx, y: Math.round(cy + r) },
+        { x: Math.round(cx - r), y: cy },
+      ];
+    } else if (cfg.shape === 'square_ortho') {
+      // Cuadrado ortogonal con aristas horizontales y verticales
+      ringVertices = [
+        { x: Math.round(cx - r), y: Math.round(cy - r) },
+        { x: Math.round(cx + r), y: Math.round(cy - r) },
+        { x: Math.round(cx + r), y: Math.round(cy + r) },
+        { x: Math.round(cx - r), y: Math.round(cy + r) },
+      ];
+    } else if (cfg.shape === 'trapezoid') {
+      // Trapecio isósceles concéntrico
+      const topY = cy - r * 0.75;
+      const botY = cy + r * 0.75;
+      const topHalfW = r * 0.60;
+      const botHalfW = r * 1.35;
+      ringVertices = [
+        { x: Math.round(cx - topHalfW), y: Math.round(topY) },
+        { x: Math.round(cx + topHalfW), y: Math.round(topY) },
+        { x: Math.round(cx + botHalfW), y: Math.round(botY) },
+        { x: Math.round(cx - botHalfW), y: Math.round(botY) },
+      ];
+    } else if (cfg.shape === 'hexagon') {
+      // Hexágono regular concéntrico
+      for (let k = 0; k < 6; k++) {
+        const rad = ((k * 60 - 90) * Math.PI) / 180;
+        ringVertices.push({
+          x: Math.round(cx + r * Math.cos(rad)),
+          y: Math.round(cy + r * Math.sin(rad)),
+        });
+      }
+    }
+
+    // Construir aristas del anillo
+    const edges: { start: { x: number; y: number }; end: { x: number; y: number } }[] = [];
+    let perimeter = 0;
+    const closedPolyline: { x: number; y: number }[] = [];
+
+    const numV = ringVertices.length;
+    for (let v = 0; v < numV; v++) {
+      const p1 = ringVertices[v];
+      const p2 = ringVertices[(v + 1) % numV];
+      const d = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+      perimeter += d;
+
+      edges.push({ start: p1, end: p2 });
+      closedPolyline.push(p1);
+
+      // Trayectoria ideal interpolada
+      const STEPS = 20;
+      const idealPath: { x: number; y: number }[] = [];
+      for (let s = 0; s <= STEPS; s++) {
+        const t = s / STEPS;
+        idealPath.push({
+          x: Math.round(p1.x + (p2.x - p1.x) * t),
+          y: Math.round(p1.y + (p2.y - p1.y) * t),
+        });
+      }
+
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+      let angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+      if (angle < 0) angle += 360;
+
+      targetLines.push({
+        id: `cp-ring-${rIdx + 1}-edge-${v + 1}`,
+        start: p1,
+        end: p2,
+        idealPath,
+        angleDeg: Math.round(angle),
+        lengthPx: Math.round(d),
+        order: lineOrderCounter++,
+        startKeyPointOrder: kpOrderCounter++,
+        endKeyPointOrder: kpOrderCounter,
+      });
+
+      // Guía de contorno poligonal
+      guideLines.push({ x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, dashed: false });
+    }
+
+    // Cerrar la polilínea para la solución fantasma
+    closedPolyline.push(ringVertices[0]);
+    ghostSolutionStrokes.push({ points: closedPolyline });
+
+    rings.push({
+      ringIndex: rIdx,
+      vertices: ringVertices,
+      edges,
+      perimeterPx: Math.round(perimeter),
+    });
+  }
+
+  // 3. Ejes Radiales de Referencia (Marco de Andamiaje Geométrico)
+  // Cruz ortogonal + Aspas diagonales alineadas con los vértices de las figuras
+  const axisLen = Math.min(canvasWidth - 70, canvasHeight - 70) / 2;
+  const outerRing = rings[rings.length - 1];
+  let diagRayX = Math.round(axisLen * 0.95);
+  let diagRayY = Math.round(axisLen * 0.95);
+
+  if (outerRing && outerRing.vertices.length >= 3 && (cfg.shape === 'triangle_up' || cfg.shape === 'triangle_wide')) {
+    // Alinear las aspas diagonales inferiores exactamente a través de las esquinas del triángulo
+    const corner = outerRing.vertices[1];
+    const dxCorner = corner.x - cx;
+    const dyCorner = corner.y - cy;
+    const cornerDist = Math.hypot(dxCorner, dyCorner);
+    if (cornerDist > 10) {
+      diagRayX = Math.round((dxCorner / cornerDist) * axisLen * 1.15);
+      diagRayY = Math.round((dyCorner / cornerDist) * axisLen * 1.15);
+    }
+  }
+
+  const radialAxes: { x1: number; y1: number; x2: number; y2: number }[] = [
+    // Eje vertical
+    { x1: cx, y1: Math.round(cy - axisLen * 1.1), x2: cx, y2: Math.round(cy + axisLen * 1.1) },
+    // Eje horizontal
+    { x1: Math.round(cx - axisLen * 1.35), y1: cy, x2: Math.round(cx + axisLen * 1.35), y2: cy },
+    // Diagonal 1 (a través de la esquina inferior derecha y el cuadrante superior izquierdo)
+    { x1: Math.round(cx - diagRayX), y1: Math.round(cy - diagRayY), x2: Math.round(cx + diagRayX), y2: Math.round(cy + diagRayY) },
+    // Diagonal 2 (a través de la esquina inferior izquierda y el cuadrante superior derecho)
+    { x1: Math.round(cx + diagRayX), y1: Math.round(cy - diagRayY), x2: Math.round(cx - diagRayX), y2: Math.round(cy + diagRayY) },
+  ];
+
+  // Insertar los ejes radiales al principio de guideLines
+  for (const ax of radialAxes) {
+    guideLines.unshift({ ...ax, dashed: false, isRadialAxis: true });
+  }
+
+  const shapeLabels: Record<ConcentricPolygonShape, string> = {
+    triangle_up: 'Triángulos Concéntricos (△)',
+    triangle_wide: 'Triángulos Anchos (△)',
+    diamond: 'Diamantes a 45° (◇)',
+    square_ortho: 'Cuadrados Ortogonales (□)',
+    trapezoid: 'Trapecios Isósceles (⏢)',
+    hexagon: 'Hexágonos Radiales (⬡)',
+  };
+
+  const shapeTitle = shapeLabels[cfg.shape] || 'Polígonos Concéntricos';
+  const totalEdges = rings.reduce((acc, r) => acc + r.edges.length, 0);
+
+  return {
+    id: `cp-${exercise.code}-${seed}`,
+    pageNumber: exercise.page || 0,
+    code: exercise.code,
+    category: 'concentric_polygons',
+    title: exercise.title,
+    subtitle: `${shapeTitle} · ${ringCount} Anillos · Paso ${targetPitchPx}px · Ejes Radiales`,
+    blockTitle: exercise.block,
+    seed,
+    instruction: exercise.instruction,
+    targetMetricsText: exercise.metrics,
+    targetAngleDeg: 0,
+    targetSpacingPx: targetPitchPx,
+    targetLengthPx: Math.round(rings[0]?.edges[0] ? Math.hypot(rings[0].edges[0].end.x - rings[0].edges[0].start.x, rings[0].edges[0].end.y - rings[0].edges[0].start.y) : 100),
+    minRequiredStrokes: Math.min(ringCount, totalEdges),
+    targetLines,
+    isSingleStrokeAutoEval: false,
+    guideMode: cfg.guideType || 'gray_line',
+    keyPoints,
+    ghostSolutionStrokes,
+    idealPath: ghostSolutionStrokes[0]?.points || [],
+    expectedDirectionAngleDeg: 0,
+    guideLines,
+    concentricPolygonParams: {
+      shape: cfg.shape,
+      center: { x: cx, y: cy },
+      rings,
+      targetPitchPx,
+      radialAxes,
+    },
+  };
 }
 
 /**
@@ -1335,6 +1587,11 @@ export function generateSingleStrokeChallenge(
   canvasWidth = 750,
   canvasHeight = 500
 ): ProceduralStrokeChallenge {
+  // Si es un reto de polígonos concéntricos (C4.4)
+  if (exercise.category === 'concentric_polygons' || exercise.concentricPolygonConfig) {
+    return generateConcentricPolygonChallenge(exercise, seed, canvasWidth, canvasHeight);
+  }
+
   // Si es un reto de espaciado en carriles (Consistencia 1.1)
   if (exercise.spacingTrackConfig) {
     return generateSpacingTrackChallenge(exercise, seed, canvasWidth, canvasHeight);
@@ -1358,27 +1615,28 @@ export function generateSingleStrokeChallenge(
 
   const rng = new SeededRNG(seed);
   const isCurve = cfg.direction === 'curve_c' || cfg.direction === 'curve_s';
+  const isLongLine = Boolean(cfg.isLongLine || cfg.variationType === 'long_line');
 
   // 1. Centro (cx, cy)
   let cx = canvasWidth / 2;
   let cy = canvasHeight / 2;
-  if (
+  if (!isLongLine && (
     cfg.variationType === 'position' ||
     cfg.variationType === 'position_length' ||
     cfg.variationType === 'total_random'
-  ) {
+  )) {
     cx = rng.range(210, canvasWidth - 210);
     cy = rng.range(190, canvasHeight - 190);
   }
 
   // 2. Longitud L
   let L = 220;
-  if (
+  if (!isLongLine && (
     cfg.variationType === 'length' ||
     cfg.variationType === 'rotation_length' ||
     cfg.variationType === 'position_length' ||
     cfg.variationType === 'total_random'
-  ) {
+  )) {
     L = rng.range(130, 310);
   }
 
@@ -1391,7 +1649,71 @@ export function generateSingleStrokeChallenge(
   let pStart = { x: cx, y: cy };
   let pEnd = { x: cx, y: cy };
 
-  if (cfg.direction === 'bottom_up_left_right') {
+  if (isLongLine) {
+    if (cfg.direction === 'horizontal_left_right') {
+      dirArrow = '→';
+      dirLabel = 'Gran Horizontal de Hombro (→ Izq-Der)';
+      angleDeg = 0;
+      const marginX = 55;
+      let y = canvasHeight / 2;
+      if (cfg.variationType === 'position' || cfg.variationType === 'position_length' || cfg.variationType === 'total_random') {
+        y = rng.range(110, canvasHeight - 110);
+      }
+      pStart = { x: marginX, y: Math.round(y) };
+      pEnd = { x: canvasWidth - marginX, y: Math.round(y) };
+      L = pEnd.x - pStart.x;
+      cx = (pStart.x + pEnd.x) / 2;
+      cy = y;
+    } else if (cfg.direction === 'vertical_bottom_up') {
+      dirArrow = '↑';
+      dirLabel = 'Gran Vertical de Brazo (↑ Abajo-Arriba)';
+      angleDeg = 90;
+      const marginY = 50;
+      let x = canvasWidth / 2;
+      if (cfg.variationType === 'position' || cfg.variationType === 'position_length' || cfg.variationType === 'total_random') {
+        x = rng.range(120, canvasWidth - 120);
+      }
+      pStart = { x: Math.round(x), y: canvasHeight - marginY };
+      pEnd = { x: Math.round(x), y: marginY };
+      L = pStart.y - pEnd.y;
+      cx = x;
+      cy = (pStart.y + pEnd.y) / 2;
+    } else if (cfg.direction === 'bottom_up_left_right') {
+      dirArrow = '↗';
+      dirLabel = 'Gran Diagonal Ascendente (↗)';
+      if (cfg.variationType === 'fixed') {
+        pStart = { x: 60, y: canvasHeight - 55 };
+        pEnd = { x: canvasWidth - 60, y: 55 };
+      } else if (cfg.variationType === 'rotation') {
+        const startX = rng.range(50, 95);
+        const startY = rng.range(canvasHeight - 75, canvasHeight - 50);
+        const endX = rng.range(canvasWidth - 140, canvasWidth - 50);
+        const endY = rng.range(50, 95);
+        pStart = { x: Math.round(startX), y: Math.round(startY) };
+        pEnd = { x: Math.round(endX), y: Math.round(endY) };
+      } else if (cfg.variationType === 'position') {
+        const spanX = canvasWidth - 160;
+        const spanY = canvasHeight - 130;
+        const offsetX = rng.range(0, 50);
+        const offsetY = rng.range(0, 30);
+        pStart = { x: Math.round(55 + offsetX), y: Math.round(canvasHeight - 50 - offsetY) };
+        pEnd = { x: Math.round(55 + offsetX + spanX), y: Math.round(canvasHeight - 50 - offsetY - spanY) };
+      } else {
+        const startX = rng.range(50, 100);
+        const startY = rng.range(canvasHeight - 85, canvasHeight - 50);
+        const endX = rng.range(canvasWidth - 110, canvasWidth - 50);
+        const endY = rng.range(50, 100);
+        pStart = { x: Math.round(startX), y: Math.round(startY) };
+        pEnd = { x: Math.round(endX), y: Math.round(endY) };
+      }
+      const dx = pEnd.x - pStart.x;
+      const dy = pStart.y - pEnd.y;
+      L = Math.hypot(dx, dy);
+      angleDeg = Math.round((Math.atan2(dy, dx) * 180) / Math.PI);
+      cx = (pStart.x + pEnd.x) / 2;
+      cy = (pStart.y + pEnd.y) / 2;
+    }
+  } else if (cfg.direction === 'bottom_up_left_right') {
     // ↗ D1: Abajo hacia Arriba, Izquierda hacia Derecha
     // Inicio (1) = Abajo-Izquierda (x menor, y mayor en canvas)
     // Fin (2) = Arriba-Derecha (x mayor, y menor en canvas)
@@ -1665,7 +1987,7 @@ export function generateSingleStrokeChallenge(
     category: exercise.category,
     title: exercise.title,
     subtitle: `${dirArrow} ${dirLabel} · L: ${Math.round(L)}px · ${
-      cfg.guideType === 'gray_line' ? 'Guía Gris Continua' : 'Solo Puntos Diana'
+      cfg.guideType === 'gray_line' ? (isLongLine ? 'Guía Continua de Hombro' : 'Guía Gris Continua') : 'Solo Puntos Diana'
     }`,
     blockTitle: exercise.block,
     seed,
@@ -1703,10 +2025,12 @@ export function generateStrokeChallenge(
       ? ALL_LAB_EXERCISES.find((e) => e.page === exerciseOrPage) || ALL_LAB_EXERCISES[0]
       : exerciseOrPage;
 
-  // Si es un ejercicio de trazo único de calistenia, generamos reto de trazo único
+  // Si es un ejercicio de trazo único de calistenia o polígonos concéntricos
   if (
     exercise.isSingleStroke ||
     exercise.spacingTrackConfig ||
+    exercise.concentricPolygonConfig ||
+    exercise.category === 'concentric_polygons' ||
     exercise.family === 'calisthenics_single' ||
     exercise.category === 'single_stroke_line' ||
     exercise.category === 'single_stroke_curve'
@@ -2218,5 +2542,225 @@ export function generateStrokeChallenge(
         ghostSolutionStrokes,
       };
     }
+  }
+}
+
+/**
+ * Calcula la posición del badge/número diana para un KeyPoint dado.
+ * Garantiza que en trazos verticales y diagonales el número se transfiera
+ * al lateral perpendicular del trazo, sin solaparse ni interferir jamás con la trayectoria.
+ */
+export function computeKeyPointBadgePosition(
+  kp: KeyPoint,
+  challenge: ProceduralStrokeChallenge,
+  canvasWidth = 750,
+  canvasHeight = 500,
+  offsetDist = 22
+): { badgeX: number; badgeY: number } {
+  // 1. Rosetas Radiales 360° (D11 y D12)
+  const isRadial =
+    (challenge.category === 'radial_focal' ||
+      challenge.directionKey === 'radial_outward' ||
+      challenge.directionKey === 'radial_inward') &&
+    challenge.keyPoints &&
+    challenge.keyPoints.length > 2;
+
+  if (isRadial && challenge.keyPoints) {
+    const centerKp = challenge.keyPoints[0];
+    const dx = kp.x - centerKp.x;
+    const dy = kp.y - centerKp.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 15) {
+      return {
+        badgeX: Math.round(kp.x + (dx / dist) * 18),
+        badgeY: Math.round(kp.y + (dy / dist) * 18),
+      };
+    } else {
+      // Centro común de la roseta: colocar arriba-izquierda
+      return {
+        badgeX: Math.round(kp.x - 16),
+        badgeY: Math.round(kp.y - 16),
+      };
+    }
+  }
+
+  // 2. Determinar el vector unitario tangente t (dx, dy) de la línea o segmento asociado
+  let tx = 0;
+  let ty = -1; // default vertical ascendente
+  let foundTangent = false;
+
+  // 2a. Si hay targetLines, buscar la línea que contiene este keypoint
+  if (challenge.targetLines && challenge.targetLines.length > 0) {
+    for (const tl of challenge.targetLines) {
+      if (tl.startKeyPointOrder === kp.order || tl.endKeyPointOrder === kp.order) {
+        const dx = tl.end.x - tl.start.x;
+        const dy = tl.end.y - tl.start.y;
+        const len = Math.hypot(dx, dy);
+        if (len > 1) {
+          tx = dx / len;
+          ty = dy / len;
+          foundTangent = true;
+          break;
+        }
+      }
+    }
+  }
+
+  // 2b. Si no se encontró en targetLines pero hay al menos 2 keyPoints en el reto
+  if (!foundTangent && challenge.keyPoints && challenge.keyPoints.length >= 2) {
+    const kps = challenge.keyPoints;
+    const idx = kps.indexOf(kp);
+    if (idx === 0) {
+      const otherKp = kps[1];
+      const dx = otherKp.x - kp.x;
+      const dy = otherKp.y - kp.y;
+      const len = Math.hypot(dx, dy);
+      if (len > 1) {
+        tx = dx / len;
+        ty = dy / len;
+        foundTangent = true;
+      }
+    } else if (idx === kps.length - 1) {
+      const otherKp = kps[idx - 1];
+      const dx = kp.x - otherKp.x;
+      const dy = kp.y - otherKp.y;
+      const len = Math.hypot(dx, dy);
+      if (len > 1) {
+        tx = dx / len;
+        ty = dy / len;
+        foundTangent = true;
+      }
+    } else if (idx > 0 && idx < kps.length - 1) {
+      // Punto intermedio en curvas o segmentos múltiples
+      const prevKp = kps[idx - 1];
+      const nextKp = kps[idx + 1];
+      const dx = nextKp.x - prevKp.x;
+      const dy = nextKp.y - prevKp.y;
+      const len = Math.hypot(dx, dy);
+      if (len > 1) {
+        tx = dx / len;
+        ty = dy / len;
+        foundTangent = true;
+      }
+    }
+  }
+
+  // 2c. Si aún no hay tangente, inferir por directionKey o targetAngleDeg
+  if (!foundTangent) {
+    if (challenge.directionKey === 'vertical_bottom_up') {
+      tx = 0; ty = -1;
+      foundTangent = true;
+    } else if (challenge.directionKey === 'vertical_top_down') {
+      tx = 0; ty = 1;
+      foundTangent = true;
+    } else if (challenge.directionKey === 'horizontal_left_right') {
+      tx = 1; ty = 0;
+      foundTangent = true;
+    } else if (challenge.directionKey === 'horizontal_right_left') {
+      tx = -1; ty = 0;
+      foundTangent = true;
+    } else if (challenge.directionKey === 'bottom_up_left_right') {
+      tx = 0.7071; ty = -0.7071;
+      foundTangent = true;
+    } else if (challenge.directionKey === 'top_down_right_left') {
+      tx = -0.7071; ty = 0.7071;
+      foundTangent = true;
+    } else if (challenge.directionKey === 'top_down_left_right') {
+      tx = 0.7071; ty = 0.7071;
+      foundTangent = true;
+    } else if (challenge.directionKey === 'bottom_up_right_left') {
+      tx = -0.7071; ty = -0.7071;
+      foundTangent = true;
+    } else if (challenge.directionKey === 'shallow_up_left_right') {
+      tx = Math.cos((18 * Math.PI) / 180); ty = -Math.sin((18 * Math.PI) / 180);
+      foundTangent = true;
+    } else if (challenge.directionKey === 'shallow_up_right_left') {
+      tx = -Math.cos((18 * Math.PI) / 180); ty = -Math.sin((18 * Math.PI) / 180);
+      foundTangent = true;
+    } else if (challenge.targetAngleDeg !== undefined) {
+      const rad = (challenge.targetAngleDeg * Math.PI) / 180;
+      tx = Math.cos(rad);
+      ty = -Math.sin(rad);
+      foundTangent = true;
+    }
+  }
+
+  // 3. Normales perpendiculares al vector tangente
+  // n1 = (-ty, tx) y n2 = (ty, -tx) = -n1
+  const n1x = -ty;
+  const n1y = tx;
+  const n2x = ty;
+  const n2y = -tx;
+
+  // Determinar la normal preferida:
+  // - Para trazos casi verticales (|tx| < 0.35, como C1.2 / C1.3): siempre transferir al lateral IZQUIERDO (nx < 0)
+  // - Para trazos casi horizontales (|ty| < 0.35, como C1.1 / C1.4): siempre transferir ARRIBA (ny < 0)
+  // - Para trazos diagonales (C2.1, C2.2, C2.3, C2.4, C2.7): preferir normal que apunte hacia ARRIBA/IZQUIERDA
+  let prefNx = n1x;
+  let prefNy = n1y;
+
+  const isNearlyVertical = Math.abs(tx) < 0.35;
+  const isNearlyHorizontal = Math.abs(ty) < 0.35;
+
+  if (isNearlyVertical) {
+    if (n1x < 0) {
+      prefNx = n1x;
+      prefNy = n1y;
+    } else {
+      prefNx = n2x;
+      prefNy = n2y;
+    }
+  } else if (isNearlyHorizontal) {
+    if (n1y < 0) {
+      prefNx = n1x;
+      prefNy = n1y;
+    } else {
+      prefNx = n2x;
+      prefNy = n2y;
+    }
+  } else {
+    const score1 = -n1y * 2 - n1x;
+    const score2 = -n2y * 2 - n2x;
+    if (score1 >= score2) {
+      prefNx = n1x;
+      prefNy = n1y;
+    } else {
+      prefNx = n2x;
+      prefNy = n2y;
+    }
+  }
+
+  // 4. Posiciones candidatas con verificación de márgenes seguros
+  const margin = 16;
+  const cand1 = {
+    x: Math.round(kp.x + prefNx * offsetDist),
+    y: Math.round(kp.y + prefNy * offsetDist),
+  };
+  const cand2 = {
+    x: Math.round(kp.x - prefNx * offsetDist),
+    y: Math.round(kp.y - prefNy * offsetDist),
+  };
+
+  const isCand1Inside =
+    cand1.x >= margin &&
+    cand1.x <= canvasWidth - margin &&
+    cand1.y >= margin &&
+    cand1.y <= canvasHeight - margin;
+
+  const isCand2Inside =
+    cand2.x >= margin &&
+    cand2.x <= canvasWidth - margin &&
+    cand2.y >= margin &&
+    cand2.y <= canvasHeight - margin;
+
+  if (isCand1Inside) {
+    return { badgeX: cand1.x, badgeY: cand1.y };
+  } else if (isCand2Inside) {
+    return { badgeX: cand2.x, badgeY: cand2.y };
+  } else {
+    return {
+      badgeX: Math.max(margin, Math.min(canvasWidth - margin, cand1.x)),
+      badgeY: Math.max(margin, Math.min(canvasHeight - margin, cand1.y)),
+    };
   }
 }

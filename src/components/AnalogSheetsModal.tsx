@@ -37,6 +37,11 @@ const PreviewCell: React.FC<{ cellIdx: number; seed: number; lesson: LessonNode 
       forceSide: lesson.forceSide,
       isShadowLevel: lesson.isShadowLevel,
       hasGroundGrid: lesson.hasGroundGrid,
+      boxType: lesson.boxType,
+      hasHeightGuide: lesson.hasHeightGuide,
+      hasHorizonGuide: lesson.hasHorizonGuide,
+      viewpoint: lesson.viewpoint,
+      rotationAngle: lesson.rotationAngle,
     });
   }, [cellSeed, lesson]);
 
@@ -119,12 +124,48 @@ const PreviewCell: React.FC<{ cellIdx: number; seed: number; lesson: LessonNode 
               );
             })}
 
-          {/* Cara dada entintada */}
-          <polygon points={pts} fill="#F7F7F7" stroke="#000000" strokeWidth="2.5" />
+          {/* Línea de horizonte técnica sutil */}
+          {challenge.hasHorizonGuide && (
+            <line
+              x1="10"
+              y1={cy + (challenge.horizonY - 150) * scale}
+              x2="290"
+              y2={cy + (challenge.horizonY - 150) * scale}
+              stroke="#CBD5E1"
+              strokeWidth="0.8"
+              strokeDasharray="4 3"
+            />
+          )}
+
+          {/* Cara dada entintada o aristas dadas */}
+          {challenge.givenFace.vertices.length === 4 ? (
+            <polygon points={pts} fill="#F7F7F7" stroke="#000000" strokeWidth="2.5" />
+          ) : (
+            <g>
+              {challenge.givenEdges.map((e, idx) => {
+                const p1 = challenge.vertices2D[e.start];
+                const p2 = challenge.vertices2D[e.end];
+                if (!p1 || !p2) return null;
+                return (
+                  <line
+                    key={idx}
+                    x1={cx + (p1.x - 150) * scale}
+                    y1={cy + (p1.y - 150) * scale}
+                    x2={cx + (p2.x - 150) * scale}
+                    y2={cy + (p2.y - 150) * scale}
+                    stroke="#000000"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                  />
+                );
+              })}
+            </g>
+          )}
 
           {/* Vértices marcados con puntos */}
           {challenge.givenFace.vertices.map((idx) => {
             const p = challenge.vertices2D[idx];
+            if (!p) return null;
             return (
               <circle
                 key={idx}
@@ -135,6 +176,22 @@ const PreviewCell: React.FC<{ cellIdx: number; seed: number; lesson: LessonNode 
               />
             );
           })}
+
+          {/* Guía de altura técnica H */}
+          {challenge.heightGuide && (() => {
+            const hg = challenge.heightGuide;
+            const offsetSide = (challenge.givenSide === 'left' ? 20 : -20) * scale;
+            const gx = cx + (hg.x - 150) * scale + offsetSide;
+            const yBot = cy + (hg.yBottom - 150) * scale;
+            const yTop = cy + (hg.yTop - 150) * scale;
+            return (
+              <g>
+                <line x1={gx} y1={yBot} x2={gx} y2={yTop} stroke="#4B5563" strokeWidth="1" strokeDasharray="3 2" />
+                <circle cx={gx} cy={yBot} r="2" fill="#4B5563" />
+                <circle cx={gx} cy={yTop} r="2" fill="#4B5563" />
+              </g>
+            );
+          })()}
         </svg>
       </div>
     </div>
