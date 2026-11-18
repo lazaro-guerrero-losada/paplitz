@@ -883,7 +883,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   <div className="flex items-center gap-2">
                     <h3 className="font-display font-bold text-base">Proyecto Open Source</h3>
                     <span className="text-[10px] font-mono uppercase bg-black text-white px-1.5 py-0.2 font-bold">
-                      MIT LICENSE
+                      AGPL-3.0 LICENSE
                     </span>
                   </div>
                   <p className="text-xs text-neutral-600 font-sans mt-1">

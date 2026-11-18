@@ -8,7 +8,7 @@
   <img src="public/paplitz-logo.svg" alt="Paplitz Logo" width="96" />
 </p>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL_3.0-blue.svg)](LICENSE)
 [![Live Demo](https://img.shields.io/badge/Live_Demo-paplitz.vercel.app-black?logo=vercel&logoColor=white)](https://paplitz.vercel.app/)
 [![Latest Release](https://img.shields.io/github/v/release/lazaro-guerrero-losada/paplitz?color=black&logo=github)](https://github.com/lazaro-guerrero-losada/paplitz/releases/latest)
 [![React](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=white)](https://react.dev/)
@@ -173,5 +173,5 @@ Explore the [`docs/`](./docs/README.md) directory for detailed engineering docum
 ---
 
 ## 📄 License
-
-Open-source under the [MIT License](LICENSE). Free to use, adapt, and expand for education, research, and creative practice.
+ 
+Open-source under the [GNU Affero General Public License v3.0 (AGPL-3.0-or-later)](LICENSE). Free to use, study, and expand for education, research, and creative practice; any public network deployment, fork, or derivative work must remain open source under the same license terms.

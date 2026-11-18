@@ -20,6 +20,7 @@ This documentation provides complete architectural, mathematical, and algorithmi
 | **[MINIGAMES_AND_PROGRESSION.md](./MINIGAMES_AND_PROGRESSION.md)** | **Gameplay**: Arcade modes (*Fever*, *Blitz*, *Survival*, *Sprint*), curriculum system, and XP progression. |
 | **[ANALOG_WORKSHEETS_AND_QR.md](./ANALOG_WORKSHEETS_AND_QR.md)** | **Paper Drawing**: Vector A4 PDF generation, QR grid indexing, and camera/scanner validation engine. |
 | **[MEGA_UPDATE_v0.4.0_REPORT.md](./MEGA_UPDATE_v0.4.0_REPORT.md)** | **v0.4.0 Dossier**: Mega-update migration report, Lab 3D engine, spatial arena, and calibration log. |
+| **[LICENSE_MIGRATION_AGPL3.md](./LICENSE_MIGRATION_AGPL3.md)** | **Licensing**: Rationale and terms of GNU AGPL-3.0 copyleft migration from v0.4.1. |
 | **[PORTING_GUIDE_ANDROID.md](./PORTING_GUIDE_ANDROID.md)** | **Android Guide**: Step-by-step setup with Capacitor, S-Pen low-latency stylus support, and camera permissions. |
 | **[PORTING_GUIDE_WINDOWS_EXE.md](./PORTING_GUIDE_WINDOWS_EXE.md)** | **Windows Guide**: Step-by-step packaging for standalone desktop executables (`.exe`) via Electron & Tauri. |
 | **[PORTING_GUIDE_LINUX.md](./PORTING_GUIDE_LINUX.md)** | **Linux Guide**: Step-by-step packaging for Linux desktop (`.AppImage`, `.deb`, `.tar.gz`) via Electron. |

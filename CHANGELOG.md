@@ -4,6 +4,13 @@ All notable changes, new features, bug fixes, and UX improvements to the Paplitz
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] — 2026-11-18
+
+### ⚖️ Licencia y Gobernanza de Código Abierto
+- **Migración a GNU AGPL-3.0**: Se actualiza la licencia del proyecto de MIT a **GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)**.
+- **Protección Copyleft para la Web**: Garantiza que todo fork, distribución o despliegue en red/nube preserve la libertad del código fuente y devuelva las mejoras a la comunidad abierta, impidiendo la privatización o cierre comercial no autorizado del software.
+- Actualizados badges en `README.md`, indicador en `ProfileView.tsx`, campo `license` en `package.json` y el archivo legal `LICENSE`.
+
 ## [0.4.0] — 2026-11-06
 
 ### 🚀 Mega-Actualización: Laboratorio 3D Dinámico, Lienzo Espacial Full-Bleed & Minijuegos Integrados

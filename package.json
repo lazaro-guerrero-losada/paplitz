@@ -1,13 +1,14 @@
 {
   "name": "paplitz",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Paplitz — Simulador y Práctica de Perspectiva",
   "author": {
     "name": "Lázaro Guerrero Losada",
     "email": "lazaroguerrerolosada@uma.es",
     "url": "https://github.com/lazaro-guerrero-losada/paplitz"
   },
+  "license": "AGPL-3.0-or-later",
   "homepage": "https://paplitz.vercel.app/",
   "main": "electron/main.cjs",
   "type": "module",
